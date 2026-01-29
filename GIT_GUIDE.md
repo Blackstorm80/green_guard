@@ -1,78 +1,124 @@
-# Guide de Contribution avec Git pour GreenGuard
+Voici une section que tu peux ajouter à ton fichier de formation, spéciale pour la config Git + Git Bash pour pousser facilement (une fois, puis tranquille).
 
-Ce document est une mini-formation pour vous aider à utiliser Git correctement dans le cadre du projet GreenGuard. L'objectif est de maintenir une version saine et stable de notre code sur la branche principale (`main`).
+***
 
-## Règle d'Or : Ne Jamais Travailler sur `main`
+## 11. Configurer Git et Git Bash pour pousser facilement
 
-La branche `main` (parfois appelée `master`) est considérée comme la source de vérité. Elle doit **toujours** contenir une version fonctionnelle et stable du projet. Personne ne doit jamais y apporter de modifications directement.
+Objectif : que chaque membre de l’équipe puisse faire `git push` sans galérer à chaque fois.
 
-Tout le travail doit se faire dans des **branches séparées**.
+### 11.1. Configurer son identité Git (une fois)
 
----
-
-## Workflow de Développement Étape par Étape
-
-Voici le processus à suivre pour chaque nouvelle fonctionnalité, correction de bug, ou modification.
-
-### 1. Se Synchroniser avec la Branche Principale
-
-Avant de commencer quoi que ce soit, assurez-vous que votre version locale de `main` est à jour.
+Dans **Git Bash**, chaque membre doit configurer son nom et son email (les mêmes que sur GitHub de préférence) :
 
 ```bash
-# 1. Allez sur la branche main
-git checkout main
-
-# 2. Récupérez les dernières modifications depuis le serveur distant (origin)
-git pull origin main
+git config --global user.name "Prénom Nom"
+git config --global user.email "email@example.com"
 ```
 
-### 2. Créer une Nouvelle Branche
-
-Créez une branche dédiée à votre tâche. Le nom de la branche doit être descriptif et préfixé par son type.
+Pour vérifier :
 
 ```bash
-# Syntaxe : git checkout -b <type>/<description-courte>
-
-# Exemple pour une nouvelle fonctionnalité :
-git checkout -b feature/authentification-utilisateur
-
-# Exemple pour une correction de bug :
-git checkout -b fix/erreur-calcul-stress-hydrique
+git config --global --list
 ```
-*   **Types courants :** `feature` (nouvelle fonctionnalité), `fix` (correction de bug), `docs` (documentation), `style` (mise en forme), `refactor` (refonte de code).
 
-### 3. Travailler et "Commiter"
+***
 
-Faites vos modifications dans le code. Une fois qu'une étape logique est terminée, faites un "commit". Essayez de faire des commits petits et ciblés.
+### 11.2. Générer une clé SSH pour GitHub (une fois par machine)
+
+1. Ouvrir **Git Bash**.  
+2. Générer une clé SSH :
 
 ```bash
-# 1. Ajoutez les fichiers que vous avez modifiés
-git add . # Ajoute tous les fichiers modifiés
-
-# 2. Créez le commit avec un message clair
-git commit -m "feat: Ajoute le formulaire de connexion"
+ssh-keygen -t ed25519 -C "votre_email_github"
 ```
 
-### 4. Pousser la Branche sur le Serveur
+- Appuyer sur **Entrée** quand il demande le chemin.  
+- Appuyer sur **Entrée** pour la passphrase (ou en mettre une si vous voulez).
 
-Lorsque vous êtes prêt à partager votre travail (même s'il n'est pas fini), poussez votre branche sur le serveur distant.
+3. Afficher la clé publique :
 
 ```bash
-# La première fois, utilisez -u pour lier votre branche locale à la branche distante
-git push -u origin feature/authentification-utilisateur
+cat ~/.ssh/id_ed25519.pub
 ```
 
-### 5. Créer une "Pull Request" (PR)
+4. Copier TOUT le contenu affiché.
 
-Une fois votre travail terminé et poussé, allez sur la plateforme (GitHub, GitLab, etc.) :
-1.  Vous verrez une notification vous proposant de créer une **Pull Request** pour votre branche.
-2.  Cliquez dessus, donnez un titre et une description clairs à votre PR.
-3.  Assignez un ou plusieurs relecteurs (les autres membres de l'équipe).
+***
 
-La Pull Request est une demande pour fusionner votre travail dans `main`. Elle permet aux autres de relire votre code, de laisser des commentaires et de s'assurer que tout fonctionne avant la fusion.
+### 11.3. Ajouter la clé SSH sur GitHub
 
-### 6. Après la Fusion
+1. Aller sur GitHub → cliquer sur l’avatar en haut à droite → **Settings**.  
+2. Menu à gauche → **SSH and GPG keys** → **New SSH key**.  
+3. Donner un nom (ex. “PC perso Annael”) et coller la clé dans le champ “Key”.  
+4. Enregistrer.
 
-Une fois votre PR validée et fusionnée dans `main` :
-1.  Vous pouvez supprimer votre branche de travail.
-2.  Retournez à l'étape 1 pour vous synchroniser avec `main` avant de commencer une nouvelle tâche.
+***
+
+### 11.4. Configurer le dépôt pour utiliser SSH
+
+Dans Git Bash, à la racine du projet `green_guard` :
+
+```bash
+git remote -v
+```
+
+Si vous voyez une URL en `https://github.com/...`, changez-la pour SSH :
+
+```bash
+git remote set-url origin git@github.com:Blackstorm80/green_guard.git
+```
+
+(ou adapter avec le bon nom d’utilisateur / repo)
+
+Tester la connexion :
+
+```bash
+ssh -T git@github.com
+```
+
+- Si tout va bien, GitHub répondra par un message du style :  
+  `Hi VOTRE_USER! You've successfully authenticated, but GitHub does not provide shell access.`  
+  → C’est normal et c’est bon signe.
+
+***
+
+### 11.5. Pousser ensuite devient simple
+
+Une fois tout ça fait, pour ce projet :
+
+1. Coder + commit :
+
+```bash
+git add .
+git commit -m "feat: message clair"
+```
+
+2. Pousser :
+
+```bash
+git push
+```
+
+- Si une passphrase a été mise sur la clé SSH, Git la demandera de temps en temps.  
+- Sinon, ça part direct sans retaper mot de passe GitHub ou token.
+
+***
+
+### 11.6. Résumé pour l’équipe
+
+Chaque membre doit :
+
+1. Configurer `user.name` et `user.email`.  
+2. Créer UNE clé SSH sur sa machine.  
+3. Ajouter cette clé dans son compte GitHub.  
+4. Mettre l’URL du remote du projet en `git@github.com:...`.  
+
+Ensuite, le cycle devient :  
+
+```bash
+git pull
+git add .
+git commit -m "..."
+git push
+```
+, ceci est a faire une seule fois ...
