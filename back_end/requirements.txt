@@ -1,0 +1,10 @@
+# --- Framework & Server ---
+fastapi
+uvicorn[standard]
+
+# --- Database & ORM ---
+sqlalchemy
+psycopg2-binary # Driver pour PostgreSQL, peut être changé pour un autre (ex: mysqlclient)
+
+# --- Data Validation (inclus dans FastAPI mais bon à expliciter) ---
+pydantic
