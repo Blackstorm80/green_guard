@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import FilterBar from "../../components/FilterBar";
 import SpacesTable from "../../components/Spaces/SpacesTable";
+import AlertsPanel from "../../components/spaces/AlertsPanel";
 
 /* داده تست (بعداً از API میاد) */
 const spacesMock = [
@@ -45,7 +46,6 @@ function EspacesEtSites() {
     fetch("https://api.example.com/cities")
       .then((res) => res.json())
       .then((data) => {
-        // مثال: ["Paris", "Lyon", "Marseille"]
         setCities(data);
       })
       .catch(() => {
@@ -93,6 +93,9 @@ function EspacesEtSites() {
 
       {/* TABLE */}
       <SpacesTable spaces={spaces} />
+
+      {/* ALERTS PANEL (👇 این همونی بود که گفتی خودم اضافه کنم) */}
+      <AlertsPanel />
     </div>
   );
 }
