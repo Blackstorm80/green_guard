@@ -3,7 +3,8 @@
 from datetime import date
 from typing import List
 
-from domain.entities import EspaceVertEntity, BilanHydriqueJournalierEntity
+from domain.entities.espace_vert import EspaceVertEntity
+from domain.entities.bilan_hydrique import BilanHydriqueJournalierEntity
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.logic.stress_sanitaire import calculer_stress_sanitaire_jour
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository

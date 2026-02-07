@@ -3,7 +3,8 @@
 import datetime
 
 # Note: Les chemins d'import sont basés sur la structure cible du projet.
-from domain.entities import EspaceVertEntity, BilanHydriqueJournalierEntity
+from domain.entities.espace_vert import EspaceVertEntity
+from domain.entities.bilan_hydrique import BilanHydriqueJournalierEntity
 from domain.logic.stress_hydrique import calculer_bilan_hydrique_simplifie
 
 
