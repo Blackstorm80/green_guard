@@ -3,18 +3,14 @@
 from datetime import date
 from typing import List
 
-from domain.entities.espace_vert import EspaceVertEntity
-from domain.entities.bilan_hydrique import BilanHydriqueJournalierEntity
-from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
-from domain.logic.stress_sanitaire import calculer_stress_sanitaire_jour
-from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
-from domain.ports.espace_vert_repository import IEspaceVertRepository
-from domain.ports.meteo_service import IMeteoService
-from domain.ports.notification_service import INotificationService
-
-# J'ajoute l'import du DTO comme suggéré.
-# Ce chemin suppose que le DTO est défini dans application/dto/bilan_hydrique.py
-from application.dto.bilan_hydrique import BilanHydriqueEspaceDTO
+from back_end.domain.entities import EspaceVertEntity, BilanHydriqueJournalierEntity
+from back_end.domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
+from back_end.domain.logic.stress_sanitaire import calculer_stress_sanitaire_jour
+from back_end.domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
+from back_end.domain.ports.espace_vert_repository import IEspaceVertRepository
+from back_end.domain.ports.meteo_service import IMeteoService
+from back_end.domain.ports.notification_service import INotificationService
+from back_end.application.dto.bilan_hydrique import BilanHydriqueEspaceDTO
 
 
 class EspaceVertIntrouvableError(Exception):

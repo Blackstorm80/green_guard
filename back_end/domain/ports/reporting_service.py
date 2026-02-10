@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from domain.entities import BilanHydriqueJournalierEntity
+from back_end.domain.entities import BilanHydriqueJournalierEntity
 
 
 class IReportingService(ABC):

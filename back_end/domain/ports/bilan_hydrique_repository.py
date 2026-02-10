@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 
-from domain.entities import BilanHydriqueJournalierEntity
+from back_end.domain.entities import BilanHydriqueJournalierEntity
 
 
 class IBilanHydriqueRepository(ABC):

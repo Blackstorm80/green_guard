@@ -1,6 +1,6 @@
 # Fichier : domain/logic/bilan_carbone.py
 
-from domain.entities.espace_vert import EspaceVertEntity
+from back_end.domain.entities import EspaceVertEntity
 
 def estimer_co2_absorbe_jour(
     espace_vert: EspaceVertEntity,

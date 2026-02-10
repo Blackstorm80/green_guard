@@ -1,0 +1,29 @@
+services:
+  backend:
+    build:
+      context: ./back_end
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Monter le code local dans le conteneur pour le live-reload
+      # On monte dans /app/back_end pour respecter la structure de package
+      - ./back_end:/app/back_end
+    command: uvicorn back_end.main:app --host 0.0.0.0 --port 8000 --reload
+
+  frontend:
+    build:
+      context: ./front_end # Assurez-vous que ce chemin est correct
+      dockerfile: Dockerfile
+    ports:
+      - "3000:80" # On accède au frontend via http://localhost:3000
+    volumes:
+      - ./front_end:/app
+      - /app/node_modules # Ne pas écraser les node_modules du conteneur
+    depends_on:
+      - backend
+
+# Plus tard, vous pourrez ajouter d'autres services ici, comme une base de données PostgreSQL
+#  database:
+#    image: "postgres:15-alpine"
+#    ...

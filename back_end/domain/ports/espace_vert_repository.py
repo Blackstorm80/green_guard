@@ -2,7 +2,7 @@
 
 from typing import Protocol
 
-from domain.entities.espace_vert import EspaceVertEntity
+from back_end.domain.entities import EspaceVertEntity
 
 
 class IEspaceVertRepository(Protocol):

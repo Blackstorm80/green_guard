@@ -1,13 +1,12 @@
 # application/use_cases/gestion_espaces_verts.py
 
-from domain.entities.espace_vert import EspaceVertEntity
-from domain.entities.plante import PlanteEntity
-from domain.ports.plante_repository import IPlanteRepository
-from domain.ports.espace_vert_repository import IEspaceVertRepository
-from domain.logic.compatibilite_plante_espace import (
+from back_end.domain.entities import EspaceVertEntity, PlanteEntity
+from back_end.domain.ports.plante_repository import IPlanteRepository
+from back_end.domain.ports.espace_vert_repository import IEspaceVertRepository
+from back_end.domain.logic.compatibilite_plante_espace import (
     verifier_compatibilite_plante_espace,
 )
-from application.dto.espace_vert import (
+from back_end.application.dto.espace_vert import (
     CreerEspaceDTO,
     EspaceVertDTO,
     MettreAJourEspaceVertDTO,

@@ -1,8 +1,8 @@
 # application/use_cases/catalogue_plantes.py
 from typing import Sequence, List
-from domain.entities.plante import PlanteEntity
-from domain.ports.plante_repository import IPlanteRepository
-from application.dto.plante import PlantDTO
+from back_end.domain.entities import PlanteEntity
+from back_end.domain.ports.plante_repository import IPlanteRepository
+from back_end.application.dto.plante import PlantDTO
 
 def lister_plantes_catalogue(
     plante_repo: IPlanteRepository,
