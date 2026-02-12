@@ -327,9 +327,7 @@ import InterventionCard from "../../components/Dashboard/InterventionCard";
 
 
 function HomeTableauDeBord() {
-  // داده‌های کامپوننت‌ها با اولویت‌بندی
   const metricsData = [
-    // CRITICAL - اولویت 1: نیاز به اقدام فوری
     {
       id: 1,
       title: "ESPACES EN STRESS",
@@ -340,7 +338,6 @@ function HomeTableauDeBord() {
       priority: "critical",
     },
 
-    // HIGH - اولویت 2: وضعیت قرمز
     {
       id: 2,
       title: "Qualité Air CO²",
@@ -365,7 +362,6 @@ function HomeTableauDeBord() {
       priority: "high",
     },
 
-    // MEDIUM - اولویت 3: وضعیت نارنجی/هشدار
     {
       id: 5,
       title: "Température Serveur",
@@ -383,7 +379,6 @@ function HomeTableauDeBord() {
       priority: "medium",
     },
 
-    // LOW - اولویت 4: وضعیت سبز/خوب
     {
       id: 7,
       title: "SANTÉ GLOBALE",
@@ -474,13 +469,11 @@ function HomeTableauDeBord() {
     },
   ];
 
-  // مرتب‌سازی بر اساس اولویت
   const sortedMetrics = [...metricsData].sort((a, b) => {
     const priorityOrder = { critical: 1, high: 2, medium: 3, low: 4 };
     return priorityOrder[a.priority] - priorityOrder[b.priority];
   });
 
-  // محاسبه تعداد در هر دسته
   const criticalCount = sortedMetrics.filter(
     (m) => m.priority === "critical"
   ).length;
@@ -490,12 +483,10 @@ function HomeTableauDeBord() {
   ).length;
   const lowCount = sortedMetrics.filter((m) => m.priority === "low").length;
 
-  // تابع هندلر برای ZoneCard
   const handleZoneClick = (zoneId) => {
     console.log(`Zone cliquée: ${zoneId}`);
   };
 
-  // تابع هندلر برای InterventionCard
   const handleInterventionClick = (title) => {
     console.log(`Intervention cliquée: ${title}`);
   };
@@ -505,9 +496,7 @@ function HomeTableauDeBord() {
       id="dashboard"
       className="section-view active space-y-6 h-full flex flex-col"
     >
-      {/* ===== STAT CARDS با سکرول و اولویت‌بندی ===== */}
       <div className="space-y-4">
-        {/* هدر بخش STAT CARDS */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
           <div>
             <h2 className="text-lg font-bold text-white">
@@ -518,7 +507,6 @@ function HomeTableauDeBord() {
             </p>
           </div>
 
-          {/* لژند اولویت‌ها */}
           <div className="text-center">
             <div className="inline-flex items-center gap-4 text-sm bg-gray-800/50 px-4 py-2 rounded-lg">
               <span className="text-slate-300">📊 Résumé:</span>
@@ -548,7 +536,6 @@ function HomeTableauDeBord() {
           </div>
         </div>
 
-        {/* Container با scroll عمودی و ارتفاع محدود */}
         <div className="h-[400px] overflow-y-auto bg-gray-800/30 rounded-xl border border-gray-700 p-4">
           <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {sortedMetrics.map((metric) => (
@@ -564,7 +551,6 @@ function HomeTableauDeBord() {
                     : ""
                 } rounded-xl hover:ring-opacity-70 transition-all`}
               >
-                {/* نشانگر اولویت در گوشه */}
                 <div
                   className={`absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold z-10 ${
                     metric.priority === "critical"

@@ -44,7 +44,6 @@ function FilterBar({
         </select>
       </div>
 
-      {/* Health - مقادیر اینجا با داده‌های اصلی شما هماهنگ شد */}
       <div className="w-40">
         <label className="block text-xs font-bold text-slate-400 uppercase mb-1">
           Santé

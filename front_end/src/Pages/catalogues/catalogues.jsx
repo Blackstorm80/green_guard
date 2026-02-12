@@ -2,32 +2,7 @@ import { useState } from "react";
 import PlantFilterBar from "../../components/Catalogues/PlantFilterBar";
 import PlantsGrid from "../../components/Catalogues/PlantsGrid";
 
-// const plantsMock = [
-//   {
-//     id: 1,
-//     name: "Sedum acre",
-//     type: "Couvre-sol • Toits végétalisés",
-//     water: "Faible",
-//     exposure: "Soleil",
-//     icon: "🌾",
-//   },
-//   {
-//     id: 2,
-//     name: "Fougère (Dryopteris)",
-//     type: "Vivace • Murs ombragés",
-//     water: "Élevé",
-//     exposure: "Ombre",
-//     icon: "🌿",
-//   },
-//   {
-//     id: 3,
-//     name: "Lavande",
-//     type: "Arbuste • Jardins secs",
-//     water: "Faible",
-//     exposure: "Soleil",
-//     icon: "🌸",
-//   },
-// ];
+
 const plantsMock = [
   {
     id: 1,
@@ -35,7 +10,6 @@ const plantsMock = [
     type: "Couvre-sol • Toits végétalisés",
     water: "Faible",
     exposure: "Soleil",
-    // آدرس جدید برای Sedum (گیاه ساکولنت پوششی)
     imageUrl: "https://cdn.pixabay.com/photo/2017/07/13/10/33/sedum-2499990_1280.jpg",
     icon: "🌾",
   },
@@ -54,7 +28,6 @@ const plantsMock = [
     type: "Arbuste • Jardins secs",
     water: "Faible",
     exposure: "Soleil",
-    // آدرس جدید برای اسطوخودوس
     imageUrl: "https://images.pexels.com/photos/1166209/pexels-photo-1166209.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
     icon: "🌸",
   },
@@ -73,7 +46,6 @@ const plantsMock = [
     type: "Arbuste • Massifs",
     water: "Élevé",
     exposure: "Mi-ombre",
-    // آدرس جدید برای گل هورتنسیا (Hydrangea)
     imageUrl: "https://images.pexels.com/photos/4505171/pexels-photo-4505171.jpeg?auto=compress&cs=tinysrgb&w=1260&h=750&dpr=1",
     icon: "💐",
   }

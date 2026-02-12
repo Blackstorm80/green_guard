@@ -1,4 +1,3 @@
-// components/Dashboard/InterventionCard.jsx
 function InterventionCard({ data }) {
   const {
     title,
@@ -11,7 +10,6 @@ function InterventionCard({ data }) {
     onClick
   } = data;
 
-  // ========== سیستم تشخیص خودکار اولویت ==========
   const detectPriority = () => {
     const titleLower = title.toLowerCase();
     const labelLower = label?.toLowerCase() || "";
@@ -64,7 +62,6 @@ function InterventionCard({ data }) {
     return "high";
   };
 
-  // ========== تشخیص خودکار وضعیت ==========
   const detectStatus = () => {
     if (status && status !== "pending") return status;
     
@@ -83,7 +80,6 @@ function InterventionCard({ data }) {
     return "pending";
   };
 
-  // ========== تشخیص خودکار رنگ و استایل ==========
   const getConfig = () => {
     const detectedPriority = priority === "auto" ? detectPriority() : priority;
     const detectedStatus = detectStatus();
@@ -150,7 +146,6 @@ function InterventionCard({ data }) {
     };
   };
 
-  // ========== تشخیص خودکار موقعیت ==========
   const detectLocation = () => {
     if (location) return location;
     
@@ -169,7 +164,6 @@ function InterventionCard({ data }) {
     return "Non spécifié";
   };
 
-  // ========== محاسبه زمان ==========
   const getTimeAgo = () => {
     if (timestamp) return timestamp;
     
@@ -207,7 +201,6 @@ function InterventionCard({ data }) {
     tabIndex={0}
     style={{ willChange: 'transform, box-shadow' }}
   >
-    {/* خط متحرک حاشیه چپ */}
     <div className={`
       absolute left-0 top-0 bottom-0 w-1
       ${config.priorityConfig.border.replace('border-', 'bg-')}
@@ -217,7 +210,6 @@ function InterventionCard({ data }) {
       transition-opacity duration-600
     `}></div>
 
-    {/* هدر کارت */}
     <div className="flex justify-between items-start mb-3 relative z-10">
       <div className="flex-1">
         <div className="flex items-center gap-2 mb-1">
@@ -258,12 +250,10 @@ function InterventionCard({ data }) {
       </div>
     </div>
 
-    {/* توضیحات */}
     <p className="text-xs text-slate-300 mt-2 line-clamp-2 group-hover:text-slate-200 transition-colors duration-600 relative z-10">
       {desc}
     </p>
 
-    {/* اطلاعات اضافی (با انیمیشن ارتفاع نرم) */}
     <div className={`
       max-h-0 overflow-hidden
       group-hover:max-h-20
@@ -300,7 +290,6 @@ function InterventionCard({ data }) {
       </div>
     </div>
 
-    {/* افکت نور پس‌زمینه */}
     <div className={`
       absolute inset-0 rounded-xl
       bg-gradient-to-r from-transparent via-white/[0.02] to-transparent

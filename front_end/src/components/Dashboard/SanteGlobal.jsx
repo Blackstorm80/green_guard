@@ -14,12 +14,10 @@ function StatCard({ data }) {
     priority = "normal",
   } = data;
 
-  // ========== سیستم تشخیص هوشمند بهبود یافته ==========
   const analyzeMetric = () => {
     const titleLower = title.toLowerCase();
     const subtitleLower = subtitle.toLowerCase();
 
-    // کلمات "افزایش = خوب" (متریک‌های مثبت)
     const higherIsBetterKeywords = [
       "santé",
       "health",
@@ -61,7 +59,6 @@ function StatCard({ data }) {
       "safety",
     ];
 
-    // کلمات "کاهش = خوب" (متریک‌های منفی)
     const lowerIsBetterKeywords = [
       "erreur",
       "error",
@@ -136,7 +133,6 @@ function StatCard({ data }) {
       "toxic",
     ];
 
-    // تشخیص نوع متریک
     const isHigherBetter = higherIsBetterKeywords.some((w) =>
       titleLower.includes(w)
     );
@@ -144,10 +140,9 @@ function StatCard({ data }) {
       titleLower.includes(w)
     );
 
-    let higherIsBetter = true; // پیش‌فرض
+    let higherIsBetter = true; 
     if (isLowerBetter) higherIsBetter = false;
 
-    // تشخیص روند از subtitle
     let trendIcon = "➡";
     let trendColor = "text-gray-400";
     let label = "Stable";
@@ -159,7 +154,6 @@ function StatCard({ data }) {
       const isDecrease = change < 0;
 
       if (isIncrease) {
-        // افزایش
         trendIcon = "▲";
         if (higherIsBetter) {
           trendColor = "text-green-400";
@@ -169,7 +163,6 @@ function StatCard({ data }) {
           label = "Dégradation";
         }
       } else if (isDecrease) {
-        // کاهش
         trendIcon = "▼";
         if (higherIsBetter) {
           trendColor = "text-red-400";
@@ -180,7 +173,6 @@ function StatCard({ data }) {
         }
       }
     } else {
-      // اگر subtitle عدد ندارد
       if (
         subtitleLower.includes("stable") ||
         subtitleLower.includes("normal") ||
@@ -192,7 +184,6 @@ function StatCard({ data }) {
       }
     }
 
-    // تشخیص وضعیت از روی متن subtitle
     if (
       subtitleLower.includes("amélioration") ||
       subtitleLower.includes("improvement") ||
@@ -230,7 +221,6 @@ function StatCard({ data }) {
     };
   };
 
-  // ========== تشخیص هشدار ==========
   const isAlertCard = () => {
     const titleLower = title.toLowerCase();
     const hasAlert =
@@ -246,12 +236,10 @@ function StatCard({ data }) {
   const alertMode = isAlertCard();
   const analysis = analyzeMetric();
 
-  // ========== رندر ==========
-  // در کامپوننت StatCard، بخش alertMode:
+ 
 if (alertMode) {
   return (
     <div className={` p-4 md:p-5 rounded-xl md:rounded-2xl shadow-lg relative overflow-hidden ${customBg}`}>
-      {/* حذف div اضافی */}
       <p className="text-slate-400 text-[10px] xs:text-xs uppercase font-bold tracking-wider text-red-500 truncate">
         {title}
       </p>
@@ -275,12 +263,10 @@ if (alertMode) {
   );
 }
 
-  // حالت عادی - بدون border داخلی
   return (
     <div
       className={`bg-gray-800 p-4 md:p-5 rounded-xl md:rounded-2xl shadow-lg hover:ring-1 hover:ring-gray-600 transition-all duration-200 ${customBg}`}
     >
-      {/* حذف border - فقط shadow باقی مونده */}
       <p className="text-slate-400 text-[10px] xs:text-xs uppercase font-bold tracking-wider truncate">
         {title}
       </p>

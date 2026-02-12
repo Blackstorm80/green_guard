@@ -72,30 +72,7 @@ function Navbar({ children }) {
       <div className="flex-1 flex flex-col overflow-hidden bg-gray-900">
         {/* Header */}
         <header className="h-16 bg-gray-800/90 backdrop-blur-md border-b border-gray-700 flex items-center justify-between px-6 sticky top-0 z-10">
-          {/* <div className="flex items-center text-slate-300">
-            <span className="text-lg font-semibold text-white">
-              Vue d'ensemble
-            </span>
-            <span className="ml-4 text-xs bg-gray-900 px-2 py-0.5 rounded border border-gray-700 text-slate-500">
-              24 Espaces Connectés
-            </span>
-          </div> */}
-
-          {/* <div className="flex-1 max-w-md mx-6">
-            <div className="relative">
-              <span className="absolute left-3 top-2 text-gray-500">🔍</span>
-              <input
-                type="text"
-                placeholder="Recherche globale..."
-                className="w-full bg-gray-900 border border-gray-600 rounded-full pl-9 pr-4 py-1.5 text-sm text-white placeholder-gray-400 focus:border-green-500 focus:ring-1 focus:ring-green-500 outline-none"
-              />
-            </div>
-          </div> */}
-
-          {/* <select className="bg-gray-900 border border-gray-600 text-sm rounded-lg px-3 py-1.5 text-slate-300 focus:ring-2 focus:ring-green-500">
-            <option>Cette Année</option>
-            <option>Ce mois</option>
-          </select> */}
+          
         </header>
 
         {/* Page Content */}

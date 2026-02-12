@@ -26,7 +26,6 @@ function SpacesTable({ spaces }) {
         </table>
       </div>
 
-      {/* PAGINATION (بعداً API) */}
       <div className="h-14 border-t border-gray-700 flex items-center justify-between px-6">
         <span className="text-xs text-slate-400">
           Affichage 1-{spaces.length}

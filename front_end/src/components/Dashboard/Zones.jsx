@@ -1,4 +1,4 @@
-// components/Dashboard/ZoneCard.jsx
+
 function ZoneCard({ data }) {
   const {
     title,
@@ -13,7 +13,6 @@ function ZoneCard({ data }) {
     className = ""
   } = data;
 
-  // پیکربندی بر اساس وضعیت
   const statusConfig = {
     stress: {
       border: "border-red-500/40 hover:border-red-500",
@@ -43,7 +42,6 @@ function ZoneCard({ data }) {
 
   const config = statusConfig[status] || statusConfig.normal;
   
-  // محاسبه درصدها
   const total = okCount + warningCount + criticalCount;
   const percentages = {
     ok: total > 0 ? (okCount / total) * 100 : 0,
@@ -51,7 +49,6 @@ function ZoneCard({ data }) {
     critical: total > 0 ? (criticalCount / total) * 100 : 0
   };
 
-  // نگاشت رنگ‌ها
   const colorMap = {
     green: "bg-green-500",
     yellow: "bg-yellow-500",
@@ -68,7 +65,6 @@ function ZoneCard({ data }) {
       role="button"
       tabIndex={0}
     >
-      {/* هدر کارت */}
       <div className="flex justify-between items-start mb-4">
         <div>
           <h4 className="text-white font-bold text-lg">{title}</h4>
@@ -81,7 +77,6 @@ function ZoneCard({ data }) {
         </span>
       </div>
 
-      {/* نوار پیشرفت */}
       <div className="w-full h-3 bg-gray-700 rounded-full overflow-hidden flex mb-2">
         {percentages.ok > 0 && (
           <div 
@@ -103,7 +98,6 @@ function ZoneCard({ data }) {
         )}
       </div>
 
-      {/* آمار */}
       <div className="flex flex-wrap justify-between items-center gap-2 text-xs">
         <div className="flex flex-wrap gap-3">
           {okCount > 0 && (
@@ -131,7 +125,6 @@ function ZoneCard({ data }) {
         </div>
       </div>
 
-      {/* زیرنویس */}
       {subtitle && (
         <p className="text-xs text-slate-500 mt-3 pt-3 border-t border-gray-700">
           {subtitle}
