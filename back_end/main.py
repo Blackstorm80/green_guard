@@ -3,12 +3,9 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from back_end.api.v1.endpoints import catalogue_plantes
+from api.v1.endpoints import meteo, vegetal, capteurs, auth, user, interventions, zones
 # Vous pourrez ajouter d'autres routeurs ici (ex: gestion_espaces_verts)
-from back_end.infrastructure.database import Base, engine
-
-# Création des tables au démarrage (pour le dev, idéalement utiliser Alembic plus tard)
-Base.metadata.create_all(bind=engine)
+from infrastructure.database import Base, engine
 
 app = FastAPI(
     title="Green Guard API",
@@ -30,8 +27,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+@app.on_event("startup")
+def on_startup():
+    # Création des tables au démarrage de l'application.
+    # C'est la manière non-bloquante de le faire.
+    Base.metadata.create_all(bind=engine)
+
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
+
 # Inclusion des routeurs
-app.include_router(catalogue_plantes.router, prefix="/api/v1")
+# Le problème de blocage étant résolu, nous pouvons réactiver tous les routeurs.
+app.include_router(meteo.router, prefix="/api/v1")
+app.include_router(vegetal.router, prefix="/api/v1")
+app.include_router(capteurs.router, prefix="/api/v1")
+app.include_router(auth.router, prefix="/api/v1")
+app.include_router(user.router, prefix="/api/v1")
+app.include_router(interventions.router, prefix="/api/v1")
+app.include_router(zones.router, prefix="/api/v1")
 
 @app.get("/")
 def read_root():

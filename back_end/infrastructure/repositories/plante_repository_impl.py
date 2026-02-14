@@ -4,8 +4,8 @@ from typing import Sequence, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from back_end.domain.entities import PlanteEntity
-from back_end.domain.ports.plante_repository import IPlanteRepository
+from domain.entities import PlanteEntity
+from domain.ports.plante_repository import IPlanteRepository
 
 
 class PlanteRepositoryImpl(IPlanteRepository):

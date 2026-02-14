@@ -2,7 +2,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Optional, Sequence
 
-from back_end.domain.entities import EspaceVertEntity
+from domain.entities import EspaceVertEntity
 
 
 class IEspaceVertRepository(ABC):

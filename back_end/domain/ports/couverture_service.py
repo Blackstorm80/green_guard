@@ -1,7 +1,7 @@
 # back_end/domain/ports/couverture_service.py
 
 from abc import ABC, abstractmethod
-from back_end.domain.entities import EspaceVertEntity
+from domain.entities import EspaceVertEntity
 
 
 class ICouverturePilotageService(ABC):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from back_end.domain.entities import EspaceVertEntity
+domain.entities import EspaceVertEntity
 
 
 class ICouverturePilotageService(ABC):

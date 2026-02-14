@@ -1,6 +1,6 @@
-# Fichier : domain/logic/bilan_carbone.py
+# back_end/domain/logic/bilan_carbone.py
 
-from back_end.domain.entities import EspaceVertEntity
+from domain.entities import EspaceVertEntity
 
 def estimer_co2_absorbe_jour(
     espace_vert: EspaceVertEntity,
@@ -8,28 +8,22 @@ def estimer_co2_absorbe_jour(
     stress_sanitaire: float | None,
 ) -> float:
     """
-    Estimation de CO2 absorbé (kg/jour).
-    Basée sur une valeur de référence par type d'espace / surface,
-    puis modulée par les stress.
+    Estime la quantité de CO2 absorbée (en kg) pour une journée donnée.
+    Formule simplifiée : Surface * Facteur de base * (1 - Stress).
     """
-    # NOTE: Les valeurs de base sont des placeholders.
-    # Elles devraient être stockées en configuration ou dans l'entité EspaceVert.
-    base_co2_par_m2 = {
-        "pelouse": 0.005,
-        "massif": 0.01,
-        "arbre isolé": 0.05,
-        "toit": 0.015,
-        "mur": 0.012,
-        "jardin": 0.02,
-    }.get(espace_vert.type_espace, 0.01)
+    # Facteur de base arbitraire : 0.05 kg/m²/jour pour une plante en bonne santé
+    # Ce facteur pourrait dépendre du type_espace ou type_plante à l'avenir.
+    facteur_base_kg_m2 = 0.05
+    
+    # Le stress réduit la photosynthèse
+    facteur_stress = (1.0 - stress_hydrique)
+    if stress_sanitaire is not None:
+        facteur_stress *= (1.0 - stress_sanitaire)
+        
+    # On s'assure que le facteur reste positif
+    facteur_stress = max(0.0, facteur_stress)
 
-    base_co2 = base_co2_par_m2 * (espace_vert.surface_m2 or 0)
-
-    facteur_hydrique = 1 - stress_hydrique
-    facteur_sanitaire = 1 - (stress_sanitaire or 0)
-    facteur_combine = max(0, min(1, facteur_hydrique * facteur_sanitaire))
-
-    return base_co2 * facteur_combine
+    return espace_vert.surface_m2 * facteur_base_kg_m2 * facteur_stress
 
 
 def estimer_o2_produit_jour(
@@ -38,12 +32,12 @@ def estimer_o2_produit_jour(
     stress_sanitaire: float | None,
 ) -> float:
     """
-    Estimation de O2 produit (kg/jour).
-    Même principe que pour le CO2. La ratio CO2/O2 est approximativement 32/44.
+    Estime la quantité d'O2 produite (en kg) pour une journée donnée.
+    Approximation : O2 produit ≈ CO2 absorbé * (32/44) (rapport des masses molaires).
     """
-    co2_absorbe = estimer_co2_absorbe_jour(espace_vert, stress_hydrique, stress_sanitaire)
+    co2 = estimer_co2_absorbe_jour(espace_vert, stress_hydrique, stress_sanitaire)
     
-    # Ratio molaire O2/CO2 est de 1. Pour les masses, c'est M(O2)/M(CO2) = 32/44
-    ratio_masse_o2_co2 = 32.0 / 44.0
+    # Rapport molaire O2 (32g/mol) / CO2 (44g/mol) ≈ 0.727
+    ratio_masse = 32.0 / 44.0
     
-    return co2_absorbe * ratio_masse_o2_co2
+    return co2 * ratio_masse

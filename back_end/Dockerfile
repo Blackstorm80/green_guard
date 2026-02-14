@@ -1,26 +1,29 @@
-# Utiliser une image Python officielle et légère
-FROM python:3.11-slim
+# Étape 1: Builder (compilation des dépendances)
+FROM python:3.13-slim AS builder
 
 # Définir le répertoire de travail dans le conteneur
 WORKDIR /app
-
-# Copier le fichier des dépendances
 COPY requirements.txt .
+RUN pip install --no-cache-dir --user -r requirements.txt
 
-# Installer les dépendances
-# --no-cache-dir pour garder l'image légère
-# --upgrade pip pour s'assurer d'avoir la dernière version
-RUN pip install --no-cache-dir --upgrade pip -r requirements.txt
+# Étape 2: Image finale (production)
+FROM python:3.13-slim
 
-# Copier tout le code du backend dans un sous-dossier 'back_end'
-# Cela permet aux imports 'from back_end...' de fonctionner correctement
-COPY . back_end/
+WORKDIR /app
 
-# Ajouter /app au PYTHONPATH pour que python trouve le package 'back_end'
-ENV PYTHONPATH=/app
+# Copie les dépendances compilées
+COPY --from=builder /root/.local /root/.local
+RUN echo '. /root/.local/bin/activate' >> /etc/bash.bashrc
 
-# Exposer le port sur lequel Uvicorn va écouter
+# Copie ton code
+COPY . .
+
+# Expose le port
 EXPOSE 8000
 
-# Commande pour lancer l'application
-CMD ["uvicorn", "back_end.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+  CMD curl -f http://localhost:8000/ping || exit 1
+
+# Lance l'API
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"]

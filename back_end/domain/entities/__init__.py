@@ -1,11 +1,5 @@
-# back_end/domain/entities/__init__.py
-
-from .plante import PlanteEntity
+# This file makes the 'entities' folder a Python package
+# and exposes the main domain entities for easier import.
 from .espace_vert import EspaceVertEntity
-from .bilan_hydrique import BilanHydriqueJournalierEntity
-
-__all__ = [
-    "PlanteEntity",
-    "EspaceVertEntity",
-    "BilanHydriqueJournalierEntity",
-]
+from .notification import NotificationEntity
+# Add other entities like PlanteEntity, BilanHydriqueJournalierEntity here as they are created.

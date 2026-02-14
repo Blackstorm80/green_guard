@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List
 
-from back_end.domain.entities import BilanHydriqueJournalierEntity
+domain.entities import BilanHydriqueJournalierEntity
 
 
 @dataclass

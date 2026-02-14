@@ -1,8 +1,8 @@
 # Fichier: application/use_cases/gestion_plantes.py
 
-from back_end.domain.entities import PlanteEntity
-from back_end.domain.ports.plante_repository import IPlanteRepository
-from back_end.application.dto.plante import PlantCreateDTO
+domain.entities import PlanteEntity
+domain.ports.plante_repository import IPlanteRepository
+application.dto.plante import PlantCreateDTO
 
 def ajouter_plante_au_catalogue(
     plante_dto: PlantCreateDTO,

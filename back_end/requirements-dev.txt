@@ -1,0 +1,8 @@
+# Dépendances pour le développement, le test et l'analyse de code.
+# À installer avec : pip install -r requirements-dev.txt
+
+pylint  # Contient pyreverse pour les diagrammes UML
+pyan3
+pydeps
+tach
+pytest  # Pour lancer les tests

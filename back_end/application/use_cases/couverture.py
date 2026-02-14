@@ -1,7 +1,9 @@
-from back_end.domain.entities import EspaceVertEntity, PlanteEntity
-from back_end.domain.ports.espace import IEspaceVertRepository
-from back_end.domain.ports.plante import IPlanteRepository
-from back_end.domain.ports.couverture_pilotage import ICouverturePilotageService
+from datetime import datetime
+from domain.entities import EspaceVertEntity, PlanteEntity
+from domain.ports.espace import IEspaceVertRepository
+from domain.ports.plante import IPlanteRepository
+from domain.ports.couverture_pilotage import ICouverturePilotageService
+from domain.ports.meteo import IMeteoService
 
 
 class EnsoleillementFortError(Exception):
@@ -51,3 +53,34 @@ def activer_couverture_si_necessaire(
     # Toutes les conditions sont réunies -> on pilote la couverture
     couverture_service.ajuster_couverture_pour_protection(espace)
     return True
+
+
+def activer_couverture_avec_meteo(
+    espace_id: int,
+    espace_repo: IEspaceVertRepository,
+    plante_repo: IPlanteRepository,
+    meteo_service: IMeteoService,
+    couverture_service: ICouverturePilotageService,
+) -> bool:
+    espace = espace_repo.get_by_id(espace_id)
+    if espace is None:
+        return False
+
+    plante = plante_repo.get_by_id(espace.plante_id)
+    if plante is None:
+        return False
+
+    # Note: Assurez-vous que votre EspaceVertEntity possède bien latitude/longitude
+    meteo = meteo_service.recuperer_conditions_actuelles(
+        latitude=getattr(espace, "latitude", 0.0),
+        longitude=getattr(espace, "longitude", 0.0),
+        maintenant=datetime.utcnow(),
+    )
+
+    if plante.exposition in ("ombre", "mi-ombre") and \
+       getattr(espace, "exposition_reelle", "") == "plein-soleil" and \
+       meteo.ensoleillement_fort:
+        couverture_service.ajuster_couverture_pour_protection(espace)
+        return True
+
+    return False

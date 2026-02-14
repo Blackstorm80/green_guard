@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from back_end.domain.entities import (
+from domain.entities import (
     EspaceVertEntity,
     BilanHydriqueJournalierEntity,
 )

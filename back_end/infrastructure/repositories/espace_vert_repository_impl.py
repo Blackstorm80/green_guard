@@ -1,85 +1,34 @@
-# infrastructure/repositories/espace_vert_repository_impl.py
-
-from typing import Optional, List
+# back_end/infrastructure/repositories/espace_vert_repository_impl.py
+from typing import List, Optional
+from domain.entities.espace_vert import EspaceVertEntity
+from domain.ports.espace_vert_repository import IEspaceVertRepository
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-
-from back_end.domain.entities import EspaceVertEntity
-from back_end.domain.ports.espace_vert_repository import IEspaceVertRepository
-
 
 class EspaceVertRepositoryImpl(IEspaceVertRepository):
-    def __init__(self, db_session: Session) -> None:
-        self._db = db_session
-
-    def _row_to_entity(self, row) -> EspaceVertEntity:
-        """Helper pour mapper une ligne de BDD (objet Row) vers une EspaceVertEntity."""
-        return EspaceVertEntity(
-            id=row.id,
-            nom=row.nom,
-            type_espace=row.type_espace,
-            localisation=row.localisation,
-            plante_id=row.plante_id,
-            surface_m2=row.surface_m2,
-            exposition_reelle=row.exposition_reelle,
-            type_sol=row.type_sol,
-            ph_sol=row.ph_sol,
-            reserve_utile_max=row.reserve_utile_max,
-            coefficient_cultural=row.coefficient_cultural,
-            zone=row.zone,
-            gerant_id=row.gerant_id,
-        )
+    """
+    Implémentation FAKE du repository d'espaces verts pour le développement.
+    """
+    # Le constructeur accepte `db: Session` pour la compatibilité avec l'injection de dépendances.
+    def __init__(self, db: Session):
+        self.db = db
+        # Les données restent en mémoire pour cette implémentation FAKE.
+        self._espaces = [
+            EspaceVertEntity(id=1, nom="Parc Central", zone="Nord", ville="Lyon", latitude=45.77, longitude=4.85, sante_percent=95),
+            EspaceVertEntity(id=2, nom="Toit Bibliothèque Centrale", zone="Centre", ville="Lyon", latitude=45.76, longitude=4.83, sante_percent=65),
+            EspaceVertEntity(id=3, nom="Jardin Suspendu Ouest", zone="Ouest", ville="Villeurbanne", latitude=45.76, longitude=4.88, sante_percent=82),
+            EspaceVertEntity(id=4, nom="Mur Mairie Sud", zone="Sud", ville="Lyon", latitude=45.74, longitude=4.85, sante_percent=45),
+            EspaceVertEntity(id=5, nom="Patio Interne", zone="Centre", ville="Lyon", latitude=45.76, longitude=4.84, sante_percent=78),
+        ]
 
     def get_by_id(self, espace_id: int) -> Optional[EspaceVertEntity]:
-        row = self._db.execute(
-            text("SELECT * FROM espaces_verts WHERE id = :id"),
-            {"id": espace_id},
-        ).first()
-        return self._row_to_entity(row) if row else None
+        return next((e for e in self._espaces if e.id == espace_id), None)
 
     def list_tous(self) -> List[EspaceVertEntity]:
-        rows = self._db.execute(text("SELECT * FROM espaces_verts ORDER BY nom")).all()
-        return [self._row_to_entity(row) for row in rows]
+        return self._espaces
 
-    def sauvegarder(self, espace: EspaceVertEntity) -> EspaceVertEntity:
-        stmt = text("""
-            INSERT INTO espaces_verts (
-                nom, type_espace, localisation, plante_id, surface_m2,
-                exposition_reelle, type_sol, ph_sol, reserve_utile_max,
-                coefficient_cultural, zone, gerant_id
-            ) VALUES (
-                :nom, :type_espace, :localisation, :plante_id, :surface_m2,
-                :exposition_reelle, :type_sol, :ph_sol, :reserve_utile_max,
-                :coefficient_cultural, :zone, :gerant_id
-            ) RETURNING id
-            """)
-        
-        result = self._db.execute(stmt, espace.__dict__)
-        new_id = result.scalar_one()
-        self._db.commit()
-
-        # Retourne une nouvelle entité avec l'ID généré par la BDD
-        return EspaceVertEntity(**{**espace.__dict__, "id": new_id})
-
-    def mettre_a_jour(self, espace: EspaceVertEntity) -> EspaceVertEntity:
-        stmt = text("""
-            UPDATE espaces_verts
-            SET
-                nom = :nom,
-                type_espace = :type_espace,
-                localisation = :localisation,
-                plante_id = :plante_id,
-                surface_m2 = :surface_m2,
-                exposition_reelle = :exposition_reelle,
-                type_sol = :type_sol,
-                ph_sol = :ph_sol,
-                reserve_utile_max = :reserve_utile_max,
-                coefficient_cultural = :coefficient_cultural,
-                zone = :zone,
-                gerant_id = :gerant_id
-            WHERE id = :id
-            """)
-        
-        self._db.execute(stmt, espace.__dict__)
-        self._db.commit()
-        return espace
+    def list_by_user(self, user_id: int) -> List[EspaceVertEntity]:
+        # Simule que l'admin (id=1) voit tout, les autres ne voient qu'un sous-ensemble.
+        if user_id == 1:
+            return self._espaces
+        else:
+            return [e for e in self._espaces if e.id % 2 != 0] # Espaces impairs
