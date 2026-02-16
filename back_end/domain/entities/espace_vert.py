@@ -1,17 +1,20 @@
-# back_end/domain/entities/espace_vert.py
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
+from infrastructure.database import Base
 
-class EspaceVertEntity:
-    """
-    Représente un espace vert dans le domaine métier.
-    """
-    def __init__(self, id: int, nom: str, zone: str | None = None, surface_m2: float = 50.0, reserve_utile_max: float = 100.0, plante_id: int = 1, ville: str | None = "Inconnue", latitude: float = 0.0, longitude: float = 0.0, sante_percent: float = 100.0):
-        self.id = id
-        self.nom = nom
-        self.zone = zone
-        self.surface_m2 = surface_m2
-        self.reserve_utile_max = reserve_utile_max
-        self.plante_id = plante_id
-        self.ville = ville
-        self.latitude = latitude
-        self.longitude = longitude
-        self.sante_percent = sante_percent
+class EspaceVertEntity(Base):
+    __tablename__ = "espaces_verts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String, index=True)
+    ville = Column(String)
+    latitude = Column(Float)
+    longitude = Column(Float)
+    surface_m2 = Column(Float)
+    sante_percent = Column(Float)
+
+    # Clé étrangère vers l'utilisateur, requise par le script init_db.py
+    user_id = Column(Integer, ForeignKey("users.id"))
+
+    # Relation inverse (à la fin de EspaceVertEntity)
+    bilans = relationship("BilanHydriqueJournalierEntity", back_populates="espace")

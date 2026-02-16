@@ -1,18 +1,18 @@
-# domain/entities/bilan_hydrique.py
-from dataclasses import dataclass
-import datetime
+from sqlalchemy import Column, Integer, Float, Date, ForeignKey
+from sqlalchemy.orm import relationship
+from infrastructure.database import Base
+from datetime import date
 
-@dataclass
-class BilanHydriqueJournalierEntity:
-    """
-    Entité métier représentant le bilan hydrique pour un jour donné.
-    """
-    id: int
-    date: datetime.date
-    reserve_eau: float
-    indice_stress: float
-    statut_hydrique: str
-    espace_id: int
-    stress_sanitaire: float | None = None
-    co2_absorbe_jour: float | None = None
-    o2_produit_jour: float | None = None
+class BilanHydriqueJournalierEntity(Base):
+    __tablename__ = "bilans_hydriques"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    espace_id = Column(Integer, ForeignKey("espaces_verts.id"))
+    date_bilan = Column(Date)
+    precipitations_mm = Column(Float)
+    evapotranspiration_mm = Column(Float)
+    bilan_mm = Column(Float)
+    arrosage_recommande_mm = Column(Float)
+    
+    # Relation bidirectionnelle
+    espace = relationship("EspaceVertEntity", back_populates="bilans")
