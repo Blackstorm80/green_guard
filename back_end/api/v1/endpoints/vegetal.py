@@ -7,6 +7,8 @@ from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRe
 from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from application.use_cases.vegetal import calculer_etat_global_vegetal, calculer_impact_carbone
 from application.dto.vegetal import EtatGlobalVegetalDTO, ImpactCarboneDTO
+from api.deps.auth import require_role
+from domain.entities.user import UserEntity
 
 router = APIRouter(prefix="/vegetal", tags=["Indicateurs Végétaux"])
 
@@ -18,7 +20,8 @@ def get_repos(db: Session = Depends(get_db_session)):
 
 @router.get("/etat-global", response_model=EtatGlobalVegetalDTO)
 def get_etat_global(
-    repos: dict = Depends(get_repos)
+    repos: dict = Depends(get_repos),
+    current_user: UserEntity = Depends(require_role("admin")),
 ):
     """
     Retourne les indicateurs de santé globale du parc (pour le dashboard).
@@ -30,7 +33,8 @@ def get_etat_global(
 
 @router.get("/impact-carbone", response_model=ImpactCarboneDTO)
 def get_impact_carbone(
-    repos: dict = Depends(get_repos)
+    repos: dict = Depends(get_repos),
+    current_user: UserEntity = Depends(require_role("admin")),
 ):
     """
     Retourne l'estimation de l'impact écologique (O2 produit, CO2 absorbé).

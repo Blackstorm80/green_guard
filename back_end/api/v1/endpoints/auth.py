@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from infrastructure.database import get_db_session
-from application.dto.user import UserDTO
-from api.deps.auth import get_current_user, verify_password
+from api.deps.auth import verify_password, create_access_token
 from domain.entities.user import UserEntity
+from schemas.token import Token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
-@router.post("/login")
+@router.post("/login", response_model=Token)
 async def login(
     username: str,
     password: str,
@@ -24,10 +24,12 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # À ce stade, l'authen est faite.
-    # Ici, je cree et retourne un vrai token JWT.
-    # Pour l'instant, je retourne le token factice , je recherche encore sur comment creer un vrai tken .
-    return {"access_token": "fake-token-admin", "token_type": "bearer"}
+    # L'authentification est réussie, on crée le token JWT
+    # en y incluant le rôle de l'utilisateur.
+    access_token = create_access_token(
+        data={"sub": user.email, "role": user.role}
+    )
+    return {"access_token": access_token, "token_type": "bearer"}
 
 @router.post("/register")
 async def register(

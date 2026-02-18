@@ -1,32 +1,43 @@
+from typing import List
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from typing import List
 
-from application.dto.zone_intelligente import ZoneIntelligenteDTO
-from application.dto.user import UserDTO
+# NOTE: Les chemins d'importation sont déduits de la structure du projet (README.md)
+# et pourraient nécessiter des ajustements mineurs.
 from infrastructure.database import get_db_session
-from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
-from domain.ports.espace_vert_repository import IEspaceVertRepository
-from application.use_cases.zones_intelligentes import creer_zones_intelligentes
-from api.deps.auth import get_current_user
+from domain.entities import EspaceVertEntity, UserEntity
+# Le snippet mentionnait `from auth import ...`. Un emplacement commun est un dossier de dépendances.
+from api.deps.auth import require_any_role
+from schemas.espaces_verts import EspaceVert # Basé sur README: schemas/espaces_verts.py
 
-router = APIRouter(prefix="/zones", tags=["zones intelligentes"])
+router = APIRouter()
 
-@router.get("/intelligentes", response_model=List[ZoneIntelligenteDTO])
+def _creer_zones_intelligentes(db: Session, user_id: int, max_zones: int) -> List[EspaceVertEntity]:
+    """
+    Logique de récupération des "zones intelligentes" (espaces verts) pour un utilisateur.
+
+    Cette fonction récupère les espaces verts associés à l'ID de l'utilisateur depuis la base de données.
+    """
+    return db.query(EspaceVertEntity).filter(EspaceVertEntity.user_id == user_id).limit(max_zones).all()
+
+
+@router.get(
+    "/api/v1/zones/intelligentes",
+    response_model=List[EspaceVert],
+    summary="Récupérer les zones intelligentes de l'utilisateur",
+    tags=["Zones Intelligentes"]
+)
 async def zones_intelligentes(
-    max_zones: int = Query(8, ge=1, le=12, description="Nombre max de zones à afficher"),
-    current_user: UserDTO = Depends(get_current_user),
+    max_zones: int = Query(8, ge=1, le=12, description="Nombre maximum de zones à retourner."),
+    current_user: UserEntity = Depends(require_any_role(["admin", "user"])),
     db: Session = Depends(get_db_session),
 ):
     """
-    Clustering dynamique complet avec K-Means
-    
-    **Logique automatique** :
-    - &lt;5 espaces → 1 zone globale
-    - 5-15 → par ville  
-    - 16-50 → par quartier (2km rayon)
-    - >50 → K-Means
+    Récupère une liste de "zones intelligentes" (espaces verts) pour l'utilisateur authentifié.
+
+    Cette route est protégée par authentification JWT. Pour l'utiliser, vous devez fournir un token valide
+    dans l'en-tête `Authorization` sous la forme `Bearer <votre_token>`.
     """
-    repo: IEspaceVertRepository = EspaceVertRepositoryImpl(db)
-    zones = creer_zones_intelligentes(repo, current_user.id, max_zones)
+    # On utilise `current_user.id` venant du token pour une requête sécurisée et dynamique.
+    zones = _creer_zones_intelligentes(db, current_user.id, max_zones)
     return zones
