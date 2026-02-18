@@ -8,7 +8,7 @@ from infrastructure.database import get_db_session
 from domain.entities import EspaceVertEntity, UserEntity
 # Le snippet mentionnait `from auth import ...`. Un emplacement commun est un dossier de dépendances.
 from api.deps.auth import require_any_role
-from schemas.espaces_verts import EspaceVert # Basé sur README: schemas/espaces_verts.py
+from schema.espaces_verts import EspaceVert # Basé sur README: schemas/espaces_verts.py
 
 router = APIRouter()
 

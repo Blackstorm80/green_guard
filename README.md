@@ -96,7 +96,7 @@ Pour un guide détaillé sur les commandes Git et notre workflow, veuillez consu
 3.  **Lancer le serveur de développement**
     L'API sera accessible à l'adresse `http://127.0.0.1:8000`.
     ```bash
-    uvicorn api.main:app --reload
+    uvicorn main:app --reload
     ```
 
 4.  **Consulter la documentation interactive**

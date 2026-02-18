@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from domain.entities.user import UserEntity
 from infrastructure.database import get_db_session
-from schemas.token import TokenData
+from schema.token import TokenData
 
 load_dotenv()
 
