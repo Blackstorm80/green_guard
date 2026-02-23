@@ -11,9 +11,15 @@ FROM python:3.13-slim
 
 WORKDIR /app
 
+# Installe curl, qui est nécessaire pour le HEALTHCHECK
+RUN apt-get update && apt-get install -y curl && \
+    rm -rf /var/lib/apt/lists/*
+
+# Ajoute le répertoire bin de l'utilisateur au PATH pour que `uvicorn` soit trouvable
+ENV PATH="/root/.local/bin:${PATH}"
+
 # Copie les dépendances compilées
 COPY --from=builder /root/.local /root/.local
-RUN echo '. /root/.local/bin/activate' >> /etc/bash.bashrc
 
 # Copie ton code
 COPY . .

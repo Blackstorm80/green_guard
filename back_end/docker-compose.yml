@@ -17,15 +17,3 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-
-  # Outil pour créer la DB (optionnel)
-  init-db:
-    build: .
-    command: python -c "
-      from infrastructure.database import engine, Base
-      from domain.entities import *  # tous tes modèles
-      Base.metadata.create_all(bind=engine)
-      print('✅ Tables créées !')
-    "
-    volumes:
-      - ./data:/app/data
