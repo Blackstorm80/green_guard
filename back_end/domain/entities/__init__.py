@@ -1,7 +1,11 @@
-# This file makes the 'entities' folder a Python package
-# and exposes the main domain entities for easier import.
+#cette page transforme le dossier entities en un module  and exposes the main domain entities for easier import.
 from .espace_vert import EspaceVertEntity
 from .notification import NotificationEntity
 from .bilan_hydrique import BilanHydriqueJournalierEntity
 from .user import UserEntity
-# Add other entities like PlanteEntity, BilanHydriqueJournalierEntity here as they are created.
+# Ajouter ces lignes
+from .zone_intelligente import ZoneIntelligenteEntity
+from .clustering_config import ClusteringConfigEntity, Granularite
+from .espece_vegetale import EspeceVegetaleEntity
+from .capteur import CapteurEntity, TypeCapteur
+from .intervention import InterventionEntity, TypeIntervention

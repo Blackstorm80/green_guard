@@ -1,5 +1,5 @@
 """
-🚀 Initialisation complète de la base Green Guard
+ Initialisation complète de la base Green Guard
 - Crée TOUTES les tables
 - Ajoute des données de démo por commencer a tester
 """
@@ -7,17 +7,15 @@
 from datetime import date
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-
+from domain.entities.espece_vegetale import EspeceVegetaleEntity
 # Le `README.md` et les cas d'usage indiquent que les entités sont
 # dans `domain/entities.py`. Les imports sont donc ajustés en conséquence.
-from domain.entities import (
-    EspaceVertEntity,
-    BilanHydriqueJournalierEntity,
-    CapteurEntity,
-    UserEntity,
-    InterventionEntity
-)
+from domain.entities import UserEntity
+    
+
 from infrastructure.database import Base
+from domain.entities.espace_vert import EspaceVertEntity
+from domain.entities.bilan_hydrique import BilanHydriqueJournalierEntity
 
 # Connexion DB
 # Le chemin est relatif au dossier `back_end/` où le script sera lancé.
@@ -25,14 +23,14 @@ engine = create_engine("sqlite:///./data/green_guard.db")
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 db = SessionLocal()
 
-print("🛠️  Création des tables...")
+print("  Création des tables...")
 
 # CRÉE TOUTES LES TABLES
 # `Base.metadata` contient les méta-informations de toutes les classes
 # qui héritent de `Base` (nos entités SQLAlchemy).
 Base.metadata.create_all(bind=engine)
 
-print("✅ Tables créées !")
+print(" Tables créées !")
 
 # DONNÉES DE DÉMO
 print("🌱 Insertion données de démo...")
@@ -110,5 +108,59 @@ for capteur in capteurs_demo:
 db.commit()
 db.close()
 
-print(f"✅ {len(espaces)} espaces, {len(capteurs_demo)} capteurs, {len(espaces)} bilans créés !")
-print("🎉 Base prête → http://localhost:8000/docs")
+
+
+# Espèces de référence (données réalistes)
+# 1. D'ABORD créer les users
+user1 = UserEntity(username="admin", email="admin@green.guard", role="admin")
+db.add(user1)
+db.commit()
+
+# 2. ENSUITE créer les espaces verts
+espace1 = EspaceVertEntity(
+    nom="Parc des Buttes Chaumont",
+    ville="Paris",
+    latitude=48.88,
+    longitude=2.38,
+    surface_m2=1000,
+    sante_percent=85.0,
+    user_id=user1.id
+)
+db.add(espace1)
+db.flush()  # Récupère l'ID
+
+espace2 = EspaceVertEntity(
+    nom="Square du Colonel Fabien", 
+    ville="Paris",
+    latitude=48.89,
+    longitude=2.39,
+    surface_m2=250,
+    sante_percent=72.0,
+    user_id=user1.id
+)
+db.add(espace2)
+db.flush()
+
+# 3. ENSUITE créer les espèces
+especes_demo = [
+    EspeceVegetaleEntity(
+        nom_commun="Gazon festuca",
+        nom_scientifique="Festuca arundinacea",
+        humidite_sol_min=25, humidite_sol_max=45,
+        vpd_min=0.8, vpd_max=1.8,
+        coeff_cultural=1.1
+    )
+]
+for espece in especes_demo:
+    db.add(espece)
+db.flush()
+
+# 4. ENSUITE lier (maintenant TOUT existe)
+db.add_all(especes_demo)
+db.commit()
+
+espace1.especes_vegetales.append(especes_demo[0])
+espace2.especes_vegetales.append(especes_demo[0])
+db.commit()
+
+

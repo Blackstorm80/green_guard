@@ -8,3 +8,4 @@ psycopg2-binary # Driver pour PostgreSQL, peut être changé pour un autre (ex: 
 
 # --- Data Validation (inclus dans FastAPI mais bon à expliciter) ---
 pydantic
+scikit-learn
