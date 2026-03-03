@@ -16,7 +16,7 @@ async def login(
     """Login pour obtenir un token d'accès."""
     user = db.query(UserEntity).filter(UserEntity.email == username).first()
 
-    # Vérifie si l'utilisateur existe ET si le mot de passe est correct
+    # Vérifie si le user  existe ET si le mot de passe est correct
     if not user or not verify_password(password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -24,8 +24,8 @@ async def login(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    # L'authentification est réussie, on crée le token JWT
-    # en y incluant le rôle de l'utilisateur.
+    # L'authentification est réussie, on crée un token JWT
+    # on rajoute  le rôle du user .
     access_token = create_access_token(
         data={"sub": user.email, "role": user.role}
     )

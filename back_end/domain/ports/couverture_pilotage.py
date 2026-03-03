@@ -9,7 +9,7 @@ domain.entities import EspaceVertEntity
 
 class ICouverturePilotageService(ABC):
     """
-    Port de domaine pour piloter la couverture physique (ombrage) d'un espace vert.
+    Port de domaine pour piloter la couverture physique  d'un espace vert.
     Une implémentation concrète pourra commander un voile d'ombrage, un store,
     mettre à jour un état IoT, etc.
     """

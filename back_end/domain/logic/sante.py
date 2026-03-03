@@ -7,7 +7,7 @@ def calculer_vpd(temperature: float, humidite_relative: float) -> float:
     """
     VPD = Déficit de Pression de Vapeur 
     Formule : VPD = SVP * (1 - HR/100)
-    SVP = 0.6108 * exp(17.27 * T / (T + 237.3))  # Tetens equation from https://handwiki.org/wiki/Physics:Tetens_equation
+    SVP = 0.6108 * exp(17.27 * T / (T + 237.3))  # equation de tetens https://handwiki.org/wiki/Physics:Tetens_equation
     """
     svp = 0.6108 * (2.71828 ** (17.27 * temperature / (temperature + 237.3)))
     vpd = svp * (1 - humidite_relative / 100)

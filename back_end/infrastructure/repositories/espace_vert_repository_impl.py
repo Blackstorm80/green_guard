@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 class EspaceVertRepositoryImpl(IEspaceVertRepository):
     """
-    Implémentation FAKE du repository d'espaces verts pour le développement.
+    Implémentation de test (je n'ai pas encore finaliser l'implementation) du repository d'espaces verts pour le développement.
     """
     # Le constructeur accepte `db: Session` pour la compatibilité avec l'injection de dépendances.
     def __init__(self, db: Session):

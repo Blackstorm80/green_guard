@@ -40,7 +40,7 @@ def calculer_features_espaces(espaces: List[EspaceVertEntity]) -> np.ndarray:
         
         features.append([lat, lon, sante_7j/100, type_espace_code, variance_sante])
     
-    # Normalisation pour que K-Means traite toutes les features équitablement
+    #  pour que K-Means traite toutes les features équitablement
     scaler = StandardScaler()
     return scaler.fit_transform(features)
 
@@ -94,7 +94,7 @@ def executer_clustering_intelligent(
     from sklearn.metrics import silhouette_score
     silhouette = silhouette_score(X, labels)
     
-    # Nettoyage des anciennes zones pour cet utilisateur
+    # Nettoyage des anciennes zones pour ce user
     db.query(ZoneIntelligenteEntity).filter(ZoneIntelligenteEntity.user_id == user_id).delete()
     db.commit()
     

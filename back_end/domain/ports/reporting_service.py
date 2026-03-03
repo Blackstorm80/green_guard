@@ -15,6 +15,6 @@ class IReportingService(ABC):
     def generer_rapport_bilan_hydrique(self, nom_espace: str, bilans: List[BilanHydriqueJournalierEntity]) -> str:
         """
         Génère un rapport à partir d'une liste de bilans hydriques.
-        Le format de sortie (CSV, texte, etc.) est défini par l'implémentation.
+        Le format de sortie (pdf encours , csv , texte ,  prochaine version ) 
         """
         pass

@@ -14,7 +14,7 @@ from api.v1.endpoints.capteurs import get_capteur_service
 router = APIRouter(prefix="/interventions", tags=["Interventions"])
 
 def get_espace_repo() -> IEspaceVertRepository:
-    # Retourne une implémentation "fake". Plus tard, on injectera la session DB.
+    # Retourne une implémentation "test". Plus tard, on injectera la session DB.
     return EspaceVertRepositoryImpl()
 
 @router.get("/urgent", response_model=InterventionsUrgentesDTO)

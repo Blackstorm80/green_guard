@@ -7,7 +7,7 @@ from domain.entities.notification import NotificationEntity
 
 class NotificationRepositoryImpl(INotificationRepository):
     """
-    Implémentation FAKE du repository de notifications.
+    Implémentation test ( je n'ai pas encore terminer l'implementation) du repository de notifications.
     Retourne des données en mémoire pour le développement.
     """
     def list_for_user(self, user_id: int, limit: int = 10) -> List[NotificationEntity]:
