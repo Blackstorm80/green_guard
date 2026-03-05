@@ -1,12 +1,12 @@
 # Fichier: domain/logic/compatibilite_plante_espace.py
 
 from typing import Tuple, List
-from domain.entities import PlanteEntity, EspaceVertEntity
+from domain.models import PlanteEntity, EspaceVert
 
 
 def est_exposition_compatible(
     plante: PlanteEntity,
-    espace: EspaceVertEntity,
+    espace: EspaceVert,
 ) -> bool:
     """
     Vérifie si l'exposition réelle de l'espace est compatible
@@ -36,7 +36,7 @@ def est_exposition_compatible(
 
 def est_sol_compatible(
     plante: PlanteEntity,
-    espace: EspaceVertEntity,
+    espace: EspaceVert,
 ) -> bool:
     """
     Vérifie si le type de sol (et éventuellement le pH) de l'espace
@@ -78,7 +78,7 @@ def est_climat_compatible(
 
 def verifier_compatibilite_plante_espace(
     plante: PlanteEntity,
-    espace: EspaceVertEntity,
+    espace: EspaceVert,
     temp_min_site: float | None = None,
     temp_max_site: float | None = None,
 ) -> Tuple[bool, List[str]]:

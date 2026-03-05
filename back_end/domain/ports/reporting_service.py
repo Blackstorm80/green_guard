@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from domain.entities import BilanHydriqueJournalierEntity
+from domain.models import BilanHydriqueJournalier
 
 
 class IReportingService(ABC):
@@ -12,7 +12,7 @@ class IReportingService(ABC):
     """
 
     @abstractmethod
-    def generer_rapport_bilan_hydrique(self, nom_espace: str, bilans: List[BilanHydriqueJournalierEntity]) -> str:
+    def generer_rapport_bilan_hydrique(self, nom_espace: str, bilans: List[BilanHydriqueJournalier]) -> str:
         """
         Génère un rapport à partir d'une liste de bilans hydriques.
         Le format de sortie (CSV, texte, etc.) est défini par l'implémentation.

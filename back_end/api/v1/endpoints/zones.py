@@ -2,9 +2,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from infrastructure.database import get_db_session
-from domain.entities import UserEntity
-from domain.entities.zone_intelligente import ZoneIntelligenteEntity
+from infrastructure.database import get_db
+from domain.models import User, ZoneIntelligente
 from api.deps.auth import require_any_role
 from domain.logic.clustering import executer_clustering_intelligent, calculer_couleur_gauge
 from schema.zones import ZoneIntelligenteRead
@@ -18,8 +17,8 @@ router = APIRouter()
     tags=["Zones Intelligentes"]
 )
 async def rebuild_zones(
-    current_user: UserEntity = Depends(require_any_role(["admin", "manager"])),
-    db: Session = Depends(get_db_session)
+    current_user: User = Depends(require_any_role(["admin", "manager"])),
+    db: Session = Depends(get_db)
 ):
     """
     Lance le recalcul complet des zones intelligentes pour le  authentifié et verifier.
@@ -40,19 +39,13 @@ async def rebuild_zones(
     tags=["Zones Intelligentes"]
 )
 async def lister_zones(
-    current_user: UserEntity = Depends(require_any_role(["admin", "user"])),
-    db: Session = Depends(get_db_session),
+    current_user: User = Depends(require_any_role(["admin", "user"])),
+    db: Session = Depends(get_db),
 ):
     """
     Récupère la liste des zones intelligentes pour le user  authen,
     avec des données prêtes à être affichées .
     """
-    zones = db.query(ZoneIntelligenteEntity).filter(ZoneIntelligenteEntity.user_id == current_user.id).all()
+    zones = db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == current_user.id).all()
     zones_dto = [ZoneIntelligenteRead(**zone.__dict__, couleur_gauge=calculer_couleur_gauge(zone.sante_moyenne)) for zone in zones]
     return zones_dto
-
-    """Cette route est protégée par auth JWT. Pour l'utiliser,il faut verifier si le user est authen avec sont token 
-    """
-    # On utilise `current_user.id` venant du token pour une requête sécurisée et dynamique.
-    zones = _creer_zones_intelligentes(db, current_user.id, max_zones)
-    return zones

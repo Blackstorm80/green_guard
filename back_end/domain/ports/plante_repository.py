@@ -1,7 +1,7 @@
 # Fichier : domain/ports/plante_repository.py
 
 from typing import Protocol, Sequence, Optional
-from domain.entities import PlanteEntity
+from domain.models import PlanteEntity
 
 class IPlanteRepository(Protocol):
     def lister_toutes(self) -> Sequence[PlanteEntity]:

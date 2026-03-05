@@ -1,19 +1,16 @@
-# back_end/domain/ports/espace_vert_repository.py
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from domain.entities.espace_vert import EspaceVertEntity
+from domain.models import EspaceVert
 
 class IEspaceVertRepository(ABC):
-    
     @abstractmethod
-    def get_by_id(self, espace_id: int) -> Optional[EspaceVertEntity]:
-        ...
+    def get_by_id(self, espace_id: int) -> Optional[EspaceVert]:
+        pass
 
     @abstractmethod
-    def list_tous(self) -> List[EspaceVertEntity]:
-        ...
+    def save(self, espace: EspaceVert) -> EspaceVert:
+        pass
 
     @abstractmethod
-    def list_by_user(self, user_id: int) -> List[EspaceVertEntity]:
-        """Liste les espaces verts associés à un utilisateur."""
-        ...
+    def get_all(self) -> List[EspaceVert]:
+        pass

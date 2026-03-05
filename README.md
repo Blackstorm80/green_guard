@@ -12,7 +12,7 @@ Le backend est conçu selon les principes de l'**Architecture Oignon (Onion Arch
 
 Notre architecture se divise en trois couches principales :
 
-1.  **Le Domaine (Cœur Métier)** : Le centre de l'oignon. Il contient la logique métier pure (algorithmes de calcul) et les entités (objets métier comme `EspaceVertEntity`). Il ne dépend d'aucune technologie externe (ni base de données, ni API). **Cette partie est sous ma responsabilité.**
+1.  **Le Domaine (Cœur Métier)** : Le centre de l'oignon. Il contient la logique métier pure (algorithmes de calcul) et les entités (objets métier comme `EspaceVert`). Il ne dépend d'aucune technologie externe (ni base de données, ni API). **Cette partie est sous ma responsabilité.**
 2.  **L'Infrastructure** : La couche intermédiaire. Elle implémente les détails techniques : accès à la base de données, connexion à des services externes (API météo, service d'email), etc. Elle dépend du Domaine.
 3.  **L'API** : La couche la plus externe. Elle expose les fonctionnalités via des endpoints FastAPI et orchestre les appels entre les différentes couches.
 
@@ -33,7 +33,7 @@ back_end/
 │           ├── bilans_hydriques.py   # (Lucrèce) Routes pour consulter les bilans.
 │           └── utilisateurs.py       # (Lucrèce) Routes pour les utilisateurs.
 ├── domain/
-│   ├── entities.py                 # (Moi) Objets métier purs (EspaceVertEntity).
+│   ├── entities.py                 # (Moi) Objets métier purs (EspaceVert).
 │   ├── logic/
 │   │   ├── stress_hydrique.py      # (Moi) Algorithme de calcul du bilan hydrique.
 │   │   └── bilan_hydrique.py       # (Moi) Orchestration de la logique métier.

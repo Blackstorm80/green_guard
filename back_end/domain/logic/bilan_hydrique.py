@@ -3,19 +3,19 @@
 import datetime
 
 # Note: Les chemins d'import sont basés sur la structure cible du projet.
-from domain.entities import EspaceVertEntity, BilanHydriqueJournalierEntity
+from domain.models import EspaceVert, BilanHydriqueJournalier
 from domain.logic.stress_hydrique import calculer_bilan_hydrique_simplifie
 
 
 def calculer_bilan_hydrique_pour_jour(
-    espace_vert: EspaceVertEntity,
-    bilan_precedent: BilanHydriqueJournalierEntity | None,
+    espace_vert: EspaceVert,
+    bilan_precedent: BilanHydriqueJournalier | None,
     pluie_jour_mm: float,
     et0_jour_mm: float,
     arrosage_jour_mm: float,
     date_du_jour: datetime.date,
     stress_sanitaire_jour: float | None,
-) -> BilanHydriqueJournalierEntity:
+) -> BilanHydriqueJournalier:
     """
     Calcule le bilan hydrique pour un espace vert à une date donnée.
     Cette fonction ne dépend pas de services externes : elle reçoit toutes les valeurs
@@ -31,7 +31,7 @@ def calculer_bilan_hydrique_pour_jour(
         stress_sanitaire_jour: Le score de stress sanitaire déjà calculé pour la journée (0–1 ou None).
 
     Returns:
-        Une nouvelle entité BilanHydriqueJournalierEntity avec les résultats du calcul.
+        Une nouvelle entité BilanHydriqueJournalier avec les résultats du calcul.
     """
     # Étape 1 : Déterminer la réserve en eau de départ.
     # Si c'est le premier calcul, on peut considérer que la réserve est pleine.
@@ -55,7 +55,7 @@ def calculer_bilan_hydrique_pour_jour(
     )
 
     # 3) Construction de l'entité métier
-    nouveau_bilan = BilanHydriqueJournalierEntity(
+    nouveau_bilan = BilanHydriqueJournalier(
         id=0,  # id géré par la persistance
         date=date_du_jour,
         reserve_eau=nouvelle_reserve,

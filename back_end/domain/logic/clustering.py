@@ -7,25 +7,20 @@ from typing import List
 from sqlalchemy.orm import Session
 
 # IMPORTS DÉFINITIFS - TOUT ICI
-from domain.entities import EspaceVertEntity, ZoneIntelligenteEntity
-from domain.entities.clustering_config import ClusteringConfigEntity
+from domain.models import EspaceVert, ZoneIntelligente, ClusteringConfig
 
 
 
 """ l'algorithme a été dev a partir de celui de https://fr.python-3.com/?p=4563 , qui a servi de base d'apprentissage et de comprenhension pour coder mon clusturing "  """
-def calculer_features_espaces(espaces: List[EspaceVertEntity]) -> np.ndarray:
+def calculer_features_espaces(espaces: List[EspaceVert]) -> np.ndarray:
     """Extrait et normalise les features pour K-Means."""
     features = []
     
     for espace in espaces:
         # 1. Géolocalisation (prioritaire)
-        lat, lon = 0.0, 0.0
-        if espace.localisation:
-            try:
-                lat = float(espace.localisation.split(',')[0])
-                lon = float(espace.localisation.split(',')[1])
-            except (ValueError, IndexError):
-                pass # Garde lat/lon à 0 si le format est incorrect
+        # On utilise directement les champs latitude/longitude du modèle
+        lat = getattr(espace, 'latitude', 0.0) or 0.0
+        lon = getattr(espace, 'longitude', 0.0) or 0.0
         
         # 2. Santé (sur 7 derniers jours, avec une valeur par défaut robuste)
         sante_7j = getattr(espace, 'sante_moyenne_7j', 85.0) or 85.0
@@ -68,7 +63,7 @@ def executer_clustering_intelligent(
     db: Session,
     user_id: int
 ):
-    # Retire complètement -> List[ZoneIntelligenteEntity]
+    # Retire complètement -> List[ZoneIntelligente]
     # Garde le reste de ton code IDENTIQUE
 
     """
@@ -78,11 +73,11 @@ def executer_clustering_intelligent(
     3. Exécute K-Means et calcule le score de silhouette.
     4. Persiste les nouvelles zones et leurs métriques.
     """
-    config = db.query(ClusteringConfigEntity).filter(ClusteringConfigEntity.user_id == user_id).first()
+    config = db.query(ClusteringConfig).filter(ClusteringConfig.user_id == user_id).first()
     if not config:
         raise ValueError("Aucune config de clustering trouvée pour cet utilisateur")
     
-    espaces = db.query(EspaceVertEntity).filter(EspaceVertEntity.gerant_id == user_id).all()
+    espaces = db.query(EspaceVert).filter(EspaceVert.gerant_id == user_id).all()
     if len(espaces) < config.n_clusters:
         raise ValueError("Pas assez d'espaces à clusteriser pour le nombre de clusters configuré")
     
@@ -95,7 +90,7 @@ def executer_clustering_intelligent(
     silhouette = silhouette_score(X, labels)
     
     # Nettoyage des anciennes zones pour cet utilisateur
-    db.query(ZoneIntelligenteEntity).filter(ZoneIntelligenteEntity.user_id == user_id).delete()
+    db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == user_id).delete()
     db.commit()
     
     nouvelles_zones = []
@@ -108,7 +103,7 @@ def executer_clustering_intelligent(
         espaces_cluster = [espaces[j] for j in indices_cluster]
         sante_moyenne = np.mean([getattr(e, 'sante_percent', 85.0) or 85.0 for e in espaces_cluster])
         
-        zone = ZoneIntelligenteEntity(
+        zone = ZoneIntelligente(
             nom=noms_zones[i],
             user_id=user_id,
             centroid_lat=float(kmeans.cluster_centers_[i][0]),#parametre de compraison pour creer les clusters
@@ -122,14 +117,6 @@ def executer_clustering_intelligent(
         db.add(zone)
         db.flush()
         
-        """for espace in espaces_cluster:
-            liaison = ZoneEspaceEntity(
-                zone_id=zone.id,
-                espace_id=espace.id,
-                distance_centroid_km=0.0, # Pourrait être calculé avec haversine
-                poids=1.0 / len(espaces_cluster)
-            )
-            db.add(liaison)"""
         for espace in espaces_cluster:
             zone.espaces.append(espace)
            

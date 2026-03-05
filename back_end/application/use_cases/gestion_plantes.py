@@ -1,6 +1,6 @@
 # Fichier: application/use_cases/gestion_plantes.py
 
-domain.entities import PlanteEntity
+domain.models import PlanteEntity
 domain.ports.plante_repository import IPlanteRepository
 application.dto.plante import PlantCreateDTO
 

@@ -2,15 +2,15 @@
 
 from __future__ import annotations
 
-domain.entities import (
-    EspaceVertEntity,
-    BilanHydriqueJournalierEntity,
+domain.models import (
+    EspaceVert,
+    BilanHydriqueJournalier,
 )
 
 
 def calculer_besoin_arrosage_mm(
-    espace: EspaceVertEntity,
-    bilan: BilanHydriqueJournalierEntity,
+    espace: EspaceVert,
+    bilan: BilanHydriqueJournalier,
     seuil_declenchement_ratio: float = 0.5,
     cible_remplissage_ratio: float = 1.0,
 ) -> float:
@@ -86,8 +86,8 @@ def convertir_besoin_en_litres(
 
 
 def calculer_volume_arrosage(
-    espace: EspaceVertEntity,
-    bilan: BilanHydriqueJournalierEntity,
+    espace: EspaceVert,
+    bilan: BilanHydriqueJournalier,
     seuil_declenchement_ratio: float = 0.5,
     cible_remplissage_ratio: float = 1.0,
     efficacite_systeme: float = 0.9,

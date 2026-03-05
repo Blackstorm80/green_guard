@@ -9,8 +9,8 @@ from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
 
-from domain.entities.user import UserEntity
-from infrastructure.database import get_db_session
+from domain.models import User
+from infrastructure.database import get_db
 from schema.token import TokenData
 
 load_dotenv()
@@ -25,7 +25,14 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    try:
+        # On verifie si le hash est valide avant la comparaison
+        if not hashed_password or len(hashed_password) < 10:
+            return False
+        return pwd_context.verify(plain_password, hashed_password)
+    except ValueError:
+        # Cas ou le hash n'est pas reconnu (UnknownHashError)
+        return False
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -40,13 +47,13 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-def get_user_by_email(db: Session, email: str) -> Optional[UserEntity]:
-    return db.query(UserEntity).filter(UserEntity.email == email).first()
+def get_user_by_email(db: Session, email: str) -> Optional[User]:
+    return db.query(User).filter(User.email == email).first()
 
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db_session),
-) -> UserEntity:
+    db: Session = Depends(get_db),
+) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -69,7 +76,7 @@ async def get_current_user(
     return user
 
 def require_role(required_role: str):
-    async def role_checker(current_user: UserEntity = Depends(get_current_user)):
+    async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role != required_role:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
@@ -79,7 +86,7 @@ def require_role(required_role: str):
     return role_checker
 
 def require_any_role(roles: list[str]):
-    async def role_checker(current_user: UserEntity = Depends(get_current_user)):
+    async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,

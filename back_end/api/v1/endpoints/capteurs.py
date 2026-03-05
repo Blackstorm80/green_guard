@@ -8,7 +8,7 @@ from infrastructure.services.meteo_open_meteo import OpenMeteoService
 from api.v1.endpoints.meteo import get_meteo_service
 from application.dto.capteurs import DashboardCapteursDTO
 from api.deps.auth import get_current_user
-from domain.entities.user import UserEntity
+from domain.models import User
 
 router = APIRouter(prefix="/capteurs", tags=["Capteurs"])
 
@@ -20,7 +20,7 @@ def get_capteur_service() -> CapteurHybridSimulator:
 @router.get("/dashboard", response_model=DashboardCapteursDTO)
 def dashboard_capteurs(
     espace_ids: List[int] = Query(default=[1, 2, 3, 4], description="Liste des IDs des espaces à interroger"),
-    current_user: UserEntity = Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     capteurs: CapteurHybridSimulator = Depends(get_capteur_service),
     meteo: OpenMeteoService = Depends(get_meteo_service)
 ):

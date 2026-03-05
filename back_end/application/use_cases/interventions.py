@@ -11,7 +11,7 @@ from application.dto.intervention import (
 from domain.ports.capteurs import ICapteurService, LectureCapteur
 from domain.ports.espace_vert_repository import IEspaceVertRepository
 from application.dto.user import UserDTO
-from domain.entities.espace_vert import EspaceVertEntity
+from domain.models import EspaceVert
 
 
 class InterventionInterne:
@@ -29,7 +29,7 @@ class InterventionInterne:
 
 
 def _detecter_problemes_critiques(
-    espace: EspaceVertEntity, 
+    espace: EspaceVert, 
     lecture: LectureCapteur
 ) -> List[InterventionInterne]:
     """

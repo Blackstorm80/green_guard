@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 
 from infrastructure.database import SessionLocal
-from domain.entities.user import UserEntity
+from domain.models import User
 from api.deps.auth import get_password_hash
 
 def create_user(email: str, password: str, name: str = "Admin"):
@@ -9,13 +9,13 @@ def create_user(email: str, password: str, name: str = "Admin"):
     db: Session = SessionLocal()
     try:
         # Vérifier si l'email existe déjà
-        existing = db.query(UserEntity).filter(UserEntity.email == email).first()
+        existing = db.query(User).filter(User.email == email).first()
         if existing:
             print(f"L'utilisateur avec l'email {email} existe déjà.")
             return
 
         hashed_password = get_password_hash(password)
-        user = UserEntity(
+        user = User(
             name=name,
             email=email,
             hashed_password=hashed_password,

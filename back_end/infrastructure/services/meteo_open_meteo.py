@@ -1,34 +1,30 @@
-# back_end/infrastructure/services/meteo_open_meteo.py
 import requests
+import os
 from datetime import datetime
+from dotenv import load_dotenv
+
+# Import des ports du domaine (L'oignon)
 from domain.ports.meteo import IMeteoService, ConditionsMeteo
 
+load_dotenv()
 
 class OpenMeteoService(IMeteoService):
-    BASE_URL = "https://api.open-meteo.com/v1/forecast"
+    """
+    Note : On garde le nom 'OpenMeteoService' pour la compatibilité des imports,
+    mais on utilise l'API OpenWeatherMap à l'intérieur.
+    """
+    
+    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
 
-    def _map_weather_code_to_condition(self, code: int) -> str:
-        """Traduit un code météo WMO en une condition textuelle simple."""
-        # Source: Documentation Open-Meteo sur les codes WMO
-        if code == 0:
-            return "Ciel clair"
-        if code in [1, 2, 3]:
-            return "Partiellement nuageux"
-        if code in [45, 48]:
-            return "Brouillard"
-        if code in [51, 53, 55, 56, 57]:
-            return "Bruine"
-        if code in [61, 63, 65, 66, 67]:
-            return "Pluie"
-        if code in [71, 73, 75, 77]:
-            return "Neige"
-        if code in [80, 81, 82]:
-            return "Averses de pluie"
-        if code in [85, 86]:
-            return "Averses de neige"
-        if code in [95, 96, 99]:
-            return "Orage"
-        return f"Code {code}"
+    def _map_owm_to_condition(self, code: int) -> str:
+        """Traduit les codes OpenWeatherMap en texte lisible."""
+        if 200 <= code <= 232: return "Orage"
+        if 300 <= code <= 321: return "Bruine"
+        if 500 <= code <= 531: return "Pluie"
+        if 600 <= code <= 622: return "Neige"
+        if code == 800: return "Ciel clair"
+        if 801 <= code <= 804: return "Nuageux"
+        return "Conditions variables"
 
     def recuperer_conditions_actuelles(
         self,
@@ -36,34 +32,51 @@ class OpenMeteoService(IMeteoService):
         longitude: float,
         maintenant: datetime,
     ) -> ConditionsMeteo:
+        
+        # Récupération de la clé API
+        api_key = os.getenv("OPENWEATHER_API_KEY")
+        
+        if not api_key:
+            raise ValueError("La clé OPENWEATHER_API_KEY est manquante dans le fichier .env")
+
         params = {
-            "latitude": latitude,
-            "longitude": longitude,
-            "current": "temperature_2m,weather_code,shortwave_radiation",
-            "timezone": "auto",
+            "lat": latitude,
+            "lon": longitude,
+            "appid": api_key,
+            "units": "metric",
+            "lang": "fr"
         }
 
-        resp = requests.get(self.BASE_URL, params=params, timeout=5)
-        resp.raise_for_status()
-        data = resp.json()
+        try:
+            resp = requests.get(self.BASE_URL, params=params, timeout=5)
+            
+            if resp.status_code == 401:
+                print(" Erreur 401 : Clé API invalide ou non activée (attendre 1h si nouvelle).")
+                
+            resp.raise_for_status()
+            data = resp.json()
 
-        current = data["current"]
+            # Extraction des données réelles
+            temperature_c = data["main"]["temp"]
+            weather_code = data["weather"][0]["id"]
+            city = data.get("name", "Localisation")
+            
+            # Déduction de l'ensoleillement
+            ensoleillement_fort = weather_code == 800 or weather_code == 801
 
-        temperature_c = current["temperature_2m"]
-        weather_code = current["weather_code"]
-        radiation = current.get("shortwave_radiation", 0.0)
+            return ConditionsMeteo(
+                city=city,
+                temperature_c=temperature_c,
+                condition=self._map_owm_to_condition(weather_code),
+                ensoleillement_fort=ensoleillement_fort,
+            )
 
-        # règle simple : ensoleillement fort si radiation > 500 W/m²
-        ensoleillement_fort = radiation is not None and radiation > 500
-
-        # Nom de ville : à ajuster selon l'API (Open‑Meteo ne donne pas de ville directement)
-        city = data.get("timezone", "Localisation")
-
-        condition = self._map_weather_code_to_condition(weather_code)
-
-        return ConditionsMeteo(
-            city=city,
-            temperature_c=temperature_c,
-            condition=condition,
-            ensoleillement_fort=bool(ensoleillement_fort),
-        )
+        except Exception as e:
+            print(f"Erreur lors de l'appel météo : {e}")
+            # Retourne une valeur par défaut pour ne pas faire crasher tout le dashboard
+            return ConditionsMeteo(
+                city="Erreur Météo",
+                temperature_c=0.0,
+                condition="Indisponible",
+                ensoleillement_fort=False
+            )

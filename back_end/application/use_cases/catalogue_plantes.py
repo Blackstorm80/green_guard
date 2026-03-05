@@ -1,6 +1,6 @@
 # application/use_cases/catalogue_plantes.py
 from typing import Sequence, List
-from domain.entities import PlanteEntity
+from domain.models import PlanteEntity
 from domain.ports.plante_repository import IPlanteRepository
 from application.dto.plante import PlantDTO
 

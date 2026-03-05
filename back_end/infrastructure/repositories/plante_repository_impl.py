@@ -4,7 +4,7 @@ from typing import Sequence, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from domain.entities import PlanteEntity
+from domain.models import PlanteEntity
 from domain.ports.plante_repository import IPlanteRepository
 
 

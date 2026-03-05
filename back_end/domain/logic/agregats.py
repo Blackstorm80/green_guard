@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List
 
-domain.entities import BilanHydriqueJournalierEntity
+domain.models import BilanHydriqueJournalier
 
 
 @dataclass
@@ -15,7 +15,7 @@ class StatutZoneAgrege:
     critical_count: int
 
 
-def calculer_statut_zone(bilans: List[BilanHydriqueJournalierEntity]) -> StatutZoneAgrege:
+def calculer_statut_zone(bilans: List[BilanHydriqueJournalier]) -> StatutZoneAgrege:
     """
     Calcule le statut agrégé d'une zone à partir des bilans de ses espaces verts.
 

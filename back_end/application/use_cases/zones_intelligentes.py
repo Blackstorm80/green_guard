@@ -4,7 +4,7 @@ from dataclasses import dataclass
 import math
 import random
 from collections import defaultdict
-from domain.entities.espace_vert import EspaceVertEntity
+from domain.models import EspaceVert
 from domain.ports.espace_vert_repository import IEspaceVertRepository
 from application.dto.zone_intelligente import ZoneIntelligenteDTO, NiveauZone
 
@@ -43,7 +43,7 @@ def creer_zones_intelligentes(
     else:
         return kmeans_espaces(espaces, k=min(max_zones, nb_espaces//8))
 
-def creer_zone_globale(espaces: List[EspaceVertEntity]) -> ZoneIntelligenteDTO:
+def creer_zone_globale(espaces: List[EspaceVert]) -> ZoneIntelligenteDTO:
     centroid = calculer_centroid(espaces)
     stats = calculer_stats_sante(espaces)
     
@@ -61,7 +61,7 @@ def creer_zone_globale(espaces: List[EspaceVertEntity]) -> ZoneIntelligenteDTO:
         couleur_gauge=determiner_couleur(stats.sante_moyenne)
     )
 
-def grouper_par_ville(espaces: List[EspaceVertEntity]) -> List[ZoneIntelligenteDTO]:
+def grouper_par_ville(espaces: List[EspaceVert]) -> List[ZoneIntelligenteDTO]:
     villes = defaultdict(list)
     for espace in espaces:
         ville = espace.ville.lower() if espace.ville else "inconnu"
@@ -87,7 +87,7 @@ def grouper_par_ville(espaces: List[EspaceVertEntity]) -> List[ZoneIntelligenteD
             ))
     return sorted(zones, key=lambda z: z.nb_espaces, reverse=True)
 
-def grouper_par_rayon(espaces: List[EspaceVertEntity], rayon_km: float = 2.0) -> List[ZoneIntelligenteDTO]:
+def grouper_par_rayon(espaces: List[EspaceVert], rayon_km: float = 2.0) -> List[ZoneIntelligenteDTO]:
     """Clustering par rayons de 2km → quartiers naturels"""
     espaces_restant = espaces.copy()
     zones = []
@@ -124,7 +124,7 @@ def grouper_par_rayon(espaces: List[EspaceVertEntity], rayon_km: float = 2.0) ->
     
     return zones
 
-def kmeans_espaces(espaces: List[EspaceVertEntity], k: int) -> List[ZoneIntelligenteDTO]:
+def kmeans_espaces(espaces: List[EspaceVert], k: int) -> List[ZoneIntelligenteDTO]:
     """K-Means géographique simple (10 itérations)"""
     if k > len(espaces):
         k = len(espaces)
@@ -177,7 +177,7 @@ def kmeans_espaces(espaces: List[EspaceVertEntity], k: int) -> List[ZoneIntellig
     
     return zones
 
-def distance_km(espace1: EspaceVertEntity, espace2: EspaceVertEntity) -> float:
+def distance_km(espace1: EspaceVert, espace2: EspaceVert) -> float:
     """Distance Haversine (km)"""
     R = 6371  # Rayon Terre
     lat1, lon1 = math.radians(espace1.latitude), math.radians(espace1.longitude)
@@ -188,17 +188,17 @@ def distance_km(espace1: EspaceVertEntity, espace2: EspaceVertEntity) -> float:
     c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
     return R * c
 
-def distance_km_espace_centroid(espace: EspaceVertEntity, centroid: Coordonnees) -> float:
+def distance_km_espace_centroid(espace: EspaceVert, centroid: Coordonnees) -> float:
     dummy_espace = type('Dummy', (), {'latitude': centroid.lat, 'longitude': centroid.lon})()
     return distance_km(espace, dummy_espace)
 
-def calculer_centroid(espaces: List[EspaceVertEntity]) -> Coordonnees:
+def calculer_centroid(espaces: List[EspaceVert]) -> Coordonnees:
     if not espaces: return Coordonnees(0, 0)
     lat_moy = sum(e.latitude for e in espaces) / len(espaces)
     lon_moy = sum(e.longitude for e in espaces) / len(espaces)
     return Coordonnees(lat_moy, lon_moy)
 
-def calculer_stats_sante(espaces: List[EspaceVertEntity]) -> StatsSante:
+def calculer_stats_sante(espaces: List[EspaceVert]) -> StatsSante:
     # Utilise sante_percent si disponible, sinon valeur par défaut
     nb_ok = sum(1 for e in espaces if getattr(e, 'sante_percent', 100) >= 75)
     nb_warning = sum(1 for e in espaces if 50 <= getattr(e, 'sante_percent', 100) < 75)

@@ -7,7 +7,8 @@ class EspaceVertBase(BaseModel):
     """Schéma de base pour un espace vert, avec les champs communs."""
     nom: str
     type_espace: str
-    localisation: Optional[str] = None # Ex: "48.8566, 2.3522"
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     surface_m2: float
     exposition_reelle: str # ex: "Ensoleillé", "Mi-ombre"
     type_sol: str # ex: "Argileux", "Sableux"
@@ -26,7 +27,8 @@ class EspaceVertUpdate(BaseModel):
     """Schéma pour la mise à jour d'un espace vert. Tous les champs sont optionnels."""
     nom: Optional[str] = None
     type_espace: Optional[str] = None
-    localisation: Optional[str] = None
+    latitude: Optional[float] = None
+    longitude: Optional[float] = None
     surface_m2: Optional[float] = None
     exposition_reelle: Optional[str] = None
     type_sol: Optional[str] = None

@@ -1,5 +1,5 @@
 from datetime import datetime
-from domain.entities import EspaceVertEntity, PlanteEntity
+from domain.models import EspaceVert, PlanteEntity
 from domain.ports.espace import IEspaceVertRepository
 from domain.ports.plante import IPlanteRepository
 from domain.ports.couverture_pilotage import ICouverturePilotageService
@@ -28,7 +28,7 @@ def activer_couverture_si_necessaire(
     Retourne True si la couverture a été activée, False sinon.
     """
 
-    espace: EspaceVertEntity | None = espace_repo.get_by_id(espace_id)
+    espace: EspaceVert | None = espace_repo.get_by_id(espace_id)
     if espace is None:
         raise EnsoleillementFortError(f"Espace {espace_id} introuvable")
 
@@ -70,7 +70,7 @@ def activer_couverture_avec_meteo(
     if plante is None:
         return False
 
-    # Note: Assurez-vous que votre EspaceVertEntity possède bien latitude/longitude
+    # Note: Assurez-vous que votre EspaceVert possède bien latitude/longitude
     meteo = meteo_service.recuperer_conditions_actuelles(
         latitude=getattr(espace, "latitude", 0.0),
         longitude=getattr(espace, "longitude", 0.0),

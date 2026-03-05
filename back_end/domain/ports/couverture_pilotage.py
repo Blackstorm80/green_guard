@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-domain.entities import EspaceVertEntity
+domain.models import EspaceVert
 
 
 class ICouverturePilotageService(ABC):
@@ -15,7 +15,7 @@ class ICouverturePilotageService(ABC):
     """
 
     @abstractmethod
-    def ajuster_couverture_pour_protection(self, espace: EspaceVertEntity) -> None:
+    def ajuster_couverture_pour_protection(self, espace: EspaceVert) -> None:
         """
         Ajuste la couverture de l'espace pour protéger les plantes :
         fermer/ouvrir, augmenter le niveau d'ombre, etc.

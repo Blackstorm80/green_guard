@@ -1,6 +1,6 @@
 # application/use_cases/gestion_espaces_verts.py
 
-from domain.entities import EspaceVertEntity, PlanteEntity
+from domain.models import EspaceVert, Plante
 from domain.ports.plante_repository import IPlanteRepository
 from domain.ports.espace_vert_repository import IEspaceVertRepository
 from domain.logic.compatibilite_plante_espace import (
@@ -43,7 +43,7 @@ def creer_espace_vert(
         raise PlanteIntrouvableError(f"Plante avec id={data.plante_id} introuvable.")
 
     # 2. Créer une entité EspaceVert temporaire pour la vérification
-    espace_potentiel = EspaceVertEntity(
+    espace_potentiel = EspaceVert(
         id=0,  # sera remplacé par l'implémentation du repo
         nom=data.nom,
         type_espace=data.type_espace,
@@ -111,7 +111,7 @@ def mettre_a_jour_espace_vert(
     # 2. Appliquer les modifications (merge)
     plante_id = data.plante_id if data.plante_id is not None else espace.plante_id
 
-    espace_modifie = EspaceVertEntity(
+    espace_modifie = EspaceVert(
         id=espace.id,
         nom=data.nom if data.nom is not None else espace.nom,
         type_espace=data.type_espace if data.type_espace is not None else espace.type_espace,

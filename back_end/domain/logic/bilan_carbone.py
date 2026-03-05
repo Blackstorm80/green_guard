@@ -1,9 +1,9 @@
 # back_end/domain/logic/bilan_carbone.py
 
-from domain.entities import EspaceVertEntity
+from domain.models import EspaceVert
 
 def estimer_co2_absorbe_jour(
-    espace_vert: EspaceVertEntity,
+    espace_vert: EspaceVert,
     stress_hydrique: float,
     stress_sanitaire: float | None,
 ) -> float:
@@ -27,7 +27,7 @@ def estimer_co2_absorbe_jour(
 
 
 def estimer_o2_produit_jour(
-    espace_vert: EspaceVertEntity,
+    espace_vert: EspaceVert,
     stress_hydrique: float,
     stress_sanitaire: float | None,
 ) -> float:

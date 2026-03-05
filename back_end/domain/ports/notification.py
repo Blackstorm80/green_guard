@@ -2,10 +2,9 @@
 from abc import ABC, abstractmethod
 from typing import List
 
-from domain.entities.notification import NotificationEntity
-
+from domain.models import Notification
 
 class INotificationRepository(ABC):
     @abstractmethod
-    def list_for_user(self, user_id: int, limit: int = 10) -> List[NotificationEntity]:
+    def list_for_user(self, user_id: int, limit: int = 10) -> List[Notification]:
         ...

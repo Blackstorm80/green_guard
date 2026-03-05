@@ -1,7 +1,7 @@
 # back_end/domain/ports/couverture_service.py
 
 from abc import ABC, abstractmethod
-from domain.entities import EspaceVertEntity
+from domain.models import EspaceVert
 
 
 class ICouverturePilotageService(ABC):
@@ -12,7 +12,7 @@ class ICouverturePilotageService(ABC):
     @abstractmethod
     def ajuster_couverture_pour_protection(
         self,
-        espace: EspaceVertEntity,
+        espace: EspaceVert,
     ) -> None:
         """
         Ajuste la couverture de l'espace (fermer/ouvrir, changer le niveau)

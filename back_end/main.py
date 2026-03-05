@@ -3,7 +3,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from api.v1.endpoints import meteo, vegetal, capteurs, auth, user, interventions, zones
+from api.v1.endpoints import meteo, vegetal, capteurs, auth, user, interventions, zones, health, espaces_verts, plants
 # Vous pourrez ajouter d'autres routeurs ici (ex: gestion_espaces_verts)
 from infrastructure.database import Base, engine
 
@@ -16,8 +16,12 @@ app = FastAPI(
 # Configuration CORS : Permet au frontend (ex: localhost:3000) de discuter avec le backend
 origins = [
     "http://localhost:3000",
+    "http://localhost:5173",      
+    "http://127.0.0.1:5173",     
     "http://localhost",
+    "*"
 ]
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -39,14 +43,19 @@ def ping():
 
 # Inclusion des routeurs
 # Le problème de blocage étant résolu, nous pouvons réactiver tous les routeurs.
-app.include_router(meteo.router, prefix="/api/v1")
-app.include_router(vegetal.router, prefix="/api/v1")
-app.include_router(capteurs.router, prefix="/api/v1")
-app.include_router(auth.router, prefix="/api/v1")
-app.include_router(user.router, prefix="/api/v1")
-app.include_router(interventions.router, prefix="/api/v1")
-app.include_router(zones.router, prefix="/api/v1")
+app.include_router(meteo.router, prefix="/api/v1", tags=["Météo"])
+app.include_router(vegetal.router, prefix="/api/v1", tags=["Végétal"])
+app.include_router(capteurs.router, prefix="/api/v1", tags=["Capteurs"])
+app.include_router(auth.router, prefix="/api/v1", tags=["Authentification"])
+app.include_router(user.router, prefix="/api/v1", tags=["Utilisateurs"])
+app.include_router(interventions.router, prefix="/api/v1", tags=["Interventions"])
+app.include_router(zones.router, prefix="/api/v1", tags=["Zones"])
+app.include_router(espaces_verts.router, prefix="/api/v1/espaces-verts", tags=["Espaces Verts"])
+app.include_router(health.router, prefix="/api/v1", tags=["Santé"])
+app.include_router(plants.router, prefix="/api/v1/plants", tags=["Plants"])
 
 @app.get("/")
 def read_root():
     return {"message": "Bienvenue sur l'API Green Guard !"}
+
+    

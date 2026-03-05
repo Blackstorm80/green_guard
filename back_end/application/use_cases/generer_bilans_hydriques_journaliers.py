@@ -3,7 +3,7 @@
 from datetime import date
 from typing import List
 
-from domain.entities import EspaceVertEntity, BilanHydriqueJournalierEntity
+from domain.models import EspaceVert, BilanHydriqueJournalier
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.logic.stress_sanitaire import calculer_stress_sanitaire_jour
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
@@ -46,7 +46,7 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
     for espace in espaces:
         # 2.1. On regarde ce qui s'est passé la veille pour cet espace.
         #      S'il n'y a jamais eu de bilan, on partira d'une réserve pleine.
-        bilan_precedent: BilanHydriqueJournalierEntity | None = (
+        bilan_precedent: BilanHydriqueJournalier | None = (
             bilan_repo.get_dernier_bilan_pour_espace(espace.id)
         )
 
@@ -126,7 +126,7 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
             date_bilan=date_du_calcul,
             statut_hydrique=nouveau_bilan.statut_hydrique,
             indice_stress=nouveau_bilan.indice_stress,
-            localisation=espace.localisation,
+            localisation=f"{espace.latitude},{espace.longitude}" if espace.latitude and espace.longitude else None,
             stress_sanitaire=nouveau_bilan.stress_sanitaire,
             co2_absorbe_jour=nouveau_bilan.co2_absorbe_jour,
             o2_produit_jour=nouveau_bilan.o2_produit_jour,
@@ -163,7 +163,7 @@ def generer_bilan_hydrique_pour_un_espace(
         raise EspaceVertIntrouvableError(f"Espace vert introuvable pour id={espace_id}")
 
     # 2. Récupérer le bilan précédent s'il existe.
-    bilan_precedent: BilanHydriqueJournalierEntity | None = (
+    bilan_precedent: BilanHydriqueJournalier | None = (
         bilan_repo.get_dernier_bilan_pour_espace(espace.id)
     )
 
@@ -231,7 +231,7 @@ def generer_bilan_hydrique_pour_un_espace(
         date_bilan=date_du_calcul,
         statut_hydrique=nouveau_bilan.statut_hydrique,
         indice_stress=nouveau_bilan.indice_stress,
-        localisation=espace.localisation,
+        localisation=f"{espace.latitude},{espace.longitude}" if espace.latitude and espace.longitude else None,
         stress_sanitaire=nouveau_bilan.stress_sanitaire,
         co2_absorbe_jour=nouveau_bilan.co2_absorbe_jour,
         o2_produit_jour=nouveau_bilan.o2_produit_jour,

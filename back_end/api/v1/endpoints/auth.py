@@ -1,23 +1,24 @@
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from infrastructure.database import get_db_session
+from infrastructure.database import get_db
 from api.deps.auth import verify_password, create_access_token
-from domain.entities.user import UserEntity
+from domain.models import User
 from schema.token import Token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 @router.post("/login", response_model=Token)
 async def login(
-    username: str,
-    password: str,
-    db: Session = Depends(get_db_session)
+    form_data: OAuth2PasswordRequestForm = Depends(),
+    db: Session = Depends(get_db)
 ):
     """Login pour obtenir un token d'accès."""
-    user = db.query(UserEntity).filter(UserEntity.email == username).first()
+    # OAuth2PasswordRequestForm nous donne 'username' et 'password'
+    user = db.query(User).filter(User.email == form_data.username).first()
 
     # Vérifie si l'utilisateur existe ET si le mot de passe est correct
-    if not user or not verify_password(password, user.hashed_password):
+    if not user or not verify_password(form_data.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou mot de passe incorrect",
@@ -35,7 +36,7 @@ async def login(
 async def register(
     email: str,
     name: str,
-    db=Depends(get_db_session)
+    db=Depends(get_db)
 ):
     """Inscription temporaire"""
     return {"message": f"Utilisateur {name} créé", "email": email}
