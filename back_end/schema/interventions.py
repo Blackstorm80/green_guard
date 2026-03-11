@@ -43,3 +43,10 @@ class InterventionUpdate(BaseModel):
    espace_id: Optional[int] = None
    planifiee_le: Optional[datetime] = None
    realisee_le: Optional[datetime] = None
+
+
+class InterventionRead(InterventionBase):
+      id: int  # ID de l'intervention
+   
+      #C'est necessaire pour que Pydantic puisse lire les données depuis un modèle SQLAlchemy
+      model_config = ConfigDict(from_attributes=True)
