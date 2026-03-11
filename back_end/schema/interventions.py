@@ -29,3 +29,17 @@ class InterventionBase(BaseModel):
     planifiee_le: Optional[datetime] = None  # Date et heure prévues pour l'intervention
     realisee_le: Optional[datetime] = None  # Date et heure quand l'intervention a été réalisée
     
+
+class InterventionCreate(InterventionBase):
+   pass
+
+class InterventionUpdate(BaseModel):
+   """Schéma pour la mise à jour et la modification d'une intervention"""
+   # elle redéfinit tous les champs  en les rendant optionnels
+   # pour permettre une MAJ
+   type: Optional[str] = None
+   description: Optional[str] = None
+   volume_eau: Optional[float] = None
+   espace_id: Optional[int] = None
+   planifiee_le: Optional[datetime] = None
+   realisee_le: Optional[datetime] = None
