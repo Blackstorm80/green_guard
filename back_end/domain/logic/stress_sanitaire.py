@@ -21,7 +21,7 @@ def calculer_stress_sanitaire_jour(
       à partir d'extrêmes (5 °C, 35 °C, 20 %, 90 %).
     """
 
-    # Sécurité : si listes vides ou None, on retourne 0.0 par défaut.
+    # Sécurité : si listes vides ou None, on retourne 0.0 par défaut pour l'instat (je chercher une better solution)
     if not temperatures_horaires or not humidites_horaires:
         return 0.0
 

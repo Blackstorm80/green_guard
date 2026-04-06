@@ -1,31 +1,39 @@
-# back_end/api/v1/endpoints/user.py
 from typing import List
 from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
 
-from application.dto.notification import NotificationDTO
-from application.dto.user import UserDTO
-from application.use_cases.notifications import lister_notifications_user
-from api.deps.auth import get_current_user
+from domain import models
+from schema import utilisateurs as user_schema, notifications as notification_schema
+from api.deps.auth import get_current_active_user
+from infrastructure.database import get_db
 from infrastructure.repositories.notification_repository_impl import NotificationRepositoryImpl
-from domain.ports.notification import INotificationRepository
-
-router = APIRouter(prefix="/user", tags=["User"])
-
-
-def get_notification_repo() -> INotificationRepository:
-    # Pour l'instant, on retourne une implémentation "fake" en mémoire.
-    # Plus tard, on injectera la session de base de données ici.
-    return NotificationRepositoryImpl()
+from application.use_cases.notifications import lister_notifications_user
+from application.dto.user import UserDTO
 
 
-@router.get("/notifications", response_model=List[NotificationDTO])
-async def get_user_notifications(
-    current_user: UserDTO = Depends(get_current_user),
-    notif_repo: INotificationRepository = Depends(get_notification_repo),
-    limit: int = 10,
+router = APIRouter()
+
+
+@router.get("/me", response_model=user_schema.User)
+def read_current_user(
+    current_user: models.User = Depends(get_current_active_user),
 ):
-    return lister_notifications_user(
-        user=current_user,
-        notif_repo=notif_repo,
-        limit=limit,
-    )
+    """
+    Récupère les informations de l'utilisateur actuellement authentifié.
+    """
+    return current_user
+
+
+@router.get("/me/notifications", response_model=List[notification_schema.NotificationRead])
+def read_user_notifications(
+    current_user: models.User = Depends(get_current_active_user),
+    db: Session = Depends(get_db),
+):
+    """
+    Récupère les dernières notifications pour l'utilisateur courant.
+    """
+    user_dto = UserDTO(id=current_user.id, name=current_user.name, email=current_user.email, role=current_user.role)
+    notif_repo = NotificationRepositoryImpl(db)
+    
+    # Le cas d'usage retourne des DTOs, FastAPI les mappe au `response_model`
+    return lister_notifications_user(user=user_dto, notif_repo=notif_repo)

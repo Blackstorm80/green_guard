@@ -1,0 +1,50 @@
+@media print {
+  /* Cache la Sidebar, le Header et les boutons non essentiels */
+  .sidebar,
+  .header,
+  .no-print,
+  button,
+  [data-no-print="true"] {
+    display: none !important;
+  }
+
+  /* Assure que le contenu principal prend toute la largeur */
+  body,
+  #root,
+  .main-content {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+  }
+  
+  /* Force les graphiques Recharts à 100% de largeur et ajuste leur rendu */
+  .recharts-wrapper,
+  .recharts-surface {
+    width: 100% !important;
+    height: auto !important;
+  }
+  
+  /* Passe en Noir sur Blanc */
+  body,
+  div,
+  p,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6,
+  span,
+  text {
+    background-color: white !important;
+    color: black !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+  
+  /* Style spécifique pour les textes dans les graphiques Recharts */
+  .recharts-text {
+    fill: black !important;
+  }
+}

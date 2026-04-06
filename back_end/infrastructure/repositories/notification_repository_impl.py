@@ -7,7 +7,7 @@ from domain.models import Notification
 
 class NotificationRepositoryImpl(INotificationRepository):
     """
-    Implémentation FAKE du repository de notifications.
+    Implémentation teste du repository de notifications.
     Retourne des données en mémoire pour le développement.
     """
     def list_for_user(self, user_id: int, limit: int = 10) -> List[Notification]:

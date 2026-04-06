@@ -3,14 +3,14 @@ import { useState, useEffect, useRef } from "react";
 import { Bell, AlertTriangle, CheckCircle, Clock } from "lucide-react";
 import { api } from "../../services/api";
 
-const PrioriteIcon = ({ priorite }) => {
-    switch (priorite) {
-        case 'CRITICAL':
+const PrioriteIcon = ({ type }) => {
+    switch (type) {
+        case 'alerte':
             return <AlertTriangle className="text-red-500" size={20} />;
-        case 'HIGH':
-            return <AlertTriangle className="text-orange-400" size={20} />;
-        default:
+        case 'info':
             return <CheckCircle className="text-green-500" size={20} />;
+        default:
+            return <Bell className="text-gray-400" size={20} />;
     }
 };
 
@@ -29,7 +29,7 @@ const TimeAgo = ({ date }) => {
 
 const Notifications = () => {
     const [isOpen, setIsOpen] = useState(false);
-    const [data, setData] = useState({ interventions: [], total: 0, non_lues: 0 });
+    const [notifications, setNotifications] = useState([]);
     const [loading, setLoading] = useState(true);
     const dropdownRef = useRef(null);
 
@@ -37,8 +37,8 @@ const Notifications = () => {
         const fetchNotifications = async () => {
             try {
                 setLoading(true);
-                const response = await api.getUrgentInterventions();
-                setData(response);
+                const response = await api.getNotifications();
+                setNotifications(response);
             } catch (error) {
                 console.error("Impossible de charger les notifications:", error);
             } finally {
@@ -47,6 +47,15 @@ const Notifications = () => {
         };
         fetchNotifications();
     }, []);
+
+    const handleMarkAsRead = async (id) => {
+        try {
+            await api.markNotificationAsRead(id);
+            setNotifications(prev => prev.map(n => n.id === id ? { ...n, est_lue: true } : n));
+        } catch (error) {
+            console.error("Impossible de marquer la notification comme lue:", error);
+        }
+    };
 
     // Fermer le dropdown si on clique en dehors
     useEffect(() => {
@@ -61,6 +70,8 @@ const Notifications = () => {
         };
     }, []);
 
+    const nonLuesCount = notifications.filter(n => !n.est_lue).length;
+
 
     return (
         <div className="relative" ref={dropdownRef}>
@@ -69,7 +80,7 @@ const Notifications = () => {
                 className="relative p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full transition-colors"
             >
                 <Bell size={20} />
-                {data.non_lues > 0 && (
+                {nonLuesCount > 0 && (
                     <span className="absolute top-1.5 right-1.5 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-gray-800 flex items-center justify-center text-xs font-bold">
                     </span>
                 )}
@@ -78,23 +89,23 @@ const Notifications = () => {
             {isOpen && (
                 <div className="absolute top-full right-0 mt-2 w-80 bg-gray-800 border border-gray-700 rounded-lg shadow-2xl z-50">
                     <div className="p-3 border-b border-gray-700">
-                        <h3 className="font-bold text-white">Notifications ({data.total})</h3>
+                        <h3 className="font-bold text-white">Notifications ({notifications.length})</h3>
                     </div>
                     <div className="max-h-96 overflow-y-auto">
                         {loading ? (
                             <div className="p-4 text-center text-gray-400">Chargement...</div>
-                        ) : data.interventions.length === 0 ? (
-                            <div className="p-4 text-center text-gray-400">Aucune notification urgente.</div>
+                        ) : notifications.length === 0 ? (
+                            <div className="p-4 text-center text-gray-400">Aucune notification.</div>
                         ) : (
                             <div>
-                                {data.interventions.map(notif => (
-                                    <div key={notif.id} className={`p-3 flex items-start gap-3 border-b border-gray-700/50 hover:bg-gray-700/50 ${!notif.is_read ? 'bg-sky-900/20' : ''}`}>
-                                        <PrioriteIcon priorite={notif.priorite} />
+                                {notifications.map(notif => (
+                                    <div key={notif.id} onClick={() => !notif.est_lue && handleMarkAsRead(notif.id)} className={`p-3 flex items-start gap-3 border-b border-gray-700/50 hover:bg-gray-700/50 ${!notif.est_lue ? 'bg-sky-900/20' : ''}`}>
+                                        <PrioriteIcon type={notif.type} />
                                         <div className="flex-1">
-                                            <p className="text-sm font-semibold text-white">{notif.espace_nom}: <span className="font-normal">{notif.description}</span></p>
+                                            <p className="text-sm font-semibold text-white">{notif.message}</p>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <Clock size={12} className="text-gray-500"/>
-                                                <TimeAgo date={notif.created_at} />
+                                                <TimeAgo date={notif.cree_le} />
                                             </div>
                                         </div>
                                     </div>
@@ -104,7 +115,7 @@ const Notifications = () => {
                     </div>
                      <div className="p-2 bg-gray-900/50 text-center">
                         <button className="text-xs text-cyan-400 hover:underline">
-                            Voir toutes les interventions
+                            Voir toutes les notifications
                         </button>
                     </div>
                 </div>

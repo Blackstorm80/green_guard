@@ -1,47 +1,54 @@
-# Fichier : schemas/espaces_verts.py
-
 from pydantic import BaseModel, ConfigDict
 from typing import Optional
+from datetime import datetime
 
 class EspaceVertBase(BaseModel):
-    """Schéma de base pour un espace vert, avec les champs communs."""
+    """Le socle commun : On ne garde en obligatoire que le strict nécessaire."""
     nom: str
-    type_espace: str
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
-    surface_m2: float
-    exposition_reelle: str # ex: "Ensoleillé", "Mi-ombre"
-    type_sol: str # ex: "Argileux", "Sableux"
-    ph_sol: float
-    reserve_utile_max: float
-    coefficient_cultural: float
-    zone: str # ex: "Zone A"
-    gerant_id: int
-    plante_id: int
-
-class EspaceVertCreate(EspaceVertBase):
-    """Schéma utilisé pour la création d'un nouvel espace vert via l'API."""
-    pass
-
-class EspaceVertUpdate(BaseModel):
-    """Schéma pour la mise à jour d'un espace vert. Tous les champs sont optionnels."""
-    nom: Optional[str] = None
-    type_espace: Optional[str] = None
-    latitude: Optional[float] = None
-    longitude: Optional[float] = None
+    ville: Optional[str] = None
+    latitude: float
+    longitude: float
     surface_m2: Optional[float] = None
-    exposition_reelle: Optional[str] = None
-    type_sol: Optional[str] = None
-    ph_sol: Optional[float] = None
-    reserve_utile_max: Optional[float] = None
-    coefficient_cultural: Optional[float] = None
+    user_id: int # L'ID de Nathan
+    
+    # --- Données Agronomiques (Optionnelles pour éviter les crashs 500) ---
+    type_espace: Optional[str] = "Jardin"
+    exposition_reelle: Optional[str] = "Ensoleillé"
+    type_sol: Optional[str] = "Argileux"
+    ph_sol: Optional[float] = 7.0
+    reserve_utile_max: Optional[float] = 0.0
+    coefficient_cultural: Optional[float] = 1.0
     zone: Optional[str] = None
     gerant_id: Optional[int] = None
     plante_id: Optional[int] = None
 
-class EspaceVert(EspaceVertBase):
-    """Schéma utilisé pour lire et retourner les données complètes d'un espace vert."""
-    id: int
+class EspaceVertCreate(EspaceVertBase):
+    """Utilisé lors de l'envoi du formulaire par le Front-end."""
+    pass
 
-    # Permet à Pydantic de lire les données depuis un modèle SQLAlchemy
+class EspaceVertRead(EspaceVertBase):
+    """Utilisé par l'API pour renvoyer les données à React."""
+    id: int
+    # On ajoute les champs calculés ou automatiques
+    sante_percent: Optional[float] = 100.0
+    cree_le: Optional[datetime] = None
+
+    # Crucial pour la compatibilité avec SQLAlchemy
     model_config = ConfigDict(from_attributes=True)
+
+class EspaceVertUpdate(BaseModel):
+    """Pour les modifications partielles des données agronomiques."""
+    nom: Optional[str] = None
+    ville: Optional[str] = None
+    surface_m2: Optional[float] = None
+    
+    # --- 9 Champs Agronomiques ---
+    type_sol: Optional[str] = None
+    ph_actuel: Optional[float] = None
+    exposition: Optional[str] = None
+    drainage: Optional[str] = None
+    humidite_cible: Optional[float] = None
+    frequence_arrosage_auto: Optional[int] = None
+    profondeur_racinaire: Optional[float] = None
+    type_irrigation: Optional[str] = None
+    date_derniere_fertilisation: Optional[datetime] = None

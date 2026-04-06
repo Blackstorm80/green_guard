@@ -1,205 +1,205 @@
-// front_end/src/Pages/espacesEtSites/espaceEtSites.jsx
-import React, { useState, useMemo, useEffect } from 'react';
-import { Search, LayoutGrid, List } from 'lucide-react';
-import { api } from '../../services/api';
+import { useState, useEffect } from "react";
+import { 
+  Search, Plus, MapPin, Leaf, LayoutGrid, List, Layers 
+} from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import { api } from "../../services/api";
+import AddSpaceModal from "./AddSpaceModal";
+import EditSpaceModal from "./EditSpaceModal"; // 1. Importer le nouveau composant
 
-// ============================================================================
-// Fonctions Utilitaires et Composants de Présentation
-// ============================================================================
+export default function EspacesSites() {
+  const [espaces, setEspaces] = useState([]);
+  const [clusters, setClusters] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false); // 2. State pour la modale d'édition
+  const [selectedEspace, setSelectedEspace] = useState(null); // 2. State pour l'espace sélectionné
+  const [search, setSearch] = useState("");
+  const [activeClusterId, setActiveClusterId] = useState(null);
+  const [viewMode, setViewMode] = useState("grid");
 
-const getHealthColor = (health) => {
-  if (health >= 85) return '#0CB95D'; // Vert
-  if (health >= 65) return '#E77C02'; // Orange
-  return '#DF1B1B'; // Rouge
-};
+  useEffect(() => {
+    chargerDonnees();
+  }, []);
 
-const RadialGauge = ({ health }) => {
-  const safeHealth = Math.max(0, Math.min(100, health || 0));
-  const color = getHealthColor(safeHealth);
-  const radius = 35;
-  const circumference = 2 * Math.PI * radius;
-  const offset = circumference - (safeHealth / 100) * circumference;
+  const chargerDonnees = async () => {
+    setLoading(true);
+    try {
+      const [sitesData, clustersData] = await Promise.all([
+        api.getEspacesVerts(),
+        api.getZones()
+      ]);
+      setEspaces(sitesData);
+      setClusters(clustersData);
+    } catch (err) {
+      console.error("Erreur chargement :", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleEditClick = (site) => {
+    setSelectedEspace(site);
+    setIsEditModalOpen(true);
+  };
+
+  const getCouleurSante = (score) => {
+    if (score >= 85) return "#0CB95D";
+    if (score >= 65) return "#E77C02";
+    return "#DF1B1B";
+  };
+
+  const sitesFiltres = espaces.filter(site => {
+    const matchSearch = site.nom.toLowerCase().includes(search.toLowerCase());
+    const matchCluster = !activeClusterId || site.zone_id === activeClusterId;
+    return matchSearch && matchCluster;
+  });
+
+  const aBesoinDePulse = espaces.length === 0;
 
   return (
-    <div className="relative flex items-center justify-center">
-      <svg className="transform -rotate-90 w-24 h-24">
-        <circle cx="48" cy="48" r={radius} stroke="#374151" strokeWidth="8" fill="transparent" />
-        <circle
-          cx="48"
-          cy="48"
-          r={radius}
-          stroke={color}
-          strokeWidth="8"
-          fill="transparent"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          style={{ transition: 'stroke-dashoffset 0.5s ease-in-out, stroke 0.5s ease' }}
-        />
-      </svg>
-      <span className="absolute text-xl font-bold text-white">{Math.round(safeHealth)}%</span>
-    </div>
-  );
-};
-
-const ClusterWidget = ({ cluster, isActive, onClick }) => {
-  const activeClasses = isActive ? 'border-teal-400 shadow-xl shadow-teal-400/20' : 'border-slate-800';
-
-  return (
-    <div
-      onClick={onClick}
-      className={`flex flex-col items-center justify-center p-4 bg-gray-900 border ${activeClasses} rounded-lg cursor-pointer transition-all duration-500 h-full`}
-    >
-      <RadialGauge health={cluster.sante_moyenne} />
-      <p className="mt-2 text-sm font-semibold text-white text-center">{cluster.nom}</p>
-      <p className="text-xs text-slate-400">Santé Moyenne</p>
-    </div>
-  );
-};
-
-const SpaceCard = ({ space }) => {
-    const healthColor = getHealthColor(space.sante_percent);
-    return (
-      <div className="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex items-center relative overflow-hidden transition-all duration-500 hover:bg-slate-800/60">
-        <div className="absolute left-0 top-0 bottom-0 w-1" style={{ backgroundColor: healthColor }}></div>
-        <div className="ml-4 flex-grow">
-          <p className="font-bold text-white">{space.nom}</p>
-          <p className="text-sm text-slate-500">{space.ville || 'Localisation non définie'}</p>
+    <div className="relative space-y-8 animate-in fade-in duration-700 pb-20">
+      
+      {/* HEADER */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-black text-white tracking-tight">Clusters Intelligents</h1>
+          <p className="text-slate-400 mt-1">Segmentation basee sur la geographie et la sante</p>
         </div>
-        <div className="flex items-center">
-          <span className="text-white font-semibold">{Math.round(space.sante_percent)}%</span>
-          <div className="w-2 h-2 rounded-full ml-2" style={{ backgroundColor: healthColor }}></div>
+        
+        <button 
+          onClick={() => setIsAddModalOpen(true)}
+          className="hidden md:flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-xl font-bold transition-all shadow-lg"
+        >
+          <Plus size={20} />
+          <span>Ajouter un espace</span>
+        </button>
+      </div>
+
+      {/* SECTION DES JAUGES DE CLUSTERS (inchangée) ... */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div 
+          onClick={() => setActiveClusterId(null)}
+          className={`cursor-pointer p-4 rounded-2xl border transition-all ${
+            !activeClusterId ? "bg-slate-800 border-green-500 shadow-lg" : "bg-slate-900 border-slate-800 hover:border-slate-700"
+          }`}
+        >
+          <div className="flex justify-between items-center">
+             <span className="text-xs font-bold text-slate-500 uppercase">Vue Globale</span>
+             <Layers size={16} className={!activeClusterId ? "text-green-500" : "text-slate-600"} />
+          </div>
+          <p className="text-2xl font-black text-white mt-2">{espaces.length}</p>
+        </div>
+
+        {clusters.map((cluster) => {
+          const couleur = getCouleurSante(cluster.sante_moyenne);
+          const isActive = activeClusterId === cluster.id;
+          return (
+            <div 
+              key={cluster.id}
+              onClick={() => setActiveClusterId(cluster.id)}
+              className={`cursor-pointer p-4 rounded-2xl border transition-all relative overflow-hidden ${
+                isActive ? "bg-slate-800 border-white/20 shadow-xl scale-[1.02]" : "bg-slate-900 border-slate-800 hover:border-slate-700"
+              }`}
+            >
+              <div className="flex justify-between items-start relative z-10">
+                <div className="max-w-[70%]">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase truncate block">{cluster.nom}</span>
+                  <p className="text-2xl font-black text-white mt-1">{cluster.nb_espaces}</p>
+                </div>
+                <div className="relative w-12 h-12 flex items-center justify-center">
+                   <svg className="w-full h-full transform -rotate-90">
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800" />
+                      <circle 
+                        cx="24" cy="24" r="20" stroke={couleur} strokeWidth="4" fill="transparent" 
+                        strokeDasharray={125}
+                        strokeDashoffset={125 - (125 * cluster.sante_moyenne) / 100}
+                        strokeLinecap="round"
+                      />
+                   </svg>
+                   <span className="absolute text-[9px] font-bold text-white">{Math.round(cluster.sante_moyenne)}%</span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* BARRE DE RECHERCHE (inchangée) ... */}
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+        <div className="relative flex-1">
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+          <input 
+            type="text"
+            placeholder="Rechercher par nom..."
+            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white outline-none focus:ring-1 focus:ring-green-500"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+        </div>
+        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
+          <button onClick={() => setViewMode("grid")} className={`p-2 rounded ${viewMode === "grid" ? "bg-slate-800 text-white" : "text-slate-500"}`}><LayoutGrid size={18} /></button>
+          <button onClick={() => setViewMode("list")} className={`p-2 rounded ${viewMode === "list" ? "bg-slate-800 text-white" : "text-slate-500"}`}><List size={18} /></button>
         </div>
       </div>
-    );
-};
 
-// ============================================================================
-// Composant Principal: EspacesEtSites
-// ============================================================================
-
-const EspacesEtSites = () => {
-    // --- États ---
-    const [spaces, setSpaces] = useState([]);
-    const [clusters, setClusters] = useState([]);
-    const [searchTerm, setSearchTerm] = useState('');
-    const [viewMode, setViewMode] = useState('grid');
-    const [activeCluster, setActiveCluster] = useState(null);
-    const [isSearchFocused, setIsSearchFocused] = useState(false);
-    const [error, setError] = useState(null);
-
-    // --- Récupération des données ---
-    useEffect(() => {
-        const fetchData = async () => {
-            try {
-                // Règle de Synchronisation: Appels couplés pour garantir l'intégrité.
-                const [spacesData, zonesData] = await Promise.all([
-                    api.getEspacesVerts(),
-                    api.getZones()
-                ]);
-
-                if (Array.isArray(zonesData) && zonesData.length > 0) {
-                     // NOTE: Le backend ne renvoie pas le lien entre un espace et sa zone.
-                    // En l'absence de `zone_id` sur l'objet `EspaceVert`, nous simulons
-                    // l'appartenance à un cluster pour faire fonctionner le filtrage de l'UI.
-                    // La logique ci-dessous doit être remplacée quand l'API renverra ce lien.
-                    const spacesWithCluster = spacesData.map((space, index) => ({
-                        ...space,
-                        clusterId: zonesData[index % zonesData.length].id
-                    }));
-                    setSpaces(spacesWithCluster);
-                } else {
-                    setSpaces(spacesData);
-                }
-               
-                setClusters(zonesData);
-
-            } catch (err) {
-                console.error("Erreur lors de la récupération des données:", err);
-                setError("Impossible de charger les données. Vérifiez la connexion avec le backend.");
-            }
-        };
-        fetchData();
-    }, []);
-
-    // --- Logique de filtrage ---
-    const filteredSpaces = useMemo(() => {
-        if (!Array.isArray(spaces)) return [];
-        return spaces.filter(space => {
-            const matchesCluster = activeCluster ? space.clusterId === activeCluster : true;
-            const matchesSearch = space.nom.toLowerCase().includes(searchTerm.toLowerCase());
-            return matchesCluster && matchesSearch;
-        });
-    }, [searchTerm, activeCluster, spaces]);
-
-    if (error) {
-        return <div className="flex items-center justify-center h-screen bg-gray-900 text-red-500">{error}</div>;
-    }
-
-    return (
-        <div className="bg-gray-900 min-h-screen p-8 text-white">
-            <h1 className="text-3xl font-bold mb-6">Espaces & Sites</h1>
-
-            {/* Niveau 1: Clusters Intelligents */}
-            <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-8">
-                <div
-                    onClick={() => setActiveCluster(null)}
-                    className={`flex flex-col items-center justify-center p-4 border rounded-lg cursor-pointer transition-all duration-500 ${!activeCluster ? 'bg-teal-600 border-teal-400 shadow-lg' : 'bg-gray-800 border-slate-700 hover:bg-gray-700'}`}
-                >
-                    <p className="text-3xl font-bold">{spaces.length}</p>
-                    <p className="mt-1 font-bold">Global</p>
-                </div>
-                <div className="md:col-span-4 grid grid-cols-1 md:grid-cols-4 gap-4">
-                    {Array.isArray(clusters) && clusters.map(cluster => (
-                        <ClusterWidget
-                            key={cluster.id}
-                            cluster={cluster}
-                            isActive={activeCluster === cluster.id}
-                            onClick={() => setActiveCluster(cluster.id)}
-                        />
-                    ))}
-                </div>
+      {/* LISTE DES SITES */}
+      <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
+        {sitesFiltres.map(site => (
+          // 3. Ajouter onClick pour ouvrir la modale d'édition
+          <div 
+            key={site.id} 
+            onClick={() => handleEditClick(site)}
+            className="bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-green-500/50 transition-all group cursor-pointer"
+          >
+            <h3 className="text-xl font-bold text-white mb-1">{site.nom}</h3>
+            <div className="flex items-center gap-2 text-slate-500 text-sm mb-4">
+              <MapPin size={14} />
+              <span>{site.ville}</span>
             </div>
-
-            {/* Niveau 2: Barre de Filtrage */}
-            <div className="sticky top-4 z-10 mb-8">
-                <div className="bg-slate-900/40 backdrop-blur-md border border-slate-800 rounded-lg p-2 flex items-center justify-between gap-4">
-                    <div className="relative flex-grow">
-                        <Search className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors duration-300 ${isSearchFocused ? 'text-teal-400' : 'text-slate-500'}`} size={20} />
-                        <input
-                            type="text"
-                            placeholder={`Rechercher parmi ${filteredSpaces.length} sites...`}
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            onFocus={() => setIsSearchFocused(true)}
-                            onBlur={() => setIsSearchFocused(false)}
-                            className="w-full bg-transparent pl-10 pr-4 py-2 text-white rounded-md focus:outline-none"
-                        />
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <button onClick={() => setViewMode('grid')} className={`p-2 rounded-md transition-colors duration-300 ${viewMode === 'grid' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:bg-slate-700/50'}`}>
-                            <LayoutGrid size={20} />
-                        </button>
-                        <button onClick={() => setViewMode('list')} className={`p-2 rounded-md transition-colors duration-300 ${viewMode === 'list' ? 'bg-teal-500/20 text-teal-400' : 'text-slate-500 hover:bg-slate-700/50'}`}>
-                            <List size={20} />
-                        </button>
-                    </div>
-                </div>
+            <div className="pt-4 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
+               <span>Zone: {site.zone_id}</span>
+               <span className={site.sante_percent >= 85 ? "text-green-500" : "text-amber-500"}>{site.sante_percent}% Sante</span>
             </div>
+          </div>
+        ))}
+      </div>
 
-            {/* Niveau 3: Liste des Espaces */}
-            <div className={`transition-all duration-500 ${viewMode === 'grid' ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6' : 'flex flex-col gap-4'}`}>
-                {Array.isArray(filteredSpaces) && filteredSpaces.map(space => (
-                    <SpaceCard key={space.id} space={space} />
-                ))}
-            </div>
-            {filteredSpaces.length === 0 && !error && (
-                <div className="text-center py-12 text-slate-500">
-                    <p>Aucun espace ne correspond à votre recherche.</p>
-                </div>
-            )}
-        </div>
-    );
-};
+      {/* BOUTON MOBILE FLOTTANT (FAB) */}
+      <AnimatePresence>
+        <motion.button
+          initial={{ scale: 0 }}
+          animate={{ 
+            scale: 1,
+            boxShadow: aBesoinDePulse ? ["0px 0px 0px rgba(34,197,94,0)", "0px 0px 20px rgba(34,197,94,0.6)", "0px 0px 0px rgba(34,197,94,0)"] : "none"
+          }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          onClick={() => setIsAddModalOpen(true)}
+          className="md:hidden fixed bottom-6 right-6 z-50 bg-green-600 text-white p-4 rounded-full shadow-2xl"
+        >
+          <Plus size={28} />
+        </motion.button>
+      </AnimatePresence>
 
-export default EspacesEtSites;
+      {/* MODALES */}
+      {isAddModalOpen && (
+        <AddSpaceModal 
+          onClose={() => setIsAddModalOpen(false)} 
+          onSuccess={chargerDonnees} 
+        />
+      )}
+      
+      {/* 4. Rendu conditionnel de la modale d'édition */}
+      {isEditModalOpen && selectedEspace && (
+        <EditSpaceModal
+          espace={selectedEspace}
+          onClose={() => setIsEditModalOpen(false)}
+          onSuccess={() => {
+            chargerDonnees();
+            setIsEditModalOpen(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}

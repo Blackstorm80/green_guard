@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { 
   FileText, 
   Download, 
@@ -6,9 +6,9 @@ import {
   CheckCircle, 
   AlertOctagon,
   Search,
-  Filter
 } from "lucide-react";
 import { cn } from "../../lib/utils";
+import { api } from '../../services/api';
 
 // --- MOCK DATA : Historique des rapports ---
 const REPORTS_DATA = [
@@ -47,14 +47,61 @@ const REPORTS_DATA = [
   },
 ];
 
-export default function Rapports() {
-  const [filter, setFilter] = useState("ALL");
+const Rapports = () => {
+  const [filters, setFilters] = useState({
+    startDate: '',
+    endDate: '',
+    espaceId: '',
+    searchTerm: '',
+    type: 'ALL',
+  });
+  const [espaces, setEspaces] = useState([]);
+
+  useEffect(() => {
+    const fetchEspaces = async () => {
+      try {
+        const response = await api.getEspacesVerts();
+        setEspaces(response);
+      } catch (error) {
+        console.error("Impossible de charger les espaces verts", error);
+      }
+    };
+    fetchEspaces();
+  }, []);
+
+  const handleFilterChange = (e) => {
+    setFilters({ ...filters, [e.target.name]: e.target.value });
+  };
+  
+  const handleTypeFilter = (type) => {
+    setFilters({ ...filters, type });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  const filteredReports = REPORTS_DATA.filter(report => {
+    const reportDate = new Date(report.date);
+    const startDate = filters.startDate ? new Date(filters.startDate) : null;
+    const endDate = filters.endDate ? new Date(filters.endDate) : null;
+
+    if (startDate && reportDate < startDate) return false;
+    if (endDate && reportDate > endDate) return false;
+    if (filters.type !== 'ALL' && report.type !== filters.type) return false;
+    if (filters.searchTerm && !report.title.toLowerCase().includes(filters.searchTerm.toLowerCase())) return false;
+    
+    // Le filtre par espace n'est pas appliqué car les données sont mockées
+    // Il faudrait l'ID de l'espace dans les données pour que ce soit fonctionnel
+
+    return true;
+  });
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
       
       {/* --- EN-TÊTE --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 no-print">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
             Rapports & Historique
@@ -63,9 +110,12 @@ export default function Rapports() {
             Consultez et téléchargez les bilans d'interventions et d'incidents.
           </p>
         </div>
-        <button className="bg-slate-800 hover:bg-slate-700 text-white border border-slate-700 px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2">
-          <Calendar size={16} />
-          <span>Filtrer par date</span>
+        <button
+          onClick={handlePrint}
+          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2"
+        >
+          <FileText size={16} />
+          <span>Imprimer le Rapport</span>
         </button>
       </div>
 
@@ -73,11 +123,14 @@ export default function Rapports() {
       <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex-1 flex flex-col min-h-0">
         
         {/* Toolbar */}
-        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
           <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 w-full sm:w-64">
             <Search size={16} className="text-slate-500" />
             <input 
               type="text" 
+              name="searchTerm"
+              value={filters.searchTerm}
+              onChange={handleFilterChange}
               placeholder="Rechercher un rapport..." 
               className="bg-transparent border-none focus:outline-none text-sm text-slate-200 w-full placeholder:text-slate-600"
             />
@@ -86,20 +139,20 @@ export default function Rapports() {
             {["ALL", "INCIDENT", "MONTHLY", "INTERVENTION"].map(type => (
               <button
                 key={type}
-                onClick={() => setFilter(type)}
+                onClick={() => handleTypeFilter(type)}
                 className={cn(
                   "px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors",
-                  filter === type 
+                  filters.type === type 
                     ? "bg-slate-800 text-white border-slate-600" 
                     : "text-slate-500 border-transparent hover:bg-slate-800 hover:text-slate-300"
                 )}
               >
-                {type === "ALL" ? "Tous" : type}
+                {type === "ALL" ? "Tous" : type.charAt(0) + type.slice(1).toLowerCase()}
               </button>
             ))}
           </div>
         </div>
-
+        
         {/* Table */}
         <div className="overflow-auto custom-scrollbar flex-1">
           <table className="w-full text-left text-sm">
@@ -109,11 +162,11 @@ export default function Rapports() {
                 <th className="px-6 py-4">Zone / Espace</th>
                 <th className="px-6 py-4">Date</th>
                 <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right">Action</th>
+                <th className="px-6 py-4 text-right no-print">Action</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800 text-slate-300">
-              {REPORTS_DATA.map((report) => (
+              {filteredReports.map((report) => (
                 <tr key={report.id} className="hover:bg-slate-800/50 transition-colors group">
                   <td className="px-6 py-4">
                     <div className="flex items-start gap-3">
@@ -157,7 +210,7 @@ export default function Rapports() {
                     )}
                   </td>
 
-                  <td className="px-6 py-4 text-right">
+                  <td className="px-6 py-4 text-right no-print">
                     <button className="text-slate-400 hover:text-white p-2 hover:bg-slate-700 rounded-lg transition-colors border border-transparent hover:border-slate-600">
                       <Download size={18} />
                     </button>
@@ -167,7 +220,18 @@ export default function Rapports() {
             </tbody>
           </table>
         </div>
+        
+        {/* Section pour l'impression */}
+        <div className="printable-content p-6 hidden">
+            <h2 className="text-xl font-semibold mb-4">Graphique de Stress Hydrique</h2>
+            <div className="bg-white p-4 rounded-lg shadow-md h-64 w-full">
+              <p className="text-center text-gray-500 pt-24">Le graphique s'affichera ici.</p>
+            </div>
+        </div>
+
       </div>
     </div>
   );
-}
+};
+
+export default Rapports;

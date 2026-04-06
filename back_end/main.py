@@ -1,61 +1,61 @@
-# back_end/main.py
-
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from infrastructure.database import engine, Base
+from domain import models
+from apscheduler.schedulers.background import BackgroundScheduler
+from infrastructure.services.capteur_hybrid_service import run_update
 
-from api.v1.endpoints import meteo, vegetal, capteurs, auth, user, interventions, zones, health, espaces_verts, plants
-# Vous pourrez ajouter d'autres routeurs ici (ex: gestion_espaces_verts)
-from infrastructure.database import Base, engine
+# Création des tables au lancement
+Base.metadata.create_all(bind=engine)
 
-app = FastAPI(
-    title="Green Guard API",
-    description="API pour la gestion des espaces verts et le calcul de bilan hydrique.",
-    version="1.0.0",
-)
+app = FastAPI(title="Green Guard API")
 
-# Configuration CORS : Permet au frontend (ex: localhost:3000) de discuter avec le backend
-origins = [
-    "http://localhost:3000",
-    "http://localhost:5173",      
-    "http://127.0.0.1:5173",     
-    "http://localhost",
-    "*"
-]
-
-
+# Configuration CORS pour React
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-@app.on_event("startup")
-def on_startup():
-    # Création des tables au démarrage de l'application.
-    # C'est la manière non-bloquante de le faire.
-    Base.metadata.create_all(bind=engine)
+# Imports des routers
+from api.v1.endpoints import (
+    espaces_verts, zones, user, auth, capteurs, vegetal, 
+    meteo, plants, catalogue, interventions, health, notifications
+)
 
-@app.get("/ping")
-def ping():
-    return {"status": "ok"}
-
-# Inclusion des routeurs
-# Le problème de blocage étant résolu, nous pouvons réactiver tous les routeurs.
-app.include_router(meteo.router, prefix="/api/v1", tags=["Météo"])
-app.include_router(vegetal.router, prefix="/api/v1", tags=["Végétal"])
-app.include_router(capteurs.router, prefix="/api/v1", tags=["Capteurs"])
-app.include_router(auth.router, prefix="/api/v1", tags=["Authentification"])
-app.include_router(user.router, prefix="/api/v1", tags=["Utilisateurs"])
-app.include_router(interventions.router, prefix="/api/v1", tags=["Interventions"])
-app.include_router(zones.router, prefix="/api/v1", tags=["Zones"])
+# Branchement des routes
+app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
+app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
 app.include_router(espaces_verts.router, prefix="/api/v1/espaces-verts", tags=["Espaces Verts"])
-app.include_router(health.router, prefix="/api/v1", tags=["Santé"])
+app.include_router(zones.router, prefix="/api/v1/zones", tags=["Zones Intelligentes"])
+app.include_router(capteurs.router, prefix="/api/v1/capteurs", tags=["Capteurs"])
+app.include_router(catalogue.router, prefix="/api/v1/catalogue", tags=["Catalogue Botanique"])
+app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["Interventions"])
+app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
+app.include_router(meteo.router, prefix="/api/v1/meteo", tags=["Météo"])
 app.include_router(plants.router, prefix="/api/v1/plants", tags=["Plants"])
+app.include_router(vegetal.router, prefix="/api/v1/vegetal", tags=["Végétal"])
+app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
+
+scheduler = BackgroundScheduler()
+
+@app.on_event("startup")
+def startup_event():
+    # 2. On programme la mise à jour (ex: toutes les 30 minutes)
+    # Pour tes tests, tu peux mettre minutes=1 pour voir les changements vite
+    scheduler.add_job(run_update, "interval", minutes=2)
+    
+    # 3. On lance le moteur
+    scheduler.start()
+    print("SYSTÈME DE SIMULATION ACTIF (Le coeur bat) ")
+
+@app.on_event("shutdown")
+def shutdown_event():
+    # On arrête proprement le moteur quand on coupe le serveur
+    scheduler.shutdown()
 
 @app.get("/")
-def read_root():
-    return {"message": "Bienvenue sur l'API Green Guard !"}
-
-    
+def health():
+    return {"status": "online", "project": "Green Guard"}

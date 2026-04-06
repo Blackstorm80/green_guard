@@ -1,34 +1,18 @@
-// components/navbar/Navbar.jsx
-import { NavLink, useLocation } from "react-router-dom";
-import { Bell, MapPin, Sun, ChevronRight, Search } from "lucide-react";
-import MeteoWidget from "./MeteoWidget"; // Import du nouveau widget
-import Notifications from "./Notifications"; // Import du composant de notifications
+import { NavLink, useLocation, Link } from "react-router-dom";
+import { Bell, ChevronRight, Search } from "lucide-react";
+import MeteoWidget from "./MeteoWidget";
+import Notifications from "./Notifications";
+import { useAuth } from "../../context/AuthContext";
+import { useState } from "react";
+import Breadcrumbs from "../navigation/Breadcrumbs";
 
 function Navbar({ children }) {
-  const location = useLocation();
-
-  // 2. Logique : Mapping du fil d'Ariane dynamique
-  const getBreadcrumbs = () => {
-    const pathnames = location.pathname.split("/").filter((x) => x);
-    if (pathnames.length === 0) return [{ label: "Tableau de bord", to: "/" }];
-    
-    return pathnames.map((name, index) => {
-      const routeTo = `/${pathnames.slice(0, index + 1).join("/")}`;
-      const labels = {
-        "espaces": "Espaces & Sites",
-        "catalogues": "Catalogue",
-        "rapports": "Rapports",
-        "parametres": "Paramètres"
-      };
-      return { label: labels[name] || name, to: routeTo };
-    });
-  };
-
-  const breadcrumbs = getBreadcrumbs();
+  const { user, logout, isAuthenticated } = useAuth();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen w-full bg-gray-900">
-      {/* Sidebar (Code inchangé) */}
+      {/* Sidebar */}
       <aside className="bg-gray-800 border-r border-gray-700 flex flex-col shrink-0 shadow-xl z-20 w-20 md:w-38 lg:w-64 transition-all duration-700">
         <div className="h-16 flex items-center px-6 border-b border-gray-700">
           <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-green-800 rounded-lg flex items-center justify-center shadow-lg">
@@ -66,17 +50,7 @@ function Navbar({ children }) {
             <div className="p-2 bg-gray-700/50 rounded-lg md:hidden">
                <span className="text-lg">🌿</span>
             </div>
-            <nav className="flex items-center gap-2 text-sm">
-              <span className="text-gray-500">GreenGuard</span>
-              {breadcrumbs.map((crumb, index) => (
-                <div key={index} className="flex items-center gap-2">
-                  <ChevronRight size={14} className="text-gray-600" />
-                  <span className={index === breadcrumbs.length - 1 ? "text-white font-medium" : "text-gray-400"}>
-                    {crumb.label}
-                  </span>
-                </div>
-              ))}
-            </nav>
+            <Breadcrumbs />
           </div>
 
           <div className="flex items-center gap-4">
@@ -86,6 +60,26 @@ function Navbar({ children }) {
             <div className="h-8 w-px bg-gray-700 mx-1 hidden sm:block" />
 
             <Notifications />
+
+            <div className="h-8 w-px bg-gray-700 mx-1 hidden sm:block" />
+
+            {isAuthenticated && user ? (
+              <div className="relative">
+                <button onClick={() => setDropdownOpen(!dropdownOpen)} className="flex items-center gap-3">
+                  <img src={user.avatar_url || `https://ui-avatars.com/api/?name=${user.name}&background=random`} alt="User avatar" className="w-8 h-8 rounded-full" />
+                  <span className="text-white hidden md:block">{user.name}</span>
+                </button>
+                {dropdownOpen && (
+                  <div className="absolute right-0 mt-2 w-48 bg-gray-800 rounded-md shadow-lg py-1">
+                    <button onClick={logout} className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-gray-700">
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <Link to="/login" className="text-white">Login</Link>
+            )}
 
             <button className="p-2 text-gray-400 hover:text-white hover:bg-gray-700 rounded-full sm:hidden">
               <Search size={20} />

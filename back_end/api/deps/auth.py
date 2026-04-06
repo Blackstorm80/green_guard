@@ -1,96 +1,118 @@
-import os
-from datetime import datetime, timedelta, timezone
-from typing import Optional
-
-from dotenv import load_dotenv
+import bcrypt
+from datetime import datetime, timedelta
+from typing import Optional, List
+from jose import JWTError, jwt
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy.orm import Session
-
-from domain.models import User
 from infrastructure.database import get_db
-from schema.token import TokenData
+from schema.utilisateurs import UserCreate
+from domain.models import User
 
-load_dotenv()
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 
-# --- Configuration ---
-SECRET_KEY = os.getenv("SECRET_KEY", "a_very_secret_key_that_should_be_in_env_file")
+# Configuration
+SECRET_KEY = "SECRET_SUPER_PRIVE_GREEN_GUARD"
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
-# --- Sécurité ---
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/login")
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/v1/auth/login")
 
-def verify_password(plain_password, hashed_password):
+#  SECTION 1 : SECURITE BCRYPT 
+def verify_password(plain_password: str, hashed_password: str) -> bool:
     try:
-        # On verifie si le hash est valide avant la comparaison
-        if not hashed_password or len(hashed_password) < 10:
-            return False
-        return pwd_context.verify(plain_password, hashed_password)
-    except ValueError:
-        # Cas ou le hash n'est pas reconnu (UnknownHashError)
+        return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
+    except Exception:
         return False
 
-def get_password_hash(password):
-    return pwd_context.hash(password)
+def get_password_hash(password: str) -> str:
+    salt = bcrypt.gensalt()
+    hashed = bcrypt.hashpw(password.encode('utf-8'), salt)
+    return hashed.decode('utf-8')
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+# SECTION 2 : JETONS (JWT)
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
+    return jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
 
-def get_user_by_email(db: Session, email: str) -> Optional[User]:
-    return db.query(User).filter(User.email == email).first()
-
-async def get_current_user(
-    token: str = Depends(oauth2_scheme),
-    db: Session = Depends(get_db),
-) -> User:
+#  SECTION 3 : LOGIQUE D'AUTHENTIFICATION 
+async def get_current_user(db: Session = Depends(get_db), token: str = Depends(oauth2_scheme)):
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Session invalide",
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        email: str | None = payload.get("sub")
-        role: str | None = payload.get("role")
-        if email is None or role is None:
+        email: str = payload.get("sub")
+        if email is None:
             raise credentials_exception
-        token_data = TokenData(username=email, role=role)
     except JWTError:
         raise credentials_exception
-
-    user = get_user_by_email(db, token_data.username)
-    if user is None or user.role != token_data.role:
+        
+    user = db.query(User).filter(User.email == email).first()
+    if user is None:
         raise credentials_exception
-
     return user
 
-def require_role(required_role: str):
+
+async def get_current_active_user(current_user: User = Depends(get_current_user)):
+    if not current_user.is_active:
+        raise HTTPException(status_code=400, detail="Utilisateur inactif")
+    return current_user
+
+
+#  SECTION 4 : GESTION DES ROLES  
+
+# Pour vegetal.py (role unique)
+def require_role(role: str):
     async def role_checker(current_user: User = Depends(get_current_user)):
-        if current_user.role != required_role:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires '{required_role}' role",
-            )
+        if current_user.role != role:
+            raise HTTPException(status_code=403, detail="Acces refuse")
         return current_user
     return role_checker
 
-def require_any_role(roles: list[str]):
+# Pour zones.py (plusieurs roles possibles)
+def require_any_role(roles: List[str]):
     async def role_checker(current_user: User = Depends(get_current_user)):
         if current_user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Requires one of roles: {roles}",
+                detail="Permissions insuffisantes"
             )
         return current_user
     return role_checker
+
+
+
+
+
+router = APIRouter()
+
+@router.post("/register")
+def register(
+    user_in: UserCreate,  
+    db: Session = Depends(get_db)
+):
+    # Verifier si l'utilisateur existe deja
+    user = db.query(User).filter(User.email == user_in.email).first()
+    if user:
+        raise HTTPException(status_code=400, detail="Cet email est deja utilise")
+
+    # Logique de creation d'un user 
+    new_user = User(
+        name=user_in.name,
+        email=user_in.email,
+        hashed_password=get_password_hash(user_in.password),
+        role=user_in.role
+    )
+    
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return {"status": "success", "message": "Utilisateur cree"}
+
+
+

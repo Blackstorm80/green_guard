@@ -1,30 +1,16 @@
-import requests
-import os
-from datetime import datetime
-from dotenv import load_dotenv
-
-# Import des ports du domaine (L'oignon)
+import python_weather
+import asyncio
+from sqlalchemy.orm import Session
+from domain.models import EspaceVert
+from infrastructure.database import SessionLocal
 from domain.ports.meteo import IMeteoService, ConditionsMeteo
-
-load_dotenv()
+from datetime import datetime
 
 class OpenMeteoService(IMeteoService):
-    """
-    Note : On garde le nom 'OpenMeteoService' pour la compatibilité des imports,
-    mais on utilise l'API OpenWeatherMap à l'intérieur.
-    """
     
-    BASE_URL = "https://api.openweathermap.org/data/2.5/weather"
-
-    def _map_owm_to_condition(self, code: int) -> str:
-        """Traduit les codes OpenWeatherMap en texte lisible."""
-        if 200 <= code <= 232: return "Orage"
-        if 300 <= code <= 321: return "Bruine"
-        if 500 <= code <= 531: return "Pluie"
-        if 600 <= code <= 622: return "Neige"
-        if code == 800: return "Ciel clair"
-        if 801 <= code <= 804: return "Nuageux"
-        return "Conditions variables"
+    async def _get_weather_async(self, latitude: float, longitude: float):
+        async with python_weather.Client(unit=python_weather.METRIC) as client:
+            return await client.get(f"{latitude},{longitude}")
 
     def recuperer_conditions_actuelles(
         self,
@@ -32,51 +18,52 @@ class OpenMeteoService(IMeteoService):
         longitude: float,
         maintenant: datetime,
     ) -> ConditionsMeteo:
-        
-        # Récupération de la clé API
-        api_key = os.getenv("OPENWEATHER_API_KEY")
-        
-        if not api_key:
-            raise ValueError("La clé OPENWEATHER_API_KEY est manquante dans le fichier .env")
-
-        params = {
-            "lat": latitude,
-            "lon": longitude,
-            "appid": api_key,
-            "units": "metric",
-            "lang": "fr"
-        }
-
         try:
-            resp = requests.get(self.BASE_URL, params=params, timeout=5)
+            weather = asyncio.run(self._get_weather_async(latitude, longitude))
             
-            if resp.status_code == 401:
-                print(" Erreur 401 : Clé API invalide ou non activée (attendre 1h si nouvelle).")
-                
-            resp.raise_for_status()
-            data = resp.json()
+            # Déduction de l'ensoleillement fort à partir des conditions actuelles
+            sunny_conditions = ["sunny", "clear"]
+            ensoleillement_fort = any(cond in weather.description.lower() for cond in sunny_conditions)
 
-            # Extraction des données réelles
-            temperature_c = data["main"]["temp"]
-            weather_code = data["weather"][0]["id"]
-            city = data.get("name", "Localisation")
-            
-            # Déduction de l'ensoleillement
-            ensoleillement_fort = weather_code == 800 or weather_code == 801
+            # python-weather ne fournit pas nativement et0
+            et0_estime = None
 
             return ConditionsMeteo(
-                city=city,
-                temperature_c=temperature_c,
-                condition=self._map_owm_to_condition(weather_code),
+                city="Inconnu", # python-weather ne fournit pas de nom de ville pour les coordonnées
+                temperature_c=weather.temperature,
+                condition=weather.description,
                 ensoleillement_fort=ensoleillement_fort,
+                humidite=weather.humidity,
+                pluie=weather.precipitation,
+                et0=et0_estime
             )
-
         except Exception as e:
-            print(f"Erreur lors de l'appel météo : {e}")
-            # Retourne une valeur par défaut pour ne pas faire crasher tout le dashboard
-            return ConditionsMeteo(
-                city="Erreur Météo",
-                temperature_c=0.0,
-                condition="Indisponible",
-                ensoleillement_fort=False
-            )
+            import logging
+            logging.error(f"Erreur lors de la récupération de la météo avec python-weather: {e}")
+            return None
+
+    def recuperer_meteo_pour_tous_les_espaces(self):
+        db: Session = SessionLocal()
+        try:
+            espaces = db.query(EspaceVert).all()
+            all_weather_data = []
+
+            for espace in espaces:
+                weather_data = self.recuperer_conditions_actuelles(espace.latitude, espace.longitude, datetime.utcnow())
+                if not weather_data:
+                    continue
+                # Ici on pourrait stocker les données ou les retourner
+                all_weather_data.append({
+                    "espace_id": espace.id,
+                    "nom": espace.nom,
+                    "weather": {
+                        "temperature": weather_data.temperature_c,
+                        "condition": weather_data.condition,
+                        "ensoleillement_fort": weather_data.ensoleillement_fort,
+                        "humidite": weather_data.humidite,
+                        "pluie": weather_data.pluie
+                    }
+                })
+            return all_weather_data
+        finally:
+            db.close()

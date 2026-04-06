@@ -22,41 +22,30 @@ def calculer_features_espaces(espaces: List[EspaceVert]) -> np.ndarray:
         lat = getattr(espace, 'latitude', 0.0) or 0.0
         lon = getattr(espace, 'longitude', 0.0) or 0.0
         
-        # 2. Santé (sur 7 derniers jours, avec une valeur par défaut robuste)
-        sante_7j = getattr(espace, 'sante_moyenne_7j', 85.0) or 85.0
-        
-        # 3. Caractéristiques structurelles (encodage simple)
+        # 2. Caractéristiques structurelles (encodage simple)
         type_espace_code = {"parc": 1, "jardin": 2, "square": 3, "rue": 4}.get(
             espace.type_espace.lower() if espace.type_espace else "square", 3
         )
         
-        # 4. Variance santé (stabilité, avec une valeur par défaut)
-        variance_sante = getattr(espace, 'variance_sante_7j', 5.0) or 5.0
-        
-        features.append([lat, lon, sante_7j/100, type_espace_code, variance_sante])
+        features.append([lat, lon, type_espace_code])
     
     # Normalisation pour que K-Means traite toutes les features équitablement
     scaler = StandardScaler()
     return scaler.fit_transform(features)
 
-def creer_noms_zones_paris(centroids: np.ndarray, granularite: str) -> List[str]:
-    """Génère des noms lisibles pour les zones (spécifique Paris pour la démo)."""
+def creer_noms_zones_generiques(n_clusters: int, granularite: str) -> List[str]:
+    """Génère des noms génériques et non-trompeurs pour les zones."""
     noms = []
-    arrondissements_paris = [
-        "1er", "2e", "3e", "4e", "5e", "6e", "7e", "8e", "9e", 
-        "10e", "11e", "12e", "13e", "14e", "15e", "16e", "17e", "18e", "19e", "20e"
-    ]
-    
-    for i, centroid in enumerate(centroids):
-        # Logique simple pour associer un centroïde à un arrondissement pour le nom
-        # Note: ceci est une approximation pour juste pour la demo , jesuis encours d'apprentissage car le sujet est legerment complex .
-        arrdt_index = int(abs(centroid[0] * centroid[1] * 100)) % len(arrondissements_paris)
-        
+    # NOTE: La logique précédente de nommage basée sur les arrondissements était incorrecte
+    # car elle créait une fausse corrélation géographique. Une vraie solution
+    # nécessiterait un service de reverse-geocoding sur les coordonnées du centroïde.
+    # En attendant, nous utilisons un nommage neutre.
+    for i in range(n_clusters):
+        prefix = "Quartier" if granularite == "quartier" else "Zone"
         if granularite == "quartier":
-            noms.append(f"Quartier {arrondissements_paris[arrdt_index]}-{i+1}")
+            noms.append(f"{prefix} Intelligent {i+1}")
         else:
-            noms.append(f"Zone {arrondissements_paris[arrdt_index]} (Z{i+1})")
-    
+            noms.append(f"{prefix} Intelligente {i+1}")
     return noms
 
 def executer_clustering_intelligent(
@@ -77,7 +66,7 @@ def executer_clustering_intelligent(
     if not config:
         raise ValueError("Aucune config de clustering trouvée pour cet utilisateur")
     
-    espaces = db.query(EspaceVert).filter(EspaceVert.gerant_id == user_id).all()
+    espaces = db.query(EspaceVert).filter(EspaceVert.user_id == user_id).all()
     if len(espaces) < config.n_clusters:
         raise ValueError("Pas assez d'espaces à clusteriser pour le nombre de clusters configuré")
     
@@ -86,40 +75,40 @@ def executer_clustering_intelligent(
     kmeans = KMeans(n_clusters=config.n_clusters, random_state=42, n_init=10)
     labels = kmeans.fit_predict(X)
     
-    from sklearn.metrics import silhouette_score
+    # Le score de silhouette est une métrique globale pour la qualité du clustering.
+    # Il ne doit pas être stocké sur chaque zone individuelle.
     silhouette = silhouette_score(X, labels)
+    print(f"Clustering exécuté avec un score de silhouette global de : {silhouette:.4f}")
     
     # Nettoyage des anciennes zones pour cet utilisateur
     db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == user_id).delete()
     db.commit()
     
     nouvelles_zones = []
-    noms_zones = creer_noms_zones_paris(kmeans.cluster_centers_, config.granularite)
+    # Utilisation de la nouvelle fonction de nommage générique
+    noms_zones = creer_noms_zones_generiques(config.n_clusters, config.granularite)
     
     for i in range(config.n_clusters):
         indices_cluster = [j for j, label in enumerate(labels) if label == i]
         if not indices_cluster: continue
 
         espaces_cluster = [espaces[j] for j in indices_cluster]
-        sante_moyenne = np.mean([getattr(e, 'sante_percent', 85.0) or 85.0 for e in espaces_cluster])
         
         zone = ZoneIntelligente(
             nom=noms_zones[i],
             user_id=user_id,
-            centroid_lat=float(kmeans.cluster_centers_[i][0]),#parametre de compraison pour creer les clusters
-            centroid_lon=float(kmeans.cluster_centers_[i][1]),#param de comparaison pour creer les clusters
+            centroid_lat=float(kmeans.cluster_centers_[i][0]),
+            centroid_lon=float(kmeans.cluster_centers_[i][1]),
             rayon_km=config.rayon_max_km,
-            sante_moyenne=float(sante_moyenne),
+            sante_moyenne=None,  # La santé sera calculée par un autre processus
             nb_espaces=len(espaces_cluster),
-            granularite=config.granularite,
-            silhouette_score=float(silhouette)
+            granularite=config.granularite
         )
         db.add(zone)
         db.flush()
         
         for espace in espaces_cluster:
             zone.espaces.append(espace)
-           
         
         nouvelles_zones.append(zone)
     

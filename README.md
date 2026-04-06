@@ -2,11 +2,11 @@
 
 Bienvenue sur le backend du projet GreenGuard. Cette API, développée avec FastAPI, est le cœur de notre système de monitoring écologique pour les espaces verts.
 
-## 🎯 Objectif du Projet
+## Objectif du Projet
 
 Le projet GreenGuard vise à optimiser la gestion  dans les espaces verts urbains (parcs, murs végétalisés, etc.) en luttant contre le gaspillage. Grâce à des capteurs IoT et à un modèle de bilan hydrique, l'application évalue le niveau de stress hydrique des plantes en temps réel. L'objectif final est de permettre un arrosage intelligent et ciblé : apporter la juste quantité d'eau, au bon moment.
 
-## 🏛️ Architecture
+##  Architecture
 
 Le backend est conçu selon les principes de l'**Architecture Oignon (Onion Architecture)**. Cette approche garantit une séparation stricte des responsabilités, ce qui rend le code plus robuste, testable et facile à faire évoluer.
 
@@ -20,7 +20,7 @@ Nous suivons également deux principes clés :
 - **Logic-First** : La logique métier est définie et validée avant tout code technique.
 - **Ports & Adapters** : Le Domaine définit des "Ports" (interfaces) pour ses besoins, et l'Infrastructure fournit des "Adaptateurs" (implémentations concrètes) qui se branchent sur ces ports.
 
-### 🌳 Structure des Fichiers et Répartition des Tâches
+###  Structure des Fichiers et Répartition des Tâches
 
 Voici une vue simplifiée de l'arborescence du projet, illustrant la répartition des responsabilités.
 
@@ -54,7 +54,7 @@ back_end/
     └── utilisateurs.py             # (Lucrèce) Contrats de données Pydantic pour l'API.
 ```
 
-## 👩‍💻 Travail de Lucrèce (backend)
+##  Travail de Lucrèce (backend)
 
 Pour assurer une collaboration efficace, les tâches sont réparties selon les couches de l'architecture. Lucrèce peut se concentrer sur les aspects périphériques mais essentiels de l'application, qui se connectent au cœur métier via des contrats clairs (les "Ports").
 
@@ -67,7 +67,7 @@ Son périmètre inclut :
 
 Ce travail est crucial car il constitue le pont entre la logique métier et le monde extérieur, tout en étant complètement découplé du cœur de l'application.
 
-## 🤝 Workflow de Contribution avec Git
+##  Workflow de Contribution avec Git
 
 Pour garantir la stabilité du projet, il est **impératif** de suivre ces règles :
 
@@ -78,7 +78,7 @@ Pour garantir la stabilité du projet, il est **impératif** de suivre ces règl
 
 Pour un guide détaillé sur les commandes Git et notre workflow, veuillez consulter le fichier `GIT_GUIDE.md` à la racine du projet.
 
-## 🚀 Lancer le Projet
+##  Lancer le Projet
 
 1.  **Cloner le dépôt**
     ```bash

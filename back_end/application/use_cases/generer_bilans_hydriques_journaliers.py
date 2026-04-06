@@ -2,6 +2,7 @@
 
 from datetime import date
 from typing import List
+import logging
 
 from domain.models import EspaceVert, BilanHydriqueJournalier
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
@@ -15,6 +16,11 @@ from application.dto.bilan_hydrique import BilanHydriqueEspaceDTO
 
 class EspaceVertIntrouvableError(Exception):
     """Exception levée quand un espace vert n'est pas trouvé."""
+    pass
+
+class MeteoServiceError(Exception):
+    """Exception spécifique pour les erreurs du service météo."""
+    # Cette exception devrait être levée par l'adaptateur météo en cas de problème.
     pass
 
 
@@ -81,10 +87,14 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
                 temperatures_horaires=temperatures_horaires,
                 humidites_horaires=humidites_horaires,
             )
-        except Exception:
+        except MeteoServiceError as e:
             # Si quelque chose ne va pas (service pas prêt, données manquantes, etc.),
             # on ne bloque pas le calcul hydrique : on se contente de dire
             # "pas de stress sanitaire calculé aujourd'hui".
+            logging.warning(f"Données météo horaires indisponibles pour {espace.nom} le {date_du_calcul}: {e}")
+            stress_sanitaire_jour = None
+        except Exception as e:
+            logging.error(f"Erreur inattendue lors du calcul du stress sanitaire pour {espace.nom}: {e}", exc_info=True)
             stress_sanitaire_jour = None
 
             # En bonus, on peut prévenir un service de notification pour que
@@ -193,13 +203,17 @@ def generer_bilan_hydrique_pour_un_espace(
             temperatures_horaires=temperatures_horaires,
             humidites_horaires=humidites_horaires,
         )
-    except Exception:
+    except MeteoServiceError as e:
         # Si la météo horaire n'est pas prête ou plante, on n'empêche pas
         # le calcul hydrique de se faire. On laisse simplement le stress
         # sanitaire à None pour cette journée.
+        logging.warning(f"Données météo horaires indisponibles pour {espace.nom} le {date_du_calcul}: {e}")
         stress_sanitaire_jour = None
         if notification_service is not None:
             notification_service.notifier_meteo_indisponible(espace, date_du_calcul)
+    except Exception as e:
+        logging.error(f"Erreur inattendue lors du calcul du stress sanitaire pour {espace.nom}: {e}", exc_info=True)
+        stress_sanitaire_jour = None
 
     # 6. Appeler la logique de domaine hydrique (cœur de l'oignon).
     nouveau_bilan = calculer_bilan_hydrique_pour_jour(

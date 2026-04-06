@@ -6,6 +6,14 @@ uvicorn[standard]
 sqlalchemy
 psycopg2-binary # Driver pour PostgreSQL, peut être changé pour un autre (ex: mysqlclient)
 
+# --- Sécurité & Authentification ---
+passlib[bcrypt]>=1.7.4
+
 # --- Data Validation (inclus dans FastAPI mais bon à expliciter) ---
 pydantic
 scikit-learn
+python-weather
+requests
+python-weather
+websockets
+requests

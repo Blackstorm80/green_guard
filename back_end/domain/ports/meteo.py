@@ -11,11 +11,17 @@ class ConditionsMeteo:
         temperature_c: float,
         condition: str,
         ensoleillement_fort: bool,
+        humidite: float,  # Ajout de l'humidité en %
+        pluie: float,     # Ajout de la pluie en mm
+        et0: float = None # Evapotranspiration
     ) -> None:
         self.city = city
         self.temperature_c = temperature_c
         self.condition = condition
         self.ensoleillement_fort = ensoleillement_fort
+        self.humidite = humidite
+        self.pluie = pluie
+        self.et0 = et0
 
 
 class IMeteoService(ABC):

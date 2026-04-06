@@ -1,13 +1,13 @@
-// front_end/src/Pages/login/Login.jsx
+import { useAuth } from "../../context/AuthContext";
+import { Lock, AtSign, Eye, EyeOff, Loader2 } from "lucide-react";
+import { useNavigate, Link } from "react-router-dom";
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { api } from "../../services/api";
-import { Lock, AtSign, Eye, EyeOff } from "lucide-react";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { login } = useAuth();
   const [email, setEmail] = useState("admin@greenguard.com");
-  const [password, setPassword] =useState("password");
+  const [password, setPassword] = useState("password");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -16,75 +16,48 @@ const Login = () => {
     e.preventDefault();
     setLoading(true);
     setError("");
+    
     try {
-      await api.login(email, password);
-      navigate("/"); // Redirection vers le dashboard après succès
+      // Le login du contexte gère déjà tout (appel api + stockage token)
+      await login(email, password);
+      navigate("/dashboard"); 
     } catch (err) {
-      setError(err.message || "Une erreur est survenue.");
-      console.error(err);
+      setError(err.message || "Identifiants incorrects.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-900 bg-cover bg-center animate-in fade-in duration-500" style={{ backgroundImage: 'url("/path/to/your/background-image.jpg")' }}>
-        <div className="w-full max-w-md">
-            <form
-              onSubmit={handleLogin}
-              className="bg-slate-900/40 backdrop-blur-xl border border-slate-800/50 rounded-2xl shadow-2xl p-8 space-y-6"
-            >
-                <div className="text-center">
-                    <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-800 rounded-2xl flex items-center justify-center shadow-lg mx-auto mb-4">
-                        <span className="text-white font-bold text-4xl">G</span>
-                    </div>
-                    <h1 className="text-3xl font-bold text-white">Green Guard</h1>
-                    <p className="text-slate-400">Connectez-vous pour piloter vos espaces.</p>
-                </div>
-                
-                <div className="relative">
-                    <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20}/>
-                    <input
-                        type="email"
-                        placeholder="Email"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                        className="w-full bg-gray-800/50 border border-slate-700 rounded-lg pl-11 pr-4 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                    />
-                </div>
-
-                <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={20}/>
-                    <input
-                        type={showPassword ? "text" : "password"}
-                        placeholder="Mot de passe"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                        className="w-full bg-gray-800/50 border border-slate-700 rounded-lg pl-11 pr-11 py-3 text-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-all"
-                    />
-                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-                        {showPassword ? <EyeOff size={20}/> : <Eye size={20}/>}
-                    </button>
-                </div>
-
-                {error && <p className="text-red-500 text-sm text-center">{error}</p>}
-
-                <div>
-                    <button
-                        type="submit"
-                        disabled={loading}
-                        className="w-full bg-teal-600 hover:bg-teal-500 disabled:bg-teal-800 disabled:cursor-not-allowed text-white font-bold py-3 rounded-lg shadow-lg transition-all duration-300"
-                    >
-                        {loading ? "Connexion..." : "Se connecter"}
-                    </button>
-                </div>
-                <p className="text-center text-xs text-slate-500">
-                    Problème de connexion ? Contactez le support.
-                </p>
-            </form>
+    <div className="flex items-center justify-center min-h-screen bg-slate-950">
+      <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-3xl p-8 space-y-6 w-full max-w-md shadow-2xl">
+        <div className="text-center">
+          <div className="w-16 h-16 bg-green-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+            <span className="text-white font-bold text-4xl italic">G</span>
+          </div>
+          <h1 className="text-3xl font-black text-white italic">Green Guard</h1>
         </div>
+
+        <div className="space-y-4">
+          <div className="relative">
+            <AtSign className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none transition-all" placeholder="Email" required />
+          </div>
+          <div className="relative">
+            <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+            <input type={showPassword ? "text" : "password"} value={password} onChange={(e) => setPassword(e.target.value)} className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-11 pr-11 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none transition-all" placeholder="Mot de passe" required />
+            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500">
+              {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+            </button>
+          </div>
+        </div>
+
+        {error && <p className="text-red-500 text-xs text-center font-bold uppercase">{error}</p>}
+
+        <button type="submit" disabled={loading} className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-xl uppercase tracking-widest text-xs flex items-center justify-center gap-2 transition-all">
+          {loading ? <Loader2 className="animate-spin" size={18} /> : "Accéder au dashboard"}
+        </button>
+      </form>
     </div>
   );
 };

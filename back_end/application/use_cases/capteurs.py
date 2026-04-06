@@ -43,8 +43,7 @@ def obtenir_dashboard_capteurs(
     for espace_id in espace_ids:
         lecture = capteur_service.lecture_actuelle(espace_id)
         if lecture:
-            capteurs.append(LectureCapteurDTO.from_orm(lecture))
-    
+                capteurs.append(LectureCapteurDTO(**lecture))    
     # Metrics agrégés
     metrics = {
         "sante_globale_percent": _calculer_sante_globale(capteurs),

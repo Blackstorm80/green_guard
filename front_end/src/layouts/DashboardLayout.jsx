@@ -1,4 +1,6 @@
+//DashboardLayout.jsx
 import { useState } from "react";
+import { useAuth } from "../context/AuthContext";
 import { Outlet, useLocation, Link } from "react-router-dom";
 import { Sidebar } from "./Sidebar";
 import { 
@@ -9,26 +11,18 @@ import {
   MapPin, 
   User, 
   MessageSquare, 
-  Sprout 
+  Sprout,
+  LogOut
 } from "lucide-react";
 import { cn } from "../lib/utils";
+import Breadcrumbs from "../components/navigation/Breadcrumbs";
 
 export default function DashboardLayout() {
-  const location = useLocation();
   const [showNotifs, setShowNotifs] = useState(false);
   const [showWeather, setShowWeather] = useState(false);
+  const { user, logout, loading } = useAuth(); // Utiliser le hook
 
-  // Génération dynamique du fil d'ariane
-  const getBreadcrumbs = () => {
-    const path = location.pathname;
-    if (path === "/") return [{ label: "Tableau de bord", path: "/" }, { label: "Vue Globale" }];
-    if (path === "/espaces") return [{ label: "Espaces & Sites", path: "/espaces" }];
-    if (path === "/catalogues") return [{ label: "Catalogue", path: "/catalogues" }];
-    if (path === "/rapports") return [{ label: "Rapports", path: "/rapports" }];
-    return [{ label: "Tableau de bord", path: "/" }];
-  };
-
-  const breadcrumbs = getBreadcrumbs();
+  if (loading) return <div className="h-screen w-screen bg-slate-950 flex items-center justify-center text-green-500">Chargement...</div>;
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex font-sans selection:bg-green-500/30">
@@ -39,26 +33,13 @@ export default function DashboardLayout() {
           
           {/* FIL D'ARIANE DYNAMIQUE */}
           <nav className="hidden md:flex items-center text-sm text-slate-400">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={index} className="flex items-center">
-                {index > 0 && <ChevronRight size={14} className="mx-2 text-slate-600" />}
-                <Link 
-                  to={crumb.path || "#"} 
-                  className={cn(
-                    "transition-colors hover:text-white",
-                    index === breadcrumbs.length - 1 ? "text-white font-medium" : ""
-                  )}
-                >
-                  {crumb.label}
-                </Link>
-              </div>
-            ))}
+            <Breadcrumbs />
           </nav>
 
           <div className="flex-1 md:hidden"></div>
 
           <div className="flex items-center gap-4">
-            {/* WIDGET MÉTÉO CLIQUABLE */}
+            {/* RECTANGLE METEO */}
             <div className="relative">
               <button 
                 onClick={() => { setShowWeather(!showWeather); setShowNotifs(false); }}
@@ -119,6 +100,10 @@ export default function DashboardLayout() {
                 </div>
               )}
             </div>
+            
+            <div className="h-8 w-px bg-slate-700 mx-1 hidden sm:block" />
+
+            {/* LE PROFIL A ÉTÉ DÉPLACÉ DANS LA SIDEBAR */}
           </div>
         </header>
 

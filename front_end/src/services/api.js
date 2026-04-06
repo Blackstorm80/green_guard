@@ -1,101 +1,75 @@
 const BASE_URL = "http://localhost:8000/api/v1";
 
-async function fetchApi(endpoint, options = {}) {
-  const token = localStorage.getItem("access_token");
-  const headers = {
-    "Content-Type": "application/json",
-    ...options.headers,
-  };
-
-  if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
-  }
-
-  const response = await fetch(`${BASE_URL}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  if (!response.ok) {
-    // Gestion spécifique du 401 Unauthorized
-    if (response.status === 401) {
-      localStorage.removeItem("access_token");
-      window.location.href = '/login';
-      // On lève une erreur pour arrêter l'exécution du code appelant
-      throw new Error("Session expirée. Redirection vers la page de connexion.");
-    }
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.detail || "Erreur API");
-  }
-
-  return response.json();
-}
-
 export const api = {
-  // --- AUTH ---
+  // --- AUTHENTIFICATION ---
   login: async (email, password) => {
     const formData = new URLSearchParams();
-    formData.append("username", email); // FastAPI OAuth2 attend 'username'
+    formData.append("username", email);
     formData.append("password", password);
-
-    const response = await fetch(`${BASE_URL}/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: formData,
+    const response = await fetch(`${BASE_URL}/auth/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: formData,
     });
-    
-    if (!response.ok) {
-        // La gestion d'erreur est spécifique ici, car le 401 n'est pas géré par fetchApi
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.detail || "Identifiants incorrects");
-    }
-    
+    if (!response.ok) throw new Error("Échec de l'authentification");
     const data = await response.json();
     localStorage.setItem("access_token", data.access_token);
     return data;
   },
 
-  // --- METEO ---
-  getMeteo: async (ville) => {
-    return fetchApi(`/meteo/${ville}`);
-  },
-
-  getMeteoByCoords: async (lat, lon) => {
-    // NOTE: La clé API OpenWeather ne doit pas être en dur dans le code backend.
-    // Elle doit être chargée depuis une variable d'environnement (ex: .env).
-    return fetchApi(`/meteo/actuelle?lat=${lat}&lon=${lon}`);
-  },
-
-  // --- INTERVENTIONS ---
-  getUrgentInterventions: async () => {
-    // Cet endpoint doit être créé côté backend
-    return fetchApi('/interventions/urgent');
-  },
-
-  // --- DIAGNOSTIC ---
-  getDashboardStats: async () => {
-    return fetchApi("/health/diagnostic", {
-      method: "POST",
-      body: JSON.stringify({ espace_id: 1 })
+  getCurrentUser: async (token) => {
+    const response = await fetch(`${BASE_URL}/users/me`, {
+      headers: { "Authorization": `Bearer ${token}` },
     });
+    return response.json();
   },
 
-  // --- ESPACES VERTS ---
-  // On utilise le nom exact attendu par le composant : getEspacesVerts
+  // --- DASHBOARD & CAPTEURS ---
+  getDashboardStats: async (espaceIds = []) => {
+    const token = localStorage.getItem("access_token");
+    const params = new URLSearchParams();
+    espaceIds.forEach(id => params.append("espace_ids", id));
+    
+    // On garde le double /capteurs car c'est ainsi que ton router est configuré
+    const url = `${BASE_URL}/capteurs/capteurs/dashboard?${params.toString()}`;
+    
+    const response = await fetch(url, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    if (!response.ok) throw new Error(`Erreur Capteurs: ${response.status}`);
+    return response.json();
+  },
+
+  // --- ESPACES & ZONES ---
   getEspacesVerts: async () => {
-    return fetchApi("/espaces-verts/");
-  },
-
-  // --- ZONES / CLUSTERS ---
-  getZones: async () => {
-    return fetchApi("/zones");
-  },
-
-  createEspace: async (payload) => {
-    const payloadComplet = { ...payload, user_id: 1 }; 
-    return fetchApi("/espaces-verts/", {
-      method: "POST",
-      body: JSON.stringify(payloadComplet)
+    const token = localStorage.getItem("access_token");
+    const response = await fetch(`${BASE_URL}/espaces-verts/`, {
+      headers: { "Authorization": `Bearer ${token}` },
     });
+    return response.json();
+  },
+
+  getZones: async () => {
+    const token = localStorage.getItem("access_token");
+    const response = await fetch(`${BASE_URL}/zones/zones`, {
+      headers: { "Authorization": `Bearer ${token}` },
+    });
+    return response.json();
+  },
+
+  // --- CATALOGUES ---
+  getCataloguePlantes: async () => {
+    const response = await fetch(`${BASE_URL}/catalogue/plantes`);
+    return response.json();
+  },
+
+  getCatalogueAuxiliaires: async () => {
+    const response = await fetch(`${BASE_URL}/catalogue/auxiliaires`);
+    return response.json();
+  },
+
+  // --- LOGOUT ---
+  logout: () => {
+    localStorage.removeItem("access_token");
   }
 };
