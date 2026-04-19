@@ -9,7 +9,7 @@ ModelType = TypeVar("ModelType", bound=Base)
 
 class BaseRepository(Generic[ModelType]):
     """
-    Repository de base générique pour les opérations CRUD.
+    Repository de base générique pour les opérations de ecriture , lecture , mise a jour , effacer.
     """
 
     def __init__(self, db: Session, model: Type[ModelType]):

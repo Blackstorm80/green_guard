@@ -34,7 +34,7 @@ def calculer_etat_global_vegetal(
             somme_indices_stress += bilan.indice_stress
             if bilan.statut_hydrique == "Critique":
                 critique_count += 1
-            elif bilan.statut_hydrique == "A surveiller": # ou "Warning" selon votre convention
+            elif bilan.statut_hydrique == "A surveiller": 
                 warning_count += 1
     
     # Calcul du pourcentage de santé globale (inverse du stress moyen)

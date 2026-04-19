@@ -32,7 +32,7 @@ def calculer_besoin_arrosage_mm(
     Returns:
         La quantité d'eau en mm à apporter. 0.0 si l'arrosage n'est pas nécessaire.
     """
-    # Sécurisation minimale des ratios (éviter les valeurs négatives)
+    # éviter les valeurs négatives
     seuil_declenchement_ratio = max(0.0, seuil_declenchement_ratio)
     cible_remplissage_ratio = max(0.0, cible_remplissage_ratio)
 

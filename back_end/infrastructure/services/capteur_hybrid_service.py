@@ -35,7 +35,7 @@ class CapteurHybridService:
                 "timestamp": derniere_mesure.timestamp.isoformat() if hasattr(derniere_mesure.timestamp, 'isoformat') else str(derniere_mesure.timestamp)
             }
 
-        # 2. Fallback de simulation si aucune donnée n'est présente
+        # 2.  simulation si aucune donnée n'est présente
         return {
             "espace_id": espace_id,
             "temperature_c": round(random.uniform(19.0, 24.5), 1),

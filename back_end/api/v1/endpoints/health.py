@@ -34,7 +34,7 @@ def run_diagnostic(payload: DiagnosticRequest):
         lux = m.get("luminosite", 3500)
         pres = m.get("pression_atm", 1013)
 
-    # L'algorithme de décision (Le Cœur)
+    # L'algorithme de décision 
     if hum_sol < 45:
         statut = "Attention"
         message = "Humidité du sol faible. Arrosage suggéré."

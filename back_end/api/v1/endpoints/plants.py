@@ -32,7 +32,7 @@ class EspaceVertRead(EspaceVertBase):
     class Config:
         from_attributes = True
 
-# --- Endpoints ---
+# Endpoints 
 
 @router.get("/", response_model=List[EspaceVertRead], summary="Lister les espaces verts")
 def read_plants(

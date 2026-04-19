@@ -200,7 +200,7 @@ export default function HomeTableauDeBord() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             
             <GlobalKpiCard 
-              title="Global_Soil_Sat" 
+              title="sat_du_sol" 
               value={saturationGlobale} 
               unit="%" 
               icon={<Droplets size={24} className="text-teal-400" />} 
@@ -216,7 +216,7 @@ export default function HomeTableauDeBord() {
             />
 
             <GlobalKpiCard 
-              title="Thermal_Stress" 
+              title="stress_Thermique" 
               value={noeudsEnStressThermique} 
               unit="Node(s)" 
               icon={<Thermometer size={24} className={noeudsEnStressThermique > 0 ? "text-red-500" : "text-slate-400"} />} 
@@ -224,7 +224,7 @@ export default function HomeTableauDeBord() {
             />
 
             <GlobalKpiCard 
-              title="Vulnerability" 
+              title="Vulnerabilité" 
               value={espaces.length > 0 ? Math.round((sitesEnAlerte.length / espaces.length) * 100) : 0} 
               unit="%" 
               icon={<ShieldAlert size={24} className="text-rose-400" />} 

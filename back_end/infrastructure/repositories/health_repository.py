@@ -23,5 +23,4 @@ class HealthRepository:
             # Log l'erreur ici
             raise e
 
-    # On pourrait ajouter ici d'autres méthodes liées à la santé,
-    # par exemple pour récupérer l'historique des alertes.
+    # a venir: récupérer l'historique des alertes.

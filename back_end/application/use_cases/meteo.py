@@ -26,6 +26,6 @@ def obtenir_meteo_actuelle(
         city=conditions.city,
         temperature_c=conditions.temperature_c,
         condition=conditions.condition,
-        icon=None,  # tu pourras mapper condition -> icône côté front si tu veux
+        icon=None,  #  mapper condition -> icône côté front bientot
         ensoleillement_fort=conditions.ensoleillement_fort,
     )

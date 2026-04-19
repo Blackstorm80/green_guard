@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 import datetime
-from domain.schemas import DonneesMeteoJournalieres
+from schema import DonneesMeteoJournalieres
 
 class IMeteoService(ABC):
     """

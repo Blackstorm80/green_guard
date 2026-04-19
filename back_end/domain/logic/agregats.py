@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 from typing import List
 
-domain.models import BilanHydriqueJournalier
+from domain.models import BilanHydriqueJournalier
 
 
 @dataclass

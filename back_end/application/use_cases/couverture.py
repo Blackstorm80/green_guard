@@ -1,8 +1,8 @@
 from datetime import datetime
 from domain.models import EspaceVert, PlanteEntity
 from domain.ports.espace import IEspaceVertRepository
-from domain.ports.plante import IPlanteRepository
-from domain.ports.couverture_pilotage import ICouverturePilotageService
+from domain.ports.plante_repository import IPlanteRepository
+from domain.ports.couverture_service import ICouverturePilotageService
 from domain.ports.meteo import IMeteoService
 
 

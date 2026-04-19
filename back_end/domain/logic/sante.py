@@ -67,7 +67,7 @@ def diagnostic_sante_espace(
         "score_global": 0.0,
         "stresses": {},
         "recommandations": [],
-        "alertes_a_creer": []  # IMPORTANT: On retourne les objets, pas de commit !
+        "alertes_a_creer": []  # IMPORTANT: On retourne les objets
     }
     
     especes = espace.especes_vegetales or []

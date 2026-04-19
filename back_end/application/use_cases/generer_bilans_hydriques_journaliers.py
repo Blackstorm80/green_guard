@@ -88,7 +88,7 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
                 humidites_horaires=humidites_horaires,
             )
         except MeteoServiceError as e:
-            # Si quelque chose ne va pas (service pas prêt, données manquantes, etc.),
+            # Si quelque chose ne va pas (service pas prêt, données manquantes),
             # on ne bloque pas le calcul hydrique : on se contente de dire
             # "pas de stress sanitaire calculé aujourd'hui".
             logging.warning(f"Données météo horaires indisponibles pour {espace.nom} le {date_du_calcul}: {e}")
@@ -97,14 +97,11 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
             logging.error(f"Erreur inattendue lors du calcul du stress sanitaire pour {espace.nom}: {e}", exc_info=True)
             stress_sanitaire_jour = None
 
-            # En bonus, on peut prévenir un service de notification pour que
+            # E prévenir un service de notification pour que
             # quelqu'un jette un œil à la météo.
             if notification_service is not None:
                 notification_service.notifier_meteo_indisponible(espace, date_du_calcul)
 
-        # 2.5. Maintenant qu'on a toutes les "ingrédients" (pluie, ET0, arrosage,
-        #      bilan précédent, stress sanitaire éventuel), on appelle la vraie
-        #      logique de domaine hydrique.
         nouveau_bilan = calculer_bilan_hydrique_pour_jour(
             espace_vert=espace,
             bilan_precedent=bilan_precedent,
@@ -119,7 +116,7 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
         bilan_repo.sauvegarder(nouveau_bilan)
 
         # 2.7. Si la situation hydrique est critique, on en profite pour
-        #      déclencher une alerte (mail, SMS, etc.) via le service de notification.
+        #      déclencher une alerte (mail, SMS(biento)) via le service de notification.
         if nouveau_bilan.statut_hydrique == "Critique" and notification_service is not None:
             notification_service.notifier_stress_hydrique(
                 nom_espace=espace.nom,
@@ -127,8 +124,8 @@ def generer_bilans_hydriques_pour_tous_les_espaces(
                 indice_stress=nouveau_bilan.indice_stress,
             )
 
-        # 2.8. Enfin, on transforme le résultat métier en DTO propre pour la couche API.
-        #      Ce DTO est ce qui sera renvoyé aux clients (front, intégrations, etc.).
+        # 2.8.  on transforme le résultat métier en DTO propre pour la couche API.
+        #      Ce DTO est ce qui sera renvoyé aux clients (front, intégrations, ).
         resume = BilanHydriqueEspaceDTO(
             espace_id=espace.id,
             nom_espace=espace.nom,

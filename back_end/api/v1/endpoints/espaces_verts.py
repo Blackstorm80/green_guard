@@ -4,7 +4,7 @@ from typing import List
 
 from infrastructure.database import get_db
 from api.deps.auth import get_current_user
-from domain import models # On importe le module domain/models en entier
+from domain import models 
 from schema.espaces_verts import EspaceVertRead, EspaceVertCreate, EspaceVertUpdate
 
 router = APIRouter()
@@ -53,7 +53,6 @@ def update_espace_vert(
     if not db_espace:
         raise HTTPException(status_code=404, detail="Espace vert non trouvé")
 
-    # Vérifier que Nathan ne peut modifier que ses propres espaces
     if db_espace.user_id != current_user.id:
         raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à modifier cet espace")
 

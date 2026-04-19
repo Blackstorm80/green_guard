@@ -8,7 +8,7 @@ from domain.models import EspaceVert
 
 router = APIRouter()
 
-# --- Schéma de réponse pour le Dashboard ---
+#  Schéma de réponse pour le Dashboard 
 class HealthDiagnostic(BaseModel):
     espace_id: int
     nom: str
@@ -19,7 +19,7 @@ class HealthDiagnostic(BaseModel):
     class Config:
         from_attributes = True
 
-# --- Endpoint ---
+#  Endpoint 
 @router.get("/diagnostic", response_model=List[HealthDiagnostic], summary="Diagnostic santé global pour le Dashboard")
 def get_diagnostic(db: Session = Depends(get_db)):
     """
@@ -29,7 +29,6 @@ def get_diagnostic(db: Session = Depends(get_db)):
     results = []
     
     for e in espaces:
-        # Récupération de la santé (logique simplifiée pour la démo basée sur les données seedées)
         sante = getattr(e, "sante_percent", 100.0) or 100.0
         
         statut = "Sain"

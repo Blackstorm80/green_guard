@@ -1,7 +1,7 @@
 # Fichier: domain/logic/compatibilite_plante_espace.py
 
 from typing import Tuple, List
-domain.models import PlanteEntity, EspaceVert
+from domain.models import PlanteEntity, EspaceVert
 
 
 def est_exposition_compatible(

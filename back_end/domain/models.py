@@ -3,7 +3,7 @@ from sqlalchemy.orm import relationship
 from datetime import datetime
 from infrastructure.database import Base
 
-# --- 1. UTILISATEURS ---
+#  1. UTILISATEURS 
 class User(Base):
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
@@ -17,7 +17,7 @@ class User(Base):
     notifications = relationship("Notification", back_populates="user")
     espaces = relationship("EspaceVert", back_populates="proprietaire")
 
-# --- 2. BOTANIQUE & CATALOGUE ---
+# 2. BOTANIQUE & CATALOGUE 
 class Plante(Base):
     __tablename__ = "plantes"
     id = Column(Integer, primary_key=True, index=True)
@@ -36,7 +36,7 @@ class Auxiliaire(Base):
     role = Column(String)
     url_image = Column(String, nullable=True)
 
-# --- 3. ESPACES & LOGIQUE MÉTIER ---
+#  3. ESPACES & LOGIQUE MÉTIER 
 class EspaceVert(Base):
     __tablename__ = "espaces_verts"
     id = Column(Integer, primary_key=True, index=True)
@@ -46,7 +46,7 @@ class EspaceVert(Base):
     longitude = Column(Float)
     surface_m2 = Column(Float, nullable=True)
     type_espace = Column(String) #    
-    # --- CHAMPS AGRONOMIQUES CRITIQUES (non fini)
+    #  CHAMPS AGRONOMIQUES CRITIQUES (non fini)
     type_sol = Column(String, nullable=True)
     ph_actuel = Column(Float, nullable=True)
     exposition = Column(String, nullable=True)
@@ -83,13 +83,13 @@ class ClusteringConfig(Base):
     distance_max = Column(Float, default=0.5)
     algorithme = Column(String, default="DBSCAN")
 
-# --- 4. CAPTEURS & MESURES ---
+#  4. CAPTEURS & MESURES 
 class Capteur(Base):
     __tablename__ = "capteurs"
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String)
     type = Column(String)
-    emplacement = Column(String, nullable=True) # Champ requis par ton script
+    emplacement = Column(String, nullable=True) 
     espace_id = Column(Integer, ForeignKey("espaces_verts.id"))
     est_actif = Column(Boolean, default=True)
     
@@ -107,7 +107,7 @@ class Mesure(Base):
     
     espace = relationship("EspaceVert", back_populates="mesures")
 
-# --- 5. ANALYSE & NOTIFICATIONS ---
+# 5. ANALYSE & NOTIFICATIONS 
 class BilanHydriqueJournalier(Base):
     __tablename__ = "bilans_hydriques"
     id = Column(Integer, primary_key=True, index=True)

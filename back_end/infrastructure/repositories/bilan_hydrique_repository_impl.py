@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from datetime import date
-from domain.models import BilanHydriqueJournalier # <--- L'import corrigé !
+from domain.models import BilanHydriqueJournalier 
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
 
 class BilanHydriqueRepositoryImpl(IBilanHydriqueRepository):

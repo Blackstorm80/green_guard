@@ -29,7 +29,7 @@ def calculer_features_espaces(espaces: List[EspaceVert]) -> np.ndarray:
         
         features.append([lat, lon, type_espace_code])
     
-    #  pour que K-Means traite toutes les features équitablement
+    #  pour que K-Means traite toutes les features 
     scaler = StandardScaler()
     return scaler.fit_transform(features)
 
@@ -75,7 +75,7 @@ def executer_clustering_intelligent(
     kmeans = KMeans(n_clusters=config.n_clusters, random_state=42, n_init=10)
     labels = kmeans.fit_predict(X)
     
-    # Le score de silhouette est une métrique globale pour la qualité du clustering.
+    # Le score de silhouette est un métrique globale pour la qualité du clustering.
     # Il ne doit pas être stocké sur chaque zone individuelle.
     silhouette = silhouette_score(X, labels)
     print(f"Clustering exécuté avec un score de silhouette global de : {silhouette:.4f}")

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-domain.models import (
+from domain.models import (
     EspaceVert,
     BilanHydriqueJournalier,
 )
@@ -78,7 +78,6 @@ def convertir_besoin_en_litres(
 
     # Sécurisation de l'efficacité pour éviter division par zéro ou négative
     if efficacite_systeme <= 0:
-        # On pourrait aussi lever une exception métier ici
         return volume_theorique_litres
 
     return volume_theorique_litres / efficacite_systeme

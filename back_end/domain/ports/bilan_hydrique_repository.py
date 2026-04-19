@@ -3,8 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
 from datetime import date
-from domain.models import BilanHydriqueJournalier # <--- L'import corrigé !
-
+from domain.models import BilanHydriqueJournalier 
 class IBilanHydriqueRepository(ABC):
     @abstractmethod
     def save(self, bilan: BilanHydriqueJournalier) -> BilanHydriqueJournalier:

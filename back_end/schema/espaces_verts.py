@@ -3,15 +3,15 @@ from typing import Optional
 from datetime import datetime
 
 class EspaceVertBase(BaseModel):
-    """Le socle commun : On ne garde en obligatoire que le strict nécessaire."""
+    """ On ne garde en obligatoire que le strict nécessaire."""
     nom: str
     ville: Optional[str] = None
     latitude: float
     longitude: float
     surface_m2: Optional[float] = None
-    user_id: int # L'ID de Nathan
+    user_id: int 
     
-    # --- Données Agronomiques (Optionnelles pour éviter les crashs 500) ---
+    #  Données Agronomiques (Optionnelles pour éviter les crashs 500) 
     type_espace: Optional[str] = "Jardin"
     exposition_reelle: Optional[str] = "Ensoleillé"
     type_sol: Optional[str] = "Argileux"
