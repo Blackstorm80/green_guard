@@ -15,7 +15,6 @@ def calculer_besoin_arrosage_mm(
     cible_remplissage_ratio: float = 1.0,
 ) -> float:
     """
-    Calcule la quantité d'eau (en mm) recommandée pour l'arrosage.
 
     On déclenche l'arrosage si la réserve actuelle est en dessous d'un certain
     pourcentage de la Réserve Utile maximale (RU max), puis on vise un niveau

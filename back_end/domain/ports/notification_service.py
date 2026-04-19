@@ -12,6 +12,6 @@ class INotificationService(ABC):
     def notifier_stress_hydrique(self, nom_espace: str, statut: str, indice_stress: float) -> None:
         """
         Envoie une notification concernant le statut de stress hydrique d'un espace.
-        L'implémentation concrète décidera du canal (email, log, etc.).
+        log au debut  (rajout de email et sms a la prochane version)
         """
         pass

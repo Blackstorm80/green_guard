@@ -9,12 +9,11 @@ def calculer_stress_sanitaire_jour(
 ) -> float:
     """
     Calcule un indice de stress sanitaire journalier entre 0 et 1
-    à partir de séries horaires de température et d'humidité.
+     par horaire de température et d'humidité.
 
     - 0 : pas de stress sanitaire lié aux conditions T/H
     - 1 : stress sanitaire maximal (conditions très défavorables)
-
-    La logique actuelle est volontairement simple et paramétrable :
+ 
     - zone de confort température : 15–24 °C
     - zone de confort humidité : 40–70 %
     - au-delà de ces zones, le stress augmente linéairement jusqu'à 1

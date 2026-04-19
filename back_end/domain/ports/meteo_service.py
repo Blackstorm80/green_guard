@@ -15,6 +15,6 @@ class IMeteoService(ABC):
         self, latitude: float, longitude: float, date: datetime.date
     ) -> DonneesMeteoJournalieres:
         """
-        Récupère les données météo pour un lieu et une date donnés.
+        Récupère les données météo pour un lieu et une date précise.
         """
         pass

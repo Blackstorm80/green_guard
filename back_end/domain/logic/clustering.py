@@ -29,7 +29,7 @@ def calculer_features_espaces(espaces: List[EspaceVert]) -> np.ndarray:
         
         features.append([lat, lon, type_espace_code])
     
-    # Normalisation pour que K-Means traite toutes les features équitablement
+    #  pour que K-Means traite toutes les features équitablement
     scaler = StandardScaler()
     return scaler.fit_transform(features)
 

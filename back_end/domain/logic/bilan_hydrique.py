@@ -17,9 +17,6 @@ def calculer_bilan_hydrique_pour_jour(
     stress_sanitaire_jour: float | None,
 ) -> BilanHydriqueJournalier:
     """
-    Calcule le bilan hydrique pour un espace vert à une date donnée.
-    Cette fonction ne dépend pas de services externes : elle reçoit toutes les valeurs
-    nécessaires en paramètres (pluie, ET0, arrosage, stress sanitaire déjà calculé).
 
     Args:
         espace_vert: L'entité de l'espace vert concerné.
@@ -33,8 +30,8 @@ def calculer_bilan_hydrique_pour_jour(
     Returns:
         Une nouvelle entité BilanHydriqueJournalier avec les résultats du calcul.
     """
-    # Étape 1 : Déterminer la réserve en eau de départ.
-    # Si c'est le premier calcul, on peut considérer que la réserve est pleine.
+    # Étape 1 : Déterminer la réserve en eau au debut.
+    # Si  premier calcul, on  considére que la réserve est pleine.
     reserve_eau_veille = (
         bilan_precedent.reserve_eau
         if bilan_precedent is not None
