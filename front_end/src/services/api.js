@@ -1,7 +1,8 @@
 const BASE_URL = "http://localhost:8000/api/v1";
 
 export const api = {
-  // --- AUTHENTIFICATION ---
+  // --- AUTHENTIFICATION & UTILISATEURS ---
+  
   login: async (email, password) => {
     const formData = new URLSearchParams();
     formData.append("username", email);
@@ -17,6 +18,29 @@ export const api = {
     return data;
   },
 
+  register: async (userData) => {
+    const payload = {
+      name: userData.name,
+      email: userData.email,
+      password: userData.password,
+      role: "admin" 
+    };
+
+    const response = await fetch(`${BASE_URL}/auth/auth/register`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.detail || "Échec de la création du compte.");
+    }
+    return await response.json();
+  },
+
   getCurrentUser: async (token) => {
     const response = await fetch(`${BASE_URL}/users/me`, {
       headers: { "Authorization": `Bearer ${token}` },
@@ -25,12 +49,12 @@ export const api = {
   },
 
   // --- DASHBOARD & CAPTEURS ---
+  
   getDashboardStats: async (espaceIds = []) => {
     const token = localStorage.getItem("access_token");
     const params = new URLSearchParams();
     espaceIds.forEach(id => params.append("espace_ids", id));
     
-    // On garde le double /capteurs car c'est ainsi que ton router est configuré
     const url = `${BASE_URL}/capteurs/capteurs/dashboard?${params.toString()}`;
     
     const response = await fetch(url, {
@@ -41,6 +65,7 @@ export const api = {
   },
 
   // --- ESPACES & ZONES ---
+  
   getEspacesVerts: async () => {
     const token = localStorage.getItem("access_token");
     const response = await fetch(`${BASE_URL}/espaces-verts/`, {
@@ -58,6 +83,7 @@ export const api = {
   },
 
   // --- CATALOGUES ---
+  
   getCataloguePlantes: async () => {
     const response = await fetch(`${BASE_URL}/catalogue/plantes`);
     return response.json();
@@ -69,6 +95,7 @@ export const api = {
   },
 
   // --- LOGOUT ---
+  
   logout: () => {
     localStorage.removeItem("access_token");
   }

@@ -63,8 +63,8 @@ export default function EspacesSites() {
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Clusters Intelligents</h1>
-          <p className="text-slate-400 mt-1">Segmentation basee sur la geographie et la sante</p>
+          <h1 className="text-3xl font-black text-white tracking-tight">Green clust</h1>
+          <p className="text-slate-400 mt-1">segmentation geographique</p>
         </div>
         
         <button 
@@ -125,7 +125,7 @@ export default function EspacesSites() {
         })}
       </div>
 
-      {/* BARRE DE RECHERCHE (inchangée) ... */}
+      {/* BARRE DE RECHERCHE  ... */}
       <div className="flex flex-col md:flex-row gap-4 items-center bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
         <div className="relative flex-1">
           <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />

@@ -104,7 +104,7 @@ const Rapports = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 no-print">
         <div>
           <h1 className="text-2xl font-bold text-white tracking-tight">
-            Rapports & Historique
+           
           </h1>
           <p className="text-slate-400 text-sm mt-1">
             Consultez et téléchargez les bilans d'interventions et d'incidents.

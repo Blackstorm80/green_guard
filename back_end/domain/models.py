@@ -57,6 +57,9 @@ class EspaceVert(Base):
     type_irrigation = Column(String, nullable=True)
     date_derniere_fertilisation = Column(Date, nullable=True)
     sante_percent = Column(Float, nullable=True)
+
+    reserve_utile_max = Column(Float, default=100.0) 
+    coefficient_cultural = Column(Float, default=1.0)
     # -----------------------------------------
 
     user_id = Column(Integer, ForeignKey("users.id"))

@@ -1,69 +1,42 @@
+import requests
+import logging
+from datetime import datetime
+
 import python_weather
 import asyncio
 from sqlalchemy.orm import Session
 from domain.models import EspaceVert
 from infrastructure.database import SessionLocal
 from domain.ports.meteo import IMeteoService, ConditionsMeteo
-from datetime import datetime
 
 class OpenMeteoService(IMeteoService):
-    
-    async def _get_weather_async(self, latitude: float, longitude: float):
-        async with python_weather.Client(unit=python_weather.METRIC) as client:
-            return await client.get(f"{latitude},{longitude}")
-
-    def recuperer_conditions_actuelles(
-        self,
-        latitude: float,
-        longitude: float,
-        maintenant: datetime,
-    ) -> ConditionsMeteo:
+    def recuperer_conditions_actuelles(self, latitude, longitude, maintenant) -> ConditionsMeteo:
         try:
-            weather = asyncio.run(self._get_weather_async(latitude, longitude))
+            url = f"https://api.open-meteo.com/v1/forecast?latitude={latitude}&longitude={longitude}&current=temperature_2m,relative_humidity_2m,precipitation,cloud_cover&daily=et0_fao_evapotranspiration&timezone=auto"
+            response = requests.get(url, timeout=10)
+            response.raise_for_status()
+            data = response.json()
             
-            # Déduction de l'ensoleillement fort à partir des conditions actuelles
-            sunny_conditions = ["sunny", "clear"]
-            ensoleillement_fort = any(cond in weather.description.lower() for cond in sunny_conditions)
+            current = data.get("current", {})
+            daily = data.get("daily", {})
 
-            # python-weather ne fournit pas nativement et0
-            et0_estime = None
+            # Déduction de l'ensoleillement : couverture nuageuse < 30%
+            cloud_cover = current.get("cloud_cover", 100)
+            ensoleillement_fort = cloud_cover < 30
+            
+            # Récupération de l'ET0 (évapotranspiration) réelle
+            et0_list = daily.get("et0_fao_evapotranspiration", [])
+            et0_reelle = et0_list[0] if et0_list else None
 
             return ConditionsMeteo(
-                city="Inconnu", # python-weather ne fournit pas de nom de ville pour les coordonnées
-                temperature_c=weather.temperature,
-                condition=weather.description,
+                city="Ma Station",
+                temperature_c=current.get("temperature_2m"),
+                condition="Dégagé" if ensoleillement_fort else "Nuageux",
                 ensoleillement_fort=ensoleillement_fort,
-                humidite=weather.humidity,
-                pluie=weather.precipitation,
-                et0=et0_estime
+                humidite=current.get("relative_humidity_2m"),
+                pluie=current.get("precipitation", 0.0),
+                et0=et0_reelle
             )
         except Exception as e:
-            import logging
-            logging.error(f"Erreur lors de la récupération de la météo avec python-weather: {e}")
+            logging.error(f"ERREUR CRITIQUE OPEN-METEO : {e}")
             return None
-
-    def recuperer_meteo_pour_tous_les_espaces(self):
-        db: Session = SessionLocal()
-        try:
-            espaces = db.query(EspaceVert).all()
-            all_weather_data = []
-
-            for espace in espaces:
-                weather_data = self.recuperer_conditions_actuelles(espace.latitude, espace.longitude, datetime.utcnow())
-                if not weather_data:
-                    continue
-                # Ici on pourrait stocker les données ou les retourner
-                all_weather_data.append({
-                    "espace_id": espace.id,
-                    "nom": espace.nom,
-                    "weather": {
-                        "temperature": weather_data.temperature_c,
-                        "condition": weather_data.condition,
-                        "ensoleillement_fort": weather_data.ensoleillement_fort,
-                        "humidite": weather_data.humidite,
-                        "pluie": weather_data.pluie
-                    }
-                })
-            return all_weather_data
-        finally:
-            db.close()
