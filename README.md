@@ -53,7 +53,8 @@ Le projet intègre le **Secret Scanning**. Tout fichier contenant des clés sens
     SECRET_KEY=votre_cle_jwt_super_secrete
     OPENWEATHER_API_KEY=votre_cle_openweather
     ```
-
+##Note: 
+le design du Dashboard a étét creer avec un outil IA 
 ## Workflow de Contribution
 
 1.  **Branchement** : Ne jamais travailler sur main. Créez une branche feature/ ou fix/.
