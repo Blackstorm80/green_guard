@@ -17,7 +17,10 @@ If you are developing a production application, we recommend using TypeScript wi
 
 ---
 
-## 🤝 Workflow de Contribution avec Git
+##  Workflow de Contribution avec Git
+
+##Note : 
+The dashboard design on this app was created with help of AI (gemini)
 
 Pour garantir la stabilité du projet, il est **impératif** de suivre ces règles :
 
