@@ -187,6 +187,22 @@ Hypothèse : un développeur à temps plein accompagné de l'architecte. Chaque 
 
 **Critère de sortie** : un parcours complet fonctionne sous Docker (inscription → connexion → créer un espace → dashboard réel → météo → déconnexion).
 
+**Suivi au 2026-10-03** (branche `fix/phase-1-fonctionnel`, 5 commits, au-dessus de la phase 0) : **critère de sortie atteint**, parcours validé dans un navigateur sur la pile Docker avec la météo réelle.
+- ✅ Étapes 1 à 5 et 7. Routes : 33 routes, préfixe unique, plus aucune erreur 500 sur le parcours. Schéma v1 avec contraintes. Front branché. Dockerfiles front et back. Dépendances figées.
+- ✅ Bonus phase 2 réalisé en avance :
+  - 22 tests verts, sur SQLite et sur PostgreSQL 16 ;
+  - IDOR corrigés (dashboard, plants, diagnostic) ;
+  - catalogue et météo authentifiés ;
+  - comptes désactivés bloqués ;
+  - mot de passe de 12 caractères minimum ;
+  - job idempotent ;
+  - clustering corrigé.
+- ⚠️ Migration de référence remplacée par `0001_schema_v1` : une base de développement créée en juin doit être recréée.
+- ⏳ Étape 6 (suppression du code mort) : refusée par le garde-fou automatique, **en attente de l'accord du porteur de projet**. Ces fichiers ne sont ni importés par l'API ni inclus dans le bundle front.
+  - Back (environ 40 fichiers) : catalogue v2 `PlanteEntity`, ports dupliqués, repositories vides, `plants.py`, `init_db.py`, `sanity_check.py`, `test_weather.py`, `run.sh`.
+  - Front (environ 20 fichiers) : `Header.jsx`, `navbar/*`, doublons `AddSpaceModal`/`AlertsPanel`, `src/data/*`, `types/domain.ts`, `NotificationCenter.jsx`.
+- Reporté en phase 3 : page Rapports (données factices), labels de formulaires non associés, wording restant.
+
 ### Phase 2 : fiabilité et sécurité (26 octobre → 6 novembre)
 1. **Tests** :
    - pytest avec `conftest.py` (BDD de test, override de `get_db`) ;

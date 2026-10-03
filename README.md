@@ -38,9 +38,10 @@ back_end/
 
 Pour gérer la montée en charge (flotte de **200+ espaces verts**), GreenGuard utilise des mécanismes avancés :
 
-* **Clustering DBSCAN** : Regroupement automatique des points par densité géographique pour éviter la surcharge visuelle du Dashboard.
-    * *Configuration cible* : `distance_max = 0.02` (Epsilon) pour une granularité précise par quartier.
-* **KPIs Temps Réel** : Agrégation des données de santé et d'humidité pour fournir des moyennes globales (Santé de la flotte, Stress hydrique critique).
+* **Zones intelligentes (K-Means géographique)** : regroupement des espaces sur leurs coordonnées projetées en km ; centroïdes et rayons en coordonnées réelles. Nombre de zones paramétrable (`clustering_configs.n_clusters`, 5 par défaut).
+* **Bilan hydrique journalier** : calculé chaque heure à partir de la météo réelle (Open-Meteo : ET0 et pluie du jour), de façon idempotente (un bilan par espace et par jour).
+* **KPIs** : santé du parc, espaces en stress, qualité de l'air, agrégés à partir des derniers bilans et mesures.
+
 ## Sécurité et Environnement
 
 * Aucun secret n'est versionné : les fichiers `.env` sont ignorés par git et la CI (`.github/workflows/securite.yml`) échoue si un `.env`, une base SQLite ou `node_modules` est commité, et lance un scan **gitleaks**.
@@ -62,6 +63,18 @@ Générer une clé JWT : `python -c "import secrets; print(secrets.token_hex(32)
 4.  **Schéma de base** : toute modification de `domain/models.py` s'accompagne d'une migration Alembic (`alembic revision --autogenerate -m "…"`).
 
 ## Lancement Rapide
+
+### Option A — Toute la pile sous Docker
+```bash
+cp .env.example .env       # puis renseigner SECRET_KEY et POSTGRES_PASSWORD
+docker compose up --build -d
+```
+Front : http://localhost:3000 — API : http://localhost:8000/docs. Les migrations s'appliquent au démarrage du backend.
+
+> Base créée avant octobre 2026 : le schéma de référence a été remplacé (`0001_schema_v1`).
+> Recréer la base de développement : `docker compose down -v` puis `docker compose up --build -d`.
+
+### Option B — Développement local
 
 ### 1. Base de données (PostgreSQL via Docker)
 ```bash
@@ -86,6 +99,14 @@ cd front_end
 npm install
 cp .env.example .env.local
 npm run dev
+```
+
+### Tests backend
+```bash
+cd back_end
+pip install -r requirements-dev.txt
+pytest                                   # SQLite, sans réseau
+TEST_DATABASE_URL=postgresql://user:mdp@localhost:5432/base_de_test pytest   # sur PostgreSQL
 ```
 
 ### 4. Créer un administrateur
