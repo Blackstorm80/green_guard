@@ -1,8 +1,12 @@
-# Dépendances pour le développement, le test et l'analyse de code.
-# À installer avec : pip install -r requirements-dev.txt
+# Dépendances de développement et de test : pip install -r requirements-dev.txt
+-r requirements.txt
 
-pylint  # Contient pyreverse pour les diagrammes UML
-pyan3
+pytest==9.0.2
+httpx==0.28.1        # requis par fastapi.testclient
+
+# Scripts de chargement de données (scripts/load/)
+pandas==3.0.1
+
+# Analyse d'architecture (optionnel)
+pylint
 pydeps
-tach
-pytest  # Pour lancer les tests

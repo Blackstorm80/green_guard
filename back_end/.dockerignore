@@ -12,3 +12,9 @@ venv/
 *.db
 *.sqlite
 *.sqlite3
+
+# Inutile dans l image
+tests/
+pytest.ini
+requirements-dev.txt
+scripts/

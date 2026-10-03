@@ -1,35 +1,26 @@
-# Étape 1: Builder (compilation des dépendances)
+# Étape 1 : installation des dépendances dans un environnement virtuel isolé
 FROM python:3.13-slim AS builder
-
-# Définir le répertoire de travail dans le conteneur
 WORKDIR /app
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:${PATH}"
 COPY requirements.txt .
-RUN pip install --no-cache-dir --user -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Étape 2: Image finale (production)
+# Étape 2 : image d'exécution minimale, sans compilateur ni curl, utilisateur non root
 FROM python:3.13-slim
-
+ENV PATH="/opt/venv/bin:${PATH}" \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 WORKDIR /app
+RUN useradd --create-home --uid 1000 greenguard
+COPY --from=builder /opt/venv /opt/venv
+COPY --chown=greenguard:greenguard . .
+USER greenguard
 
-# Installe curl, qui est nécessaire pour le HEALTHCHECK
-RUN apt-get update && apt-get install -y curl && \
-    rm -rf /var/lib/apt/lists/*
-
-# Ajoute le répertoire bin de l'utilisateur au PATH pour que `uvicorn` soit trouvable
-ENV PATH="/root/.local/bin:${PATH}"
-
-# Copie les dépendances compilées
-COPY --from=builder /root/.local /root/.local
-
-# Copie ton code
-COPY . .
-
-# Expose le port
 EXPOSE 8000
 
-# Healthcheck
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/ping || exit 1
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=4).status == 200 else 1)"
 
-# Lance l'API
-CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port 8000 --reload"]
+# Migrations puis API (pas de --reload en production)
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers"]

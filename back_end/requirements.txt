@@ -1,34 +1,33 @@
-# --- Framework & Server ---
-fastapi>=0.111.0
-uvicorn[standard]>=0.30.0
+# Versions figées = versions testées (pytest vert). Mise à jour : modifier ici, relancer la suite.
 
-# --- Database & ORM ---
-sqlalchemy>=2.0.0
-psycopg2-binary>=2.9.9
-alembic>=1.13.0
+# --- Framework & serveur ---
+fastapi==0.135.1
+uvicorn[standard]==0.41.0
 
-# --- Sécurité & Authentification ---
-passlib[bcrypt]>=1.7.4
-python-jose[cryptography]>=3.3.0
-bcrypt>=4.0.0
+# --- Base de données ---
+SQLAlchemy==2.0.48
+psycopg2-binary==2.9.11
+alembic==1.18.4
 
-# --- Validation & Formulaires ---
-pydantic[email]>=2.0.0
-python-multipart>=0.0.9
+# --- Sécurité & authentification ---
+# python-jose : remplacement par PyJWT prévu en phase 2 (ADR-6, dépendance ecdsa non maintenue)
+python-jose[cryptography]==3.5.0
+bcrypt==5.0.0
 
-# --- Variables d'environnement ---
-python-dotenv>=1.0.0
+# --- Validation ---
+pydantic==2.12.5
+email-validator==2.3.0
+python-multipart==0.0.22
+
+# --- Configuration ---
+python-dotenv==1.2.1
 
 # --- Tâches planifiées ---
-apscheduler>=3.10.0
+APScheduler==3.11.2
 
-# --- Data Science ---
-scikit-learn>=1.4.0
-numpy>=1.26.0
+# --- Calcul (clustering des zones) ---
+scikit-learn==1.8.0
+numpy==2.4.2
 
-# --- HTTP & Météo ---
-requests>=2.31.0
-httpx>=0.27.0
-
-# --- WebSockets ---
-websockets>=12.0
+# --- HTTP sortant (Open-Meteo) ---
+requests==2.32.5
