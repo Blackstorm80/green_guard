@@ -4,3 +4,11 @@ __pycache__/
 *.pyd
 .pytest_cache/
 venv/
+.venv/
+
+# Secrets et données locales : ne jamais les embarquer dans l'image
+.env
+.env.*
+*.db
+*.sqlite
+*.sqlite3
