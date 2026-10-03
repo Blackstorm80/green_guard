@@ -103,13 +103,19 @@ export default function Catalogues() {
           <div key={item.id} className="group relative bg-slate-900/30 border border-slate-800/60 rounded-[2.5rem] p-5 hover:border-green-500/40 hover:bg-slate-900/50 transition-all duration-500">
             
             <div className="aspect-[4/3] rounded-[2rem] overflow-hidden bg-slate-950 mb-6 relative">
-              <img 
-                src={item.url_image} 
-                alt={item.nom_commun || item.nom}
-                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-1000 ease-in-out"
-                loading="lazy"
-                onError={(e) => { e.target.src = "https://images.unsplash.com/photo-1466692476868-aef1dfb1e735?q=80&w=500"; }}
-              />
+              {item.url_image ? (
+                <img
+                  src={item.url_image}
+                  alt={item.nom_commun || item.nom}
+                  className="w-full h-full object-cover opacity-80 group-hover:opacity-100 group-hover:scale-110 transition-all duration-1000 ease-in-out"
+                  loading="lazy"
+                  onError={(e) => { e.currentTarget.style.display = "none"; }}
+                />
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-slate-700" aria-label="Pas de photo disponible">
+                  <Leaf size={48} aria-hidden />
+                </div>
+              )}
               <div className="absolute top-4 right-4 bg-slate-950/60 backdrop-blur-md p-2 rounded-full text-white/50 opacity-0 group-hover:opacity-100 transition-opacity">
                 <Info size={16} />
               </div>
@@ -130,12 +136,12 @@ export default function Catalogues() {
               {activeTab === "plantes" && (
                 <div className="flex justify-between items-center pt-5 mt-2 border-t border-slate-800/40">
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-blue-500/10 rounded-full text-blue-400 border border-blue-500/10">
-                    <Bug size={14} className="fill-current" />
-                    <span className="text-xs font-black">{item.besoin_eau}</span>
+                    <Droplets size={14} aria-hidden />
+                    <span className="text-xs font-black">{item.besoin_eau ?? "Eau : non renseigné"}</span>
                   </div>
                   <div className="flex items-center gap-2 px-3 py-1.5 bg-emerald-500/10 rounded-full text-emerald-400 border border-emerald-500/10">
                     <Thermometer size={14} />
-                    <span className="text-xs font-black">pH {item.ph_ideal}</span>
+                    <span className="text-xs font-black">{item.ph_ideal != null ? `pH ${item.ph_ideal}` : "pH : non renseigné"}</span>
                   </div>
                 </div>
               )}

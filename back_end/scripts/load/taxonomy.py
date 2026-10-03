@@ -1,126 +1,143 @@
+"""Chargement du catalogue botanique (plantes et insectes auxiliaires) depuis les exports iNaturalist.
+
+Usage (depuis back_end/, DATABASE_URL pointant vers la base cible, schéma déjà migré) :
+    python -m scripts.load.taxonomy [--dry-run]
+
+- Une ligne du CSV est une *observation* : le catalogue est dédoublonné par espèce.
+- Idempotent : une espèce déjà présente (même nom scientifique) n'est pas réinsérée.
+- Aucune valeur inventée : pH et besoin en eau ne sont renseignés que lorsqu'une règle
+  par famille botanique s'applique (estimation indicative, à faire valider) ; l'image
+  est la photo iNaturalist de l'observation, sinon aucune.
+"""
+import argparse
 import os
-import random
 import sys
 
 import pandas as pd
 
-#script pour extraire et charger le catalogue
-# 1. CONFIGURATION DES CHEMINS
-current_dir = os.path.dirname(os.path.abspath(__file__))
-project_root = os.path.abspath(os.path.join(current_dir, "../../"))
-if project_root not in sys.path:
-    sys.path.insert(0, project_root)
+BACKEND = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+if BACKEND not in sys.path:
+    sys.path.insert(0, BACKEND)
 
-from domain.models import Auxiliaire, Base, Plante
-from infrastructure.database import SessionLocal, engine
+from domain.models import Auxiliaire, Plante  # noqa: E402
+from infrastructure.database import SessionLocal  # noqa: E402
+
+DOSSIER_DONNEES = os.path.join(BACKEND, "..", "inaturalist")
+FICHIERS = ["inaturalist_train (1).csv", "inaturalist_test (1).csv"]
+
+# (mots-clés dans le nom, pH indicatif, besoin en eau) — première règle applicable retenue
+REGLES_PHYSIOLOGIE = [
+    (("rosa", "prunus", "malus", "fragaria"), 6.5, "Modéré"),
+    (("cactus", "cactaceae", "succulent", "yucca", "agave"), 7.2, "Faible"),
+    (("pinus", "picea", "abies", "juniperus"), 5.8, "Faible à modéré"),
+    (("quercus", "ilex"), 6.0, "Faible à modéré"),
+    (("acer", "maple"), 6.5, "Modéré"),
+    (("solanum", "tomato", "potato"), 6.2, "Élevé"),
+    (("lavandula", "thymus", "rosmarinus"), 7.0, "Très faible"),
+    (("fern", "fougère", "polypodium"), 5.5, "Élevé"),
+    (("lily", "lilium", "tulipa"), 6.5, "Modéré à élevé"),
+]
+
+ROLES_AUXILIAIRES = [
+    (("bee", "bumble", "butterfly", "hover fly"), "Pollinisateur",
+     "Assure la pollinisation des espèces à fleurs."),
+    (("lady beetle", "ladybug", "lacewing", "mantis", "wasp"), "Prédateur",
+     "Régule naturellement les ravageurs (pucerons, chenilles…)."),
+]
 
 
-def get_physio_data_enhanced(name):
-    """
-    Génère des données physiologiques (pH, besoins en eau) plus réalistes
-    basées sur des mots-clés dans le nom de l'espèce.
-    """
-    name_low = str(name).lower()
+def _texte(valeur) -> str | None:
+    if pd.isna(valeur):
+        return None
+    texte = str(valeur).strip()
+    return None if texte.lower() in ("", "none", "nan") else texte
 
-    # Defaults
-    ph_base, eau_base = 6.8, "Modéré" # (e.g., 300-500 mm/an)
 
-    # Familles/Genres spécifiques
-    if any(k in name_low for k in ["rosa", "prunus", "malus", "fragaria"]): # Rosaceae
-        ph_base, eau_base = 6.5, "Modéré"
-    elif any(k in name_low for k in ["cactus", "cactaceae", "succulent", "yucca", "agave"]):
-        ph_base, eau_base = 7.2, "Faible" # (e.g., < 200 mm/an)
-    elif any(k in name_low for k in ["pinus", "picea", "abies", "juniperus"]): # Conifères
-        ph_base, eau_base = 5.8, "Faible à Modéré"
-    elif any(k in name_low for k in ["quercus", "robur", "ilex"]): # Chênes
-        ph_base, eau_base = 6.0, "Faible à Modéré"
-    elif any(k in name_low for k in ["acer", "maple"]): # Érables
-        ph_base, eau_base = 6.5, "Modéré"
-    elif any(k in name_low for k in ["solanum", "tomato", "potato"]): # Solanaceae
-        ph_base, eau_base = 6.2, "Élevé" # (e.g., > 600 mm/an)
-    elif any(k in name_low for k in ["lavandula", "thymus", "rosmarinus"]): # Lamiaceae/Méditerranéen
-        ph_base, eau_base = 7.0, "Très Faible"
-    elif any(k in name_low for k in ["fern", "fougère", "polypodium"]):
-        ph_base, eau_base = 5.5, "Élevé"
-    elif any(k in name_low for k in ["lily", "lilium", "tulipa"]):
-        ph_base, eau_base = 6.5, "Modéré à Élevé"
+def physiologie(nom: str) -> tuple[float | None, str | None]:
+    nom = nom.lower()
+    for mots, ph, eau in REGLES_PHYSIOLOGIE:
+        if any(m in nom for m in mots):
+            return ph, eau
+    return None, None
 
-    ph_final = round(ph_base * random.uniform(0.97, 1.03), 1)
-    return {"ph": ph_final, "eau": eau_base}
 
-def is_beneficial_insect(name):
-    beneficial_keywords = ["bee", "bumble", "lady beetle", "mantis", "wasp", "butterfly", "lacewing", "hover fly"]
-    return any(k in str(name).lower() for k in beneficial_keywords)
+def role_auxiliaire(nom: str) -> tuple[str, str] | None:
+    nom = nom.lower()
+    for mots, role, description in ROLES_AUXILIAIRES:
+        if any(m in nom for m in mots):
+            return role, description
+    return None
 
-def load_taxonomy():
-    Base.metadata.create_all(bind=engine)
+
+def photo(valeur) -> str | None:
+    url = _texte(valeur)
+    if not url or not url.startswith("https://"):
+        return None
+    return url.replace("/square.", "/medium.")
+
+
+def lire_observations() -> pd.DataFrame:
+    chemins = [os.path.join(DOSSIER_DONNEES, f) for f in FICHIERS]
+    manquants = [c for c in chemins if not os.path.exists(c)]
+    if manquants:
+        raise FileNotFoundError(f"Fichiers introuvables : {manquants}")
+    df = pd.concat([pd.read_csv(c, usecols=["species_guess", "common_name", "taxon", "photos"]) for c in chemins])
+    df["species_guess"] = df["species_guess"].map(_texte)
+    df["taxon"] = df["taxon"].astype(str).str.strip()
+    df = df.dropna(subset=["species_guess"])
+    # Une espèce = une entrée ; on garde de préférence une observation avec photo
+    df["a_photo"] = df["photos"].map(photo).notna()
+    df["cle"] = df["species_guess"].str.lower()
+    return df.sort_values("a_photo", ascending=False).drop_duplicates("cle")
+
+
+def charger(dry_run: bool = False) -> None:
+    df = lire_observations()
     db = SessionLocal()
-
-    csv_path = os.path.abspath(os.path.join(project_root, "..", "inaturalist", "inaturalist_train (1).csv"))
-
-    if not os.path.exists(csv_path):
-        print(f"ERREUR : Fichier introuvable à l'adresse : {csv_path}")
-        return
-
     try:
-        print(f"Lecture du fichier : {csv_path}")
-        df = pd.read_csv(csv_path)
-        # Assurer que la colonne 'taxon' est de type string pour le filtrage
-        df['taxon'] = df['taxon'].astype(str).str.strip()
+        plantes_existantes = {n.lower() for (n,) in db.query(Plante.nom_scientifique) if n}
+        auxiliaires_existants = {n.lower() for (n,) in db.query(Auxiliaire.nom) if n}
 
-        # --- PLANTES ---
-        plantes_df = df[df["taxon"].str.contains("Plantae", case=False, na=False)]
-        print(f"Traitement de {len(plantes_df)} plantes...")
-        for _, row in plantes_df.iterrows():
-            physio = get_physio_data_enhanced(row["species_guess"])
-
-            # Gestion de l'URL de l'image
-            img_url = ""
-            if pd.notna(row["photos"]) and "http" in str(row["photos"]):
-                img_raw = str(row["photos"])
-                img_url = img_raw.replace("square", "medium")
-            else:
-                # Créer une URL de recherche si l'image est manquante
-                search_query = str(row["species_guess"]).replace(" ", "+")
-                img_url = f"https://www.google.com/search?q={search_query}+botany&tbm=isch"
-
-            nom_commun_valide = pd.notna(row["common_name"]) and str(row["common_name"]).lower() != "nan"
-            nom_commun_final = str(row["common_name"]) if nom_commun_valide else str(row["species_guess"])
-
-            db.add(Plante(
-                nom_scientifique=str(row["species_guess"]),
-                nom_commun=nom_commun_final,
-                ph_ideal=physio["ph"],
-                besoin_eau=physio["eau"],
-                url_image=img_url,
-                famille="Plantae" # Pourrait être affiné si l'info est dans le CSV
+        nouvelles_plantes = []
+        for row in df[df["taxon"] == "Plantae"].itertuples():
+            if row.cle in plantes_existantes:
+                continue
+            ph, eau = physiologie(row.species_guess)
+            nouvelles_plantes.append(Plante(
+                nom_scientifique=row.species_guess,
+                nom_commun=_texte(row.common_name) or row.species_guess,
+                famille="Plantae",
+                ph_ideal=ph,
+                besoin_eau=eau,
+                url_image=photo(row.photos),
             ))
 
-        # --- INSECTES ---
-        insectes_df = df[df["taxon"].str.contains("Insecta", case=False, na=False)]
-        count_ins = 0
-        print(f"Traitement de {len(insectes_df)} insectes pour trouver les auxiliaires...")
-        for _, row in insectes_df.iterrows():
-            if is_beneficial_insect(row["species_guess"]):
-                img_raw = str(row["photos"])
-                img_clean = img_raw.replace("square", "medium")
+        nouveaux_auxiliaires = []
+        for row in df[df["taxon"] == "Insecta"].itertuples():
+            role = role_auxiliaire(row.species_guess)
+            if role is None or row.cle in auxiliaires_existants:
+                continue
+            nouveaux_auxiliaires.append(Auxiliaire(
+                nom=row.species_guess, role=role[0], description=role[1], url_image=photo(row.photos),
+            ))
 
-                db.add(Auxiliaire(
-                    nom=str(row["species_guess"]),
-                    role="Pollinisateur/Predateur",
-                    description="Favorise l'equilibre de l'ecosysteme.",
-                    url_image=img_clean
-                ))
-                count_ins += 1
-
+        renseignes = sum(1 for p in nouvelles_plantes if p.ph_ideal is not None)
+        print(f"Plantes à ajouter : {len(nouvelles_plantes)} (pH/eau estimés pour {renseignes}) ; "
+              f"auxiliaires à ajouter : {len(nouveaux_auxiliaires)}.")
+        if dry_run:
+            print("Simulation (--dry-run) : aucune écriture.")
+            return
+        db.add_all(nouvelles_plantes + nouveaux_auxiliaires)
         db.commit()
-        print(f"Importation terminée : {len(plantes_df)} plantes et {count_ins} insectes auxiliaires ajoutés.")
-
-    except Exception as e:
-        print(f"ERREUR CRITIQUE : {e}")
+        print("Catalogue chargé.")
+    except Exception:
         db.rollback()
+        raise
     finally:
         db.close()
 
+
 if __name__ == "__main__":
-    load_taxonomy()
+    parser = argparse.ArgumentParser(description="Charge le catalogue botanique depuis les CSV iNaturalist.")
+    parser.add_argument("--dry-run", action="store_true", help="Compter sans écrire en base")
+    charger(dry_run=parser.parse_args().dry_run)
