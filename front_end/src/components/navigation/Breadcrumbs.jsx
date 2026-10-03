@@ -41,17 +41,16 @@ const Breadcrumbs = () => {
     // Mappage des noms statiques
     const breadcrumbNameMap = {
         'dashboard': 'Tableau de bord',
-        'espaces': 'Mes Sites',
-        'profil': 'Mon Profil',
-        'settings': 'Réglages',
+        'espaces': 'Espaces et zones',
         'catalogues': 'Catalogue',
-        'rapports': 'Rapports'
+        'rapports': 'Rapports',
+        'parametres': 'Paramètres'
     };
 
     const renderItems = (isMobile) => {
         let items = [
             <li key="home">
-                <Link to="/" className="text-gray-400 hover:text-white">Accueil</Link>
+                <Link to="/" className="text-fg-muted hover:text-fg">Accueil</Link>
             </li>
         ];
 
@@ -65,7 +64,7 @@ const Breadcrumbs = () => {
                 const parentSegment = pathnames[index - 1];
                 name = <DynamicBreadcrumbName pathSegment={parentSegment} id={value} />;
             } else {
-                name = breadcrumbNameMap[value] || value.charAt(0).toUpperCase() + value.slice(1);
+                name = breadcrumbNameMap[value] || 'Page introuvable';
             }
 
             return { to, name, isLast };
@@ -80,11 +79,11 @@ const Breadcrumbs = () => {
             items.push(
                 <li key={item.to}>
                     <div className="flex items-center">
-                        <span className="mx-2 text-gray-600">/</span>
+                        <span className="mx-2 text-fg-subtle" aria-hidden>/</span>
                         {item.isLast ? (
-                            <span className="font-medium text-white">{item.name}</span>
+                            <span className="font-medium text-fg" aria-current="page">{item.name}</span>
                         ) : (
-                            <Link to={item.to} className="text-gray-400 hover:text-white">{item.name}</Link>
+                            <Link to={item.to} className="text-fg-muted hover:text-fg">{item.name}</Link>
                         )}
                     </div>
                 </li>
@@ -94,7 +93,7 @@ const Breadcrumbs = () => {
     };
 
     return (
-        <nav aria-label="Breadcrumb" className="text-sm">
+        <nav aria-label="Fil d'Ariane" className="text-sm">
             <ol className="hidden sm:flex items-center space-x-1">{renderItems(false)}</ol>
             <ol className="flex sm:hidden items-center space-x-1">{renderItems(true)}</ol>
         </nav>

@@ -1,154 +1,115 @@
 import { useState } from "react";
-import { X } from "lucide-react";
+import { Trash2 } from "lucide-react";
 import { api } from "../../services/api";
+import { Modal } from "../../components/ui/Modal";
+import { Button } from "../../components/ui/Button";
+import { Alert } from "../../components/ui/Card";
+import { Champ, Choix } from "./champsEspace";
+import { DRAINAGES, EXPOSITIONS, IRRIGATIONS, TYPES_SOL } from "../../lib/referentiels";
 
 const CHAMPS_NUMERIQUES = new Set([
   "surface_m2", "ph_actuel", "humidite_cible", "frequence_arrosage_auto", "profondeur_racinaire",
 ]);
 
 const valeursInitiales = (espace) => ({
-  nom: espace?.nom || "",
-  ville: espace?.ville || "",
+  nom: espace?.nom ?? "",
+  ville: espace?.ville ?? "",
   surface_m2: espace?.surface_m2 ?? "",
-  type_sol: espace?.type_sol || "Limon-Argileux",
-  ph_actuel: espace?.ph_actuel ?? 7.0,
-  exposition: espace?.exposition || "Soleil",
-  drainage: espace?.drainage || "Moyen",
-  humidite_cible: espace?.humidite_cible ?? 60,
-  frequence_arrosage_auto: espace?.frequence_arrosage_auto ?? 48,
-  profondeur_racinaire: espace?.profondeur_racinaire ?? 30,
-  type_irrigation: espace?.type_irrigation || "Goutte-à-goutte",
-  date_derniere_fertilisation: espace?.date_derniere_fertilisation
-    ? new Date(espace.date_derniere_fertilisation).toISOString().split("T")[0]
-    : "",
+  type_sol: espace?.type_sol ?? "",
+  ph_actuel: espace?.ph_actuel ?? "",
+  exposition: espace?.exposition ?? "",
+  drainage: espace?.drainage ?? "",
+  humidite_cible: espace?.humidite_cible ?? "",
+  frequence_arrosage_auto: espace?.frequence_arrosage_auto ?? "",
+  profondeur_racinaire: espace?.profondeur_racinaire ?? "",
+  type_irrigation: espace?.type_irrigation ?? "",
+  date_derniere_fertilisation: espace?.date_derniere_fertilisation ?? "",
 });
 
 export default function EditSpaceModal({ espace, onClose, onSuccess }) {
   // Le parent monte la modale avec l'espace sélectionné : l'état initial suffit
-  const [formData, setFormData] = useState(() => valeursInitiales(espace));
+  const [valeurs, setValeurs] = useState(() => valeursInitiales(espace));
   const [erreur, setErreur] = useState("");
+  const [envoi, setEnvoi] = useState(false);
+  const [confirmerSuppression, setConfirmerSuppression] = useState(false);
+  const onChange = (e) => setValeurs((v) => ({ ...v, [e.target.name]: e.target.value }));
+  const lie = { valeurs, onChange };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setErreur("");
+    setEnvoi(true);
     // Champs vides omis (inchangés côté serveur), champs numériques convertis
     const payload = Object.fromEntries(
-      Object.entries(formData)
+      Object.entries(valeurs)
         .filter(([, v]) => v !== "" && v !== null && v !== undefined)
         .map(([k, v]) => [k, CHAMPS_NUMERIQUES.has(k) ? Number(v) : v])
     );
     try {
       await api.updateEspace(espace.id, payload);
-      onSuccess(); // Recharge la liste
-      onClose();   // Ferme la modale
+      onSuccess();
     } catch (err) {
       setErreur(err.message);
+    } finally {
+      setEnvoi(false);
     }
   };
-  
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+
+  const supprimer = async () => {
+    setErreur("");
+    setEnvoi(true);
+    try {
+      await api.deleteEspace(espace.id);
+      onSuccess();
+    } catch (err) {
+      setErreur(err.message);
+      setEnvoi(false);
+    }
   };
 
-  if (!espace) return null;
-
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl p-8 shadow-2xl">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-black text-white">Éditer: {espace.nom}</h2>
-          <button onClick={onClose} className="text-slate-500 hover:text-white transition-colors">
-            <X size={24} />
-          </button>
-        </div>
+    <Modal titre={`Modifier « ${espace.nom} »`} onClose={onClose}>
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <legend className="mb-3 text-sm font-bold uppercase tracking-wide text-fg-muted">Informations générales</legend>
+          <Champ {...lie} nom="nom" label="Nom" required />
+          <Champ {...lie} nom="ville" label="Ville" />
+          <Champ {...lie} nom="surface_m2" label="Surface (m²)" type="number" min="0" step="any" />
+        </fieldset>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Infos Générales */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Nom du site</label>
-                    <input name="nom" value={formData.nom} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                </div>
-                <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Ville</label>
-                    <input name="ville" value={formData.ville} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                </div>
-                <div>
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Surface (m²)</label>
-                    <input type="number" name="surface_m2" value={formData.surface_m2} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                </div>
+        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <legend className="mb-3 text-sm font-bold uppercase tracking-wide text-fg-muted">Données agronomiques</legend>
+          <Choix {...lie} nom="type_sol" label="Type de sol" options={TYPES_SOL} />
+          <Champ {...lie} nom="ph_actuel" label="pH du sol" type="number" min="0" max="14" step="0.1" />
+          <Choix {...lie} nom="exposition" label="Exposition" options={EXPOSITIONS} />
+          <Choix {...lie} nom="drainage" label="Drainage" options={DRAINAGES} />
+          <Champ {...lie} nom="humidite_cible" label="Humidité cible (%)" type="number" min="0" max="100" />
+          <Champ {...lie} nom="frequence_arrosage_auto" label="Arrosage auto (heures)" type="number" min="0" />
+          <Champ {...lie} nom="profondeur_racinaire" label="Profondeur racinaire (cm)" type="number" min="0" />
+          <Choix {...lie} nom="type_irrigation" label="Irrigation" options={IRRIGATIONS} />
+          <Champ {...lie} nom="date_derniere_fertilisation" label="Dernière fertilisation" type="date" />
+        </fieldset>
+
+        {erreur && <Alert ton="danger">{erreur}</Alert>}
+
+        <div className="flex flex-col gap-3 border-t border-line pt-5 sm:flex-row sm:items-center sm:justify-between">
+          {confirmerSuppression ? (
+            <div className="flex flex-wrap items-center gap-2" role="group" aria-label="Confirmer la suppression">
+              <span className="text-sm font-semibold text-danger">Supprimer définitivement cet espace et ses mesures ?</span>
+              <Button variante="danger" taille="sm" onClick={supprimer} chargement={envoi}>Oui, supprimer</Button>
+              <Button variante="fantome" taille="sm" onClick={() => setConfirmerSuppression(false)}>Non</Button>
             </div>
-
-            <div className="pt-4 border-t border-slate-800">
-                 <h3 className="text-lg font-bold text-slate-300 mb-4">Données Agronomiques</h3>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4">
-                    {/* Colonne 1 */}
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type de Sol</label>
-                            <select name="type_sol" value={formData.type_sol} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500">
-                                <option>Argileux</option>
-                                <option>Limon-Argileux</option>
-                                <option>Sableux</option>
-                                <option>Tourbeux</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">pH Actuel</label>
-                            <input type="number" step="0.1" name="ph_actuel" value={formData.ph_actuel} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Drainage</label>
-                             <select name="drainage" value={formData.drainage} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500">
-                                <option>Faible</option>
-                                <option>Moyen</option>
-                                <option>Bon</option>
-                                <option>Excellent</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Type d'irrigation</label>
-                            <input name="type_irrigation" value={formData.type_irrigation} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                        </div>
-                    </div>
-                    {/* Colonne 2 */}
-                    <div className="space-y-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Exposition</label>
-                            <select name="exposition" value={formData.exposition} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500">
-                                <option>Soleil</option>
-                                <option>Mi-ombre</option>
-                                <option>Ombre</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Humidité Cible (%)</label>
-                            <input type="number" name="humidite_cible" value={formData.humidite_cible} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Fréquence Arrosage (h)</label>
-                            <input type="number" name="frequence_arrosage_auto" value={formData.frequence_arrosage_auto} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Dernière Fertilisation</label>
-                            <input type="date" name="date_derniere_fertilisation" value={formData.date_derniere_fertilisation} onChange={handleInputChange} className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white outline-none focus:ring-1 focus:ring-green-500"/>
-                        </div>
-                    </div>
-                 </div>
-            </div>
-
-          {erreur && (
-            <p role="alert" className="bg-red-500/10 border border-red-500/20 text-red-300 p-3 rounded-xl text-sm">{erreur}</p>
+          ) : (
+            <Button variante="fantome" icone={Trash2} onClick={() => setConfirmerSuppression(true)} className="text-danger hover:text-danger">
+              Supprimer l'espace
+            </Button>
           )}
-          <button
-            type="submit"
-            className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all mt-4"
-          >
-            Sauvegarder les modifications
-          </button>
-        </form>
-      </div>
-    </div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row">
+            <Button variante="secondaire" onClick={onClose}>Annuler</Button>
+            <Button type="submit" chargement={envoi}>Enregistrer</Button>
+          </div>
+        </div>
+      </form>
+    </Modal>
   );
 }

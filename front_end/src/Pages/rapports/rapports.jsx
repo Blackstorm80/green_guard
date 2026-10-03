@@ -1,221 +1,193 @@
-import { useState } from "react";
-import { 
-  FileText, 
-  Download, 
-  Calendar, 
-  CheckCircle, 
-  AlertOctagon,
-  Search,
-} from "lucide-react";
-import { cn } from "../../lib/utils";
+import { useCallback, useMemo, useState } from "react";
+import { CheckCircle2, Download, Printer } from "lucide-react";
+import { api } from "../../services/api";
+import { useRequete, useTitrePage } from "../../lib/hooks";
+import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION } from "../../lib/referentiels";
+import { Button } from "../../components/ui/Button";
+import { Field } from "../../components/ui/Field";
+import { Alert, Badge, Card } from "../../components/ui/Card";
 
-// --- MOCK DATA : Historique des rapports ---
-const REPORTS_DATA = [
-  {
-    id: "R-2023-10-A",
-    title: "Rapport d'incident - Mortalité massive",
-    date: "24 Oct 2023",
-    type: "INCIDENT", // INCIDENT, MONTHLY, INTERVENTION
-    zone: "Zone Paris-Nord",
-    espace: "Jardin des Plantes",
-    author: "Jean Michel (Tech)",
-    status: "SIGNED", // SIGNED, PENDING
-    size: "2.4 MB"
-  },
-  {
-    id: "R-2023-09-M",
-    title: "Bilan Mensuel - Septembre",
-    date: "01 Oct 2023",
-    type: "MONTHLY",
-    zone: "Global",
-    espace: "-",
-    author: "Système",
-    status: "SIGNED",
-    size: "5.1 MB"
-  },
-  {
-    id: "R-2023-10-B",
-    title: "Intervention Arrosage d'Urgence",
-    date: "22 Oct 2023",
-    type: "INTERVENTION",
-    zone: "Jardins Sud-Ouest",
-    espace: "Rond-point Mermoz",
-    author: "Sophie D.",
-    status: "PENDING",
-    size: "1.2 MB"
-  },
-];
+const TON_STATUT = { planifiee: "info", en_cours: "alerte", terminee: "succes" };
+const FILTRES_INITIAUX = { du: "", au: "", espaceId: "", type: "", statut: "", recherche: "" };
 
-const Rapports = () => {
-  const [filters, setFilters] = useState({
-    startDate: '',
-    endDate: '',
-    searchTerm: '',
-    type: 'ALL',
-  });
-  const handleFilterChange = (e) => {
-    setFilters({ ...filters, [e.target.name]: e.target.value });
-  };
-  
-  const handleTypeFilter = (type) => {
-    setFilters({ ...filters, type });
-  };
-
-  const handlePrint = () => {
-    window.print();
-  };
-
-  const filteredReports = REPORTS_DATA.filter(report => {
-    const reportDate = new Date(report.date);
-    const startDate = filters.startDate ? new Date(filters.startDate) : null;
-    const endDate = filters.endDate ? new Date(filters.endDate) : null;
-
-    if (startDate && reportDate < startDate) return false;
-    if (endDate && reportDate > endDate) return false;
-    if (filters.type !== 'ALL' && report.type !== filters.type) return false;
-    if (filters.searchTerm && !report.title.toLowerCase().includes(filters.searchTerm.toLowerCase())) return false;
-    
-    // Le filtre par espace n'est pas appliqué car les données sont mockées
-    // Il faudrait l'ID de l'espace dans les données pour que ce soit fonctionnel
-
-    return true;
-  });
-
-  return (
-    <div className="space-y-6 animate-in fade-in duration-500 h-full flex flex-col">
-      
-      {/* --- EN-TÊTE --- */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shrink-0 no-print">
-        <div>
-          <h1 className="text-2xl font-bold text-white tracking-tight">
-           
-          </h1>
-          <p className="text-slate-400 text-sm mt-1">
-            Consultez et téléchargez les bilans d'interventions et d'incidents.
-          </p>
-        </div>
-        <button
-          onClick={handlePrint}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-all flex items-center gap-2"
-        >
-          <FileText size={16} />
-          <span>Imprimer le Rapport</span>
-        </button>
-      </div>
-
-      {/* --- LISTE DES RAPPORTS --- */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-xl flex-1 flex flex-col min-h-0">
-        
-        {/* Toolbar */}
-        <div className="p-4 border-b border-slate-800 flex flex-col sm:flex-row gap-4 items-center justify-between no-print">
-          <div className="flex items-center gap-2 bg-slate-950 px-3 py-2 rounded-lg border border-slate-800 w-full sm:w-64">
-            <Search size={16} className="text-slate-500" />
-            <input 
-              type="text" 
-              name="searchTerm"
-              value={filters.searchTerm}
-              onChange={handleFilterChange}
-              placeholder="Rechercher un rapport..." 
-              className="bg-transparent border-none focus:outline-none text-sm text-slate-200 w-full placeholder:text-slate-600"
-            />
-          </div>
-          <div className="flex gap-2 w-full sm:w-auto overflow-x-auto">
-            {["ALL", "INCIDENT", "MONTHLY", "INTERVENTION"].map(type => (
-              <button
-                key={type}
-                onClick={() => handleTypeFilter(type)}
-                className={cn(
-                  "px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors",
-                  filters.type === type 
-                    ? "bg-slate-800 text-white border-slate-600" 
-                    : "text-slate-500 border-transparent hover:bg-slate-800 hover:text-slate-300"
-                )}
-              >
-                {type === "ALL" ? "Tous" : type.charAt(0) + type.slice(1).toLowerCase()}
-              </button>
-            ))}
-          </div>
-        </div>
-        
-        {/* Table */}
-        <div className="overflow-auto custom-scrollbar flex-1">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-slate-950/80 text-slate-500 uppercase text-xs font-semibold sticky top-0 z-10 backdrop-blur-sm">
-              <tr>
-                <th className="px-6 py-4">Document</th>
-                <th className="px-6 py-4">Zone / Espace</th>
-                <th className="px-6 py-4">Date</th>
-                <th className="px-6 py-4">Statut</th>
-                <th className="px-6 py-4 text-right no-print">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-800 text-slate-300">
-              {filteredReports.map((report) => (
-                <tr key={report.id} className="hover:bg-slate-800/50 transition-colors group">
-                  <td className="px-6 py-4">
-                    <div className="flex items-start gap-3">
-                      <div className={cn(
-                        "p-2 rounded-lg shrink-0",
-                        report.type === 'INCIDENT' ? "bg-red-500/10 text-red-400" :
-                        report.type === 'MONTHLY' ? "bg-blue-500/10 text-blue-400" :
-                        "bg-amber-500/10 text-amber-400"
-                      )}>
-                        <FileText size={20} />
-                      </div>
-                      <div>
-                        <div className="font-bold text-white group-hover:text-green-400 transition-colors">
-                          {report.title}
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5">
-                          Par {report.author} • {report.size}
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4">
-                    <div className="text-slate-300">{report.zone}</div>
-                    <div className="text-xs text-slate-500">{report.espace}</div>
-                  </td>
-
-                  <td className="px-6 py-4 font-mono text-slate-400">
-                    {report.date}
-                  </td>
-
-                  <td className="px-6 py-4">
-                    {report.status === 'SIGNED' ? (
-                      <span className="inline-flex items-center gap-1.5 text-emerald-400 text-xs font-bold bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
-                        <CheckCircle size={12} /> Signé
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 text-amber-400 text-xs font-bold bg-amber-500/10 px-2 py-1 rounded-full border border-amber-500/20">
-                        <AlertOctagon size={12} /> En attente
-                      </span>
-                    )}
-                  </td>
-
-                  <td className="px-6 py-4 text-right no-print">
-                    <button className="text-slate-400 hover:text-white p-2 hover:bg-slate-700 rounded-lg transition-colors border border-transparent hover:border-slate-600">
-                      <Download size={18} />
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        
-        {/* Section pour l'impression */}
-        <div className="printable-content p-6 hidden">
-            <h2 className="text-xl font-semibold mb-4">Graphique de Stress Hydrique</h2>
-            <div className="bg-white p-4 rounded-lg shadow-md h-64 w-full">
-              <p className="text-center text-gray-500 pt-24">Le graphique s'affichera ici.</p>
-            </div>
-        </div>
-
-      </div>
-    </div>
-  );
+const chargerDonnees = async (signal) => {
+  const [interventions, espaces] = await Promise.all([api.getInterventions(undefined, signal), api.getEspacesVerts(signal)]);
+  return { interventions, espaces };
 };
 
-export default Rapports;
+const formatDate = (iso) => (iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—");
+
+/** Export CSV compatible Excel (séparateur « ; », BOM UTF-8, champs échappés). */
+function exporterCsv(lignes, nomEspace) {
+  const echapper = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const entete = ["Créée le", "Espace", "Type", "Description", "Volume (L)", "Statut", "Réalisée le"];
+  const corps = lignes.map((i) => [
+    formatDate(i.cree_le), nomEspace(i.espace_id), LIBELLES_INTERVENTION[i.type] ?? i.type, i.description,
+    i.volume_eau_l, LIBELLES_STATUT_INTERVENTION[i.statut] ?? i.statut, formatDate(i.realisee_le),
+  ]);
+  const csv = [entete, ...corps].map((l) => l.map(echapper).join(";")).join("\r\n");
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  lien.download = `greenguard-interventions-${new Date().toISOString().slice(0, 10)}.csv`;
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
+export default function Rapports() {
+  useTitrePage("Rapports");
+  const { donnees, setDonnees, chargement, erreur } = useRequete(chargerDonnees, { interventions: [], espaces: [] });
+  const [filtres, setFiltres] = useState(FILTRES_INITIAUX);
+  const [erreurAction, setErreurAction] = useState("");
+  const majFiltre = (champ) => (e) => setFiltres((f) => ({ ...f, [champ]: e.target.value }));
+
+  const nomsEspaces = useMemo(() => Object.fromEntries(donnees.espaces.map((e) => [e.id, e.nom])), [donnees.espaces]);
+  const nomEspace = useCallback((id) => nomsEspaces[id] ?? `Espace n°${id}`, [nomsEspaces]);
+
+  const lignes = useMemo(() => {
+    const du = filtres.du ? new Date(`${filtres.du}T00:00:00`) : null;
+    const au = filtres.au ? new Date(`${filtres.au}T23:59:59`) : null;
+    const recherche = filtres.recherche.trim().toLowerCase();
+    return donnees.interventions.filter((i) => {
+      const date = new Date(i.cree_le);
+      if (du && date < du) return false;
+      if (au && date > au) return false;
+      if (filtres.espaceId && String(i.espace_id) !== filtres.espaceId) return false;
+      if (filtres.type && i.type !== filtres.type) return false;
+      if (filtres.statut && i.statut !== filtres.statut) return false;
+      if (recherche && !`${i.description ?? ""} ${nomEspace(i.espace_id)}`.toLowerCase().includes(recherche)) return false;
+      return true;
+    });
+  }, [donnees.interventions, filtres, nomEspace]);
+
+  const synthese = useMemo(() => ({
+    total: lignes.length,
+    aFaire: lignes.filter((i) => i.statut !== "terminee").length,
+    terminees: lignes.filter((i) => i.statut === "terminee").length,
+    volume: lignes.reduce((s, i) => s + (i.volume_eau_l ?? 0), 0),
+  }), [lignes]);
+
+  const terminer = async (intervention) => {
+    setErreurAction("");
+    try {
+      const maj = await api.updateIntervention(intervention.id, { statut: "terminee" });
+      setDonnees((d) => ({ ...d, interventions: d.interventions.map((i) => (i.id === maj.id ? maj : i)) }));
+    } catch (err) {
+      setErreurAction(err.message);
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-fg">Rapports</h1>
+          <p className="mt-1 text-fg-muted">Historique des interventions sur vos espaces verts.</p>
+        </div>
+        <div className="no-print flex gap-2">
+          <Button variante="secondaire" icone={Printer} onClick={() => window.print()}>Imprimer</Button>
+          <Button icone={Download} onClick={() => exporterCsv(lignes, nomEspace)} disabled={!lignes.length}>
+            Exporter en CSV
+          </Button>
+        </div>
+      </div>
+
+      <Card as="form" aria-label="Filtres" className="no-print grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-6"
+            onSubmit={(e) => e.preventDefault()}>
+        <Field label="Du" type="date" value={filtres.du} onChange={majFiltre("du")} />
+        <Field label="Au" type="date" value={filtres.au} onChange={majFiltre("au")} />
+        <Field label="Espace">
+          {(a11y) => (
+            <select {...a11y} value={filtres.espaceId} onChange={majFiltre("espaceId")}>
+              <option value="">Tous</option>
+              {donnees.espaces.map((e) => <option key={e.id} value={e.id}>{e.nom}</option>)}
+            </select>
+          )}
+        </Field>
+        <Field label="Type">
+          {(a11y) => (
+            <select {...a11y} value={filtres.type} onChange={majFiltre("type")}>
+              <option value="">Tous</option>
+              {Object.entries(LIBELLES_INTERVENTION).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          )}
+        </Field>
+        <Field label="Statut">
+          {(a11y) => (
+            <select {...a11y} value={filtres.statut} onChange={majFiltre("statut")}>
+              <option value="">Tous</option>
+              {Object.entries(LIBELLES_STATUT_INTERVENTION).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          )}
+        </Field>
+        <Field label="Recherche" type="search" placeholder="Description, espace…" value={filtres.recherche}
+               onChange={majFiltre("recherche")} />
+      </Card>
+
+      <dl className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+        {[
+          ["Interventions", synthese.total],
+          ["À réaliser", synthese.aFaire],
+          ["Terminées", synthese.terminees],
+          ["Eau apportée", `${synthese.volume.toLocaleString("fr-FR")} L`],
+        ].map(([libelle, valeur]) => (
+          <Card key={libelle} as="div" className="p-4 sm:p-5">
+            <dt className="text-sm text-fg-muted">{libelle}</dt>
+            <dd className="mt-1 text-2xl font-bold text-fg">{valeur}</dd>
+          </Card>
+        ))}
+      </dl>
+
+      {erreur && <Alert ton="danger">{erreur}</Alert>}
+      {erreurAction && <Alert ton="danger">{erreurAction}</Alert>}
+
+      {/* relative : contient les éléments sr-only (position absolue) dans la zone défilante */}
+      <Card className="relative overflow-x-auto p-0 sm:p-0">
+        <table className="w-full min-w-[720px] text-left text-sm">
+          <caption className="sr-only">Interventions filtrées ({lignes.length})</caption>
+          <thead className="border-b border-line bg-surface-raised text-fg-muted">
+            <tr>
+              {["Créée le", "Espace", "Type", "Description", "Statut", ""].map((titre, i) => (
+                <th key={titre || i} scope="col" className="px-4 py-3 font-semibold">
+                  {titre || <span className="sr-only">Actions</span>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {chargement && (
+              <tr><td colSpan={6} className="px-4 py-8 text-center text-fg-muted" role="status">Chargement…</td></tr>
+            )}
+            {!chargement && lignes.length === 0 && (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-fg-muted">
+                  {donnees.interventions.length
+                    ? "Aucune intervention ne correspond à ces filtres."
+                    : "Aucune intervention pour le moment. Elles se créent depuis le tableau de bord, sur les espaces en alerte."}
+                </td>
+              </tr>
+            )}
+            {lignes.map((i) => (
+              <tr key={i.id} className="text-fg-soft">
+                <td className="whitespace-nowrap px-4 py-3">{formatDate(i.cree_le)}</td>
+                <td className="px-4 py-3 font-medium text-fg">{nomEspace(i.espace_id)}</td>
+                <td className="px-4 py-3">{LIBELLES_INTERVENTION[i.type] ?? i.type}</td>
+                <td className="px-4 py-3">{i.description || "—"}</td>
+                <td className="px-4 py-3">
+                  <Badge ton={TON_STATUT[i.statut]}>{LIBELLES_STATUT_INTERVENTION[i.statut] ?? i.statut}</Badge>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  {i.statut !== "terminee" && (
+                    <Button variante="fantome" taille="sm" icone={CheckCircle2} onClick={() => terminer(i)}
+                            className="no-print" aria-label={`Marquer terminée : ${LIBELLES_INTERVENTION[i.type] ?? i.type}, ${nomEspace(i.espace_id)}`}>
+                      Terminer
+                    </Button>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </Card>
+    </div>
+  );
+}

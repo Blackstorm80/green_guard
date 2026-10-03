@@ -7,7 +7,7 @@ export default function ProtectedRoute() {
 
   if (loading) {
     return (
-      <div role="status" className="h-screen w-screen bg-slate-950 flex items-center justify-center text-green-500">
+      <div role="status" className="h-screen w-screen bg-canvas flex items-center justify-center text-success">
         Chargement de la session…
       </div>
     );

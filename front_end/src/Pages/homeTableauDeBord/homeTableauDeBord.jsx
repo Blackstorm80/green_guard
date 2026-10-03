@@ -4,19 +4,23 @@ import {
   ShieldAlert, Stethoscope, Sun, Target, Thermometer, Umbrella, Wind,
 } from "lucide-react";
 import { api } from "../../services/api";
+import { useTitrePage } from "../../lib/hooks";
+import { TON_STATUT } from "../../lib/referentiels";
+import { Badge } from "../../components/ui/Card";
 
 const INTERVALLE_RAFRAICHISSEMENT_MS = 30000;
 const STATUTS_EN_ALERTE = ["Critique", "A surveiller"];
 const ACTIONS = [
-  { type: "arrosage", label: "Arroser", icon: Droplets, classe: "bg-blue-600 hover:bg-blue-500 text-white" },
-  { type: "ombrage", label: "Ombrager", icon: Umbrella, classe: "bg-orange-600 hover:bg-orange-500 text-white" },
-  { type: "diagnostic", label: "Diagnostic", icon: Stethoscope, classe: "bg-slate-700 hover:bg-slate-600 text-white" },
+  { type: "arrosage", label: "Arroser", icon: Droplets, classe: "bg-blue-600 hover:bg-blue-700 text-on-accent" },
+  { type: "ombrage", label: "Ombrager", icon: Umbrella, classe: "bg-orange-700 hover:bg-orange-800 text-on-accent" },
+  { type: "diagnostic", label: "Diagnostic", icon: Stethoscope, classe: "bg-surface-strong hover:bg-line-strong text-fg" },
 ];
 
 const formatNombre = (v, decimales = 0) =>
   typeof v === "number" ? v.toLocaleString("fr-FR", { maximumFractionDigits: decimales }) : "--";
 
 export default function HomeTableauDeBord() {
+  useTitrePage("Tableau de bord");
   const [dashboard, setDashboard] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -72,8 +76,8 @@ export default function HomeTableauDeBord() {
   if (loading && !dashboard) {
     return (
       <div role="status" className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-10 h-10 border-2 border-green-500/20 border-t-green-500 rounded-full animate-spin" />
-        <p className="text-sm text-green-500">Chargement du tableau de bord…</p>
+        <div className="w-10 h-10 border-2 border-success/20 border-t-green-500 rounded-full animate-spin" />
+        <p className="text-sm text-success">Chargement du tableau de bord…</p>
       </div>
     );
   }
@@ -95,54 +99,56 @@ export default function HomeTableauDeBord() {
     : null;
 
   return (
-    <div className="space-y-6 text-slate-300">
+    <div className="space-y-6 text-fg-soft">
+      <h1 className="text-3xl font-bold tracking-tight text-fg">Tableau de bord</h1>
+
       {/* BARRE DE STATUT */}
-      <div className="flex flex-wrap gap-3 justify-between items-center bg-slate-900/50 border border-slate-800 p-3 rounded-lg text-xs font-bold uppercase tracking-wide">
+      <div className="flex flex-wrap gap-3 justify-between items-center bg-surface/50 border border-line p-3 rounded-lg text-xs font-bold uppercase tracking-wide">
         <div className="flex gap-6">
-          <span className="flex items-center gap-2"><Cpu size={14} className="text-green-500" /> Espaces suivis : {metrics?.espaces_suivis ?? 0}</span>
+          <span className="flex items-center gap-2"><Cpu size={14} className="text-success" /> Espaces suivis : {metrics?.espaces_suivis ?? 0}</span>
           {dashboard?.meteo_exterieure && (
-            <span className="flex items-center gap-2 text-blue-300">
+            <span className="flex items-center gap-2 text-info">
               <Sun size={14} /> Extérieur : {formatNombre(dashboard.meteo_exterieure.temperature_c, 1)} °C, {dashboard.meteo_exterieure.condition}
             </span>
           )}
         </div>
-        <span className="flex items-center gap-2 text-white bg-slate-800 px-3 py-1 rounded border border-slate-700">
+        <span className="flex items-center gap-2 text-fg bg-surface-raised px-3 py-1 rounded border border-line-strong">
           <Clock size={12} /> {lastUpdate || "--:--:--"}
         </span>
       </div>
 
       {error && (
-        <div role="alert" className="bg-red-500/10 border border-red-500/20 text-red-300 p-3 rounded-lg text-sm font-bold flex items-center gap-2">
+        <div role="alert" className="bg-danger-soft border border-danger-line text-danger p-3 rounded-lg text-sm font-bold flex items-center gap-2">
           <AlertTriangle size={16} /> {error}
         </div>
       )}
       {feedback && (
-        <div role="status" className={`p-3 rounded-lg text-sm font-bold border ${feedback.ok ? "bg-green-500/10 border-green-500/20 text-green-300" : "bg-red-500/10 border-red-500/20 text-red-300"}`}>
+        <div role="status" className={`p-3 rounded-lg text-sm font-bold border ${feedback.ok ? "bg-success-soft border-success/20 text-success" : "bg-danger-soft border-danger-line text-danger"}`}>
           {feedback.message}
         </div>
       )}
 
       {/* SYNTHÈSE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 p-6 rounded-2xl border-2 bg-slate-900 border-slate-800 relative overflow-hidden">
+        <div className="lg:col-span-2 p-6 rounded-2xl border-2 bg-surface border-line relative overflow-hidden">
           <div className="flex items-center gap-6 relative z-10">
-            <div className={`p-4 rounded-xl ${isSain ? "bg-green-500 text-slate-950" : "bg-amber-500 text-slate-950"}`}>
+            <div className={`p-4 rounded-xl ${isSain ? "bg-primary text-on-accent" : "bg-amber-500 text-slate-950"}`}>
               {isSain ? <CheckCircle size={32} aria-hidden /> : <AlertTriangle size={32} aria-hidden />}
             </div>
             <div>
-              <h2 className="text-3xl font-black text-white tracking-tight">{dashboard?.statut ?? "Inconnu"}</h2>
-              <p className="text-slate-400 text-sm mt-1">{dashboard?.message}</p>
+              <h2 className="text-3xl font-black text-fg tracking-tight">{dashboard?.statut ?? "Inconnu"}</h2>
+              <p className="text-fg-muted text-sm mt-1">{dashboard?.message}</p>
             </div>
           </div>
-          <Activity size={100} className="absolute -right-4 -bottom-4 text-slate-800/20" aria-hidden />
+          <Activity size={100} className="absolute -right-4 -bottom-4 text-fg-subtle/20" aria-hidden />
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-center text-center">
-          <span className="text-xs text-slate-400 font-bold uppercase mb-2">Santé globale</span>
-          <span className="text-5xl font-black text-white">{formatNombre(sante)}{typeof sante === "number" ? " %" : ""}</span>
-          <div className="w-full bg-slate-800 h-1.5 mt-4 rounded-full overflow-hidden" role="progressbar"
+        <div className="bg-surface border border-line p-6 rounded-2xl flex flex-col justify-center text-center">
+          <span className="text-xs text-fg-muted font-bold uppercase mb-2">Santé globale</span>
+          <span className="text-5xl font-black text-fg">{formatNombre(sante)}{typeof sante === "number" ? " %" : ""}</span>
+          <div className="w-full bg-surface-raised h-1.5 mt-4 rounded-full overflow-hidden" role="progressbar"
                aria-valuenow={sante ?? 0} aria-valuemin={0} aria-valuemax={100} aria-label="Santé globale">
-            <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${sante ?? 0}%` }} />
+            <div className="bg-primary h-full transition-all duration-1000" style={{ width: `${sante ?? 0}%` }} />
           </div>
         </div>
       </div>
@@ -150,7 +156,7 @@ export default function HomeTableauDeBord() {
       {/* INTERVENTIONS REQUISES */}
       {sitesEnAlerte.length > 0 && (
         <section className="space-y-4" aria-labelledby="titre-interventions">
-          <h2 id="titre-interventions" className="flex items-center gap-2 text-rose-400 text-sm font-black uppercase tracking-wide">
+          <h2 id="titre-interventions" className="flex items-center gap-2 text-danger text-sm font-black uppercase tracking-wide">
             <ShieldAlert size={16} aria-hidden /> Interventions requises
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
@@ -164,31 +170,31 @@ export default function HomeTableauDeBord() {
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start pt-4">
         {/* TÉLÉMÉTRIE PAR ESPACE */}
         <section className="space-y-6" aria-labelledby="titre-telemetrie">
-          <h2 id="titre-telemetrie" className="text-sm font-black text-white uppercase tracking-wide flex items-center gap-2 border-b border-slate-800 pb-2">
-            <Activity size={16} className="text-green-500" aria-hidden /> Télémétrie par espace
+          <h2 id="titre-telemetrie" className="text-sm font-black text-fg uppercase tracking-wide flex items-center gap-2 border-b border-line pb-2">
+            <Activity size={16} className="text-success" aria-hidden /> Télémétrie par espace
           </h2>
           {capteurs.length === 0 && (
-            <p className="text-slate-400 text-sm">Ajoutez un espace vert pour commencer le suivi.</p>
+            <p className="text-fg-muted text-sm">Ajoutez un espace vert pour commencer le suivi.</p>
           )}
           {capteurs.map((capteur) => {
             const ouvert = Boolean(ouverts[capteur.espace_id]);
             return (
-              <article key={capteur.espace_id} className="bg-slate-900/30 p-6 rounded-2xl border border-slate-800/50">
+              <article key={capteur.espace_id} className="bg-surface/30 p-6 rounded-2xl border border-line/50">
                 <header className="flex justify-between items-center mb-4">
-                  <h3 className="text-sm font-black text-slate-200">{capteur.nom}</h3>
-                  <span className="text-xs font-bold text-slate-400">{capteur.statut}</span>
+                  <h3 className="text-sm font-black text-fg">{capteur.nom}</h3>
+                  <Badge ton={TON_STATUT[capteur.statut] ?? "neutre"}>{capteur.statut}</Badge>
                 </header>
                 <div className="flex flex-col gap-3">
                   <MetricCard icon={<Thermometer className="text-orange-400" />} label="Température" value={formatNombre(capteur.temperature_c, 1)} unit="°C" />
                   <MetricCard icon={<Droplets className="text-teal-400" />} label="Humidité du sol" value={formatNombre(capteur.humidite_percent, 1)} unit="%" />
-                  <MetricCard icon={<Wind className="text-blue-400" />} label="Humidité de l'air" value={formatNombre(capteur.humidite_air_percent)} unit="%" />
+                  <MetricCard icon={<Wind className="text-info" />} label="Humidité de l'air" value={formatNombre(capteur.humidite_air_percent)} unit="%" />
                 </div>
-                <div className="flex flex-col items-center mt-6 border-t border-slate-800/50 pt-6">
+                <div className="flex flex-col items-center mt-6 border-t border-line/50 pt-6">
                   <button
                     type="button"
                     aria-expanded={ouvert}
                     onClick={() => setOuverts((o) => ({ ...o, [capteur.espace_id]: !ouvert }))}
-                    className="flex items-center gap-2 px-6 py-2 bg-slate-900 hover:bg-slate-800 text-xs font-bold uppercase tracking-wide rounded-full border border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
+                    className="flex items-center gap-2 px-6 py-2 bg-surface hover:bg-surface-raised text-xs font-bold uppercase tracking-wide rounded-full border border-line-strong focus:outline-none focus-visible:ring-2 focus-visible:ring-focus"
                   >
                     {ouvert ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
                     {ouvert ? "Masquer le détail" : "Voir le détail"}
@@ -207,8 +213,8 @@ export default function HomeTableauDeBord() {
 
         {/* ANALYSE DU PARC */}
         <section className="space-y-6 xl:sticky xl:top-6" aria-labelledby="titre-analyse">
-          <h2 id="titre-analyse" className="text-sm font-black text-white uppercase tracking-wide flex items-center gap-2 border-b border-slate-800 pb-2">
-            <Target size={16} className="text-blue-500" aria-hidden /> Analyse du parc
+          <h2 id="titre-analyse" className="text-sm font-black text-fg uppercase tracking-wide flex items-center gap-2 border-b border-line pb-2">
+            <Target size={16} className="text-info" aria-hidden /> Analyse du parc
           </h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <GlobalKpiCard title="Humidité moyenne du sol" value={formatNombre(humiditeMoyenne)} unit="%"
@@ -217,10 +223,10 @@ export default function HomeTableauDeBord() {
             <GlobalKpiCard title={`Qualité de l'air (${metrics?.qualite_air ?? "Inconnue"})`} value={formatNombre(metrics?.co2_moyen_ppm)} unit="ppm"
               icon={<Wind size={24} className="text-purple-400" />} status="ok" />
             <GlobalKpiCard title="Stress thermique" value={stressThermique} unit="espace(s)"
-              icon={<Thermometer size={24} className={stressThermique > 0 ? "text-red-500" : "text-slate-400"} />}
+              icon={<Thermometer size={24} className={stressThermique > 0 ? "text-danger" : "text-fg-muted"} />}
               status={stressThermique > 0 ? "critical" : "ok"} />
             <GlobalKpiCard title="Espaces en alerte" value={formatNombre(vulnerabilite)} unit="%"
-              icon={<ShieldAlert size={24} className="text-rose-400" />}
+              icon={<ShieldAlert size={24} className="text-danger" />}
               status={sitesEnAlerte.length > 0 ? "warning" : "ok"} />
           </div>
         </section>
@@ -231,10 +237,10 @@ export default function HomeTableauDeBord() {
 
 function ActionCard({ site, onAction, actionEnCours }) {
   return (
-    <div className="bg-slate-900/80 border-l-4 border-l-rose-500 border border-slate-800 p-4 rounded-lg">
+    <div className="bg-surface/80 border-l-4 border-l-rose-500 border border-line p-4 rounded-lg">
       <div className="flex justify-between items-center mb-3">
-        <span className="text-sm font-bold text-white truncate w-2/3">{site.nom}</span>
-        <span className="text-xs font-bold text-rose-400">{formatNombre(site.sante_percent)} % santé</span>
+        <span className="text-sm font-bold text-fg truncate w-2/3">{site.nom}</span>
+        <span className="text-xs font-bold text-danger">{formatNombre(site.sante_percent)} % santé</span>
       </div>
       <div className="grid grid-cols-3 gap-2">
         {ACTIONS.map((action) => {
@@ -259,13 +265,13 @@ function ActionCard({ site, onAction, actionEnCours }) {
 
 function MetricCard({ icon, label, value, unit }) {
   return (
-    <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
-      <div className="p-3 bg-slate-900 rounded-lg" aria-hidden>{icon}</div>
+    <div className="bg-canvas/50 p-4 rounded-xl border border-line flex items-center gap-4">
+      <div className="p-3 bg-surface rounded-lg" aria-hidden>{icon}</div>
       <div>
-        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">{label}</p>
+        <p className="text-xs text-fg-muted font-bold uppercase tracking-wide">{label}</p>
         <p className="flex items-baseline gap-1">
-          <span className="text-xl font-black text-white">{value}</span>
-          <span className="text-xs text-slate-500 font-bold">{value !== "--" ? unit : ""}</span>
+          <span className="text-xl font-black text-fg">{value}</span>
+          <span className="text-xs text-fg-muted font-bold">{value !== "--" ? unit : ""}</span>
         </p>
       </div>
     </div>
@@ -274,18 +280,18 @@ function MetricCard({ icon, label, value, unit }) {
 
 function GlobalKpiCard({ title, value, unit, icon, status }) {
   const statusColors = {
-    ok: "border-slate-800",
-    warning: "border-amber-500/50 bg-amber-500/5",
-    critical: "border-red-500/50 bg-red-500/5",
+    ok: "border-line",
+    warning: "border-warning/40 bg-warning-soft",
+    critical: "border-danger-line bg-danger-soft",
   };
   return (
-    <div className={`p-6 rounded-2xl border bg-slate-900 ${statusColors[status] || statusColors.ok}`}>
-      <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 w-fit mb-4" aria-hidden>{icon}</div>
+    <div className={`p-6 rounded-2xl border bg-surface ${statusColors[status] || statusColors.ok}`}>
+      <div className="p-2 bg-canvas rounded-lg border border-line w-fit mb-4" aria-hidden>{icon}</div>
       <p className="flex items-baseline gap-1">
-        <span className="text-3xl font-black text-white">{value}</span>
-        <span className="text-xs text-slate-500 font-bold">{value !== "--" ? unit : ""}</span>
+        <span className="text-3xl font-black text-fg">{value}</span>
+        <span className="text-xs text-fg-muted font-bold">{value !== "--" ? unit : ""}</span>
       </p>
-      <p className="text-xs text-slate-400 font-bold uppercase tracking-wide mt-1">{title}</p>
+      <p className="text-xs text-fg-muted font-bold uppercase tracking-wide mt-1">{title}</p>
     </div>
   );
 }

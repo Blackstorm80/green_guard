@@ -1,126 +1,102 @@
-//sidebar.jsx
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Trees, 
-  FileText, 
-  Settings, 
-  Sprout, 
-  Menu,
-  LogOut // AJOUT DE L'ICÔNE LOGOUT
-} from "lucide-react";
+import { FileText, LayoutDashboard, LogOut, Menu, Settings, Sprout, Trees, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { cn } from "../lib/utils";
+import { Logo } from "../components/ui/Logo";
+import { LIBELLES_ROLES } from "../lib/referentiels";
+
+const NAVIGATION = [
+  { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
+  { name: "Espaces et zones", href: "/espaces", icon: Trees },
+  { name: "Catalogue", href: "/catalogues", icon: Sprout },
+  { name: "Rapports", href: "/rapports", icon: FileText },
+  { name: "Paramètres", href: "/parametres", icon: Settings },
+];
+
+const initiales = (texte) => {
+  if (!texte) return "?";
+  const mots = texte.trim().split(/\s+/);
+  return (mots.length > 1 ? `${mots[0][0]}${mots[1][0]}` : texte.slice(0, 2)).toUpperCase();
+};
 
 export function Sidebar() {
-  const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const { user, logout } = useAuth(); // RÉCUPÉRATION DU LOGOUT
+  const [ouvert, setOuvert] = useState(false);
+  const { user, logout } = useAuth();
 
-  const navigation = [
-    { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
-    { name: "Espaces & Sites", href: "/espaces", icon: Trees },
-    { name: "Catalogue", href: "/catalogues", icon: Sprout },
-    { name: "Rapports", href: "/rapports", icon: FileText },
-    { name: "Paramètres", href: "/parametres", icon: Settings },
-  ];
-
-  // Initiales dynamiques pour l'avatar (optimisé pour ton AuthContext)
-  const getInitials = (nameOrEmail = "Admin") => {
-    if (!nameOrEmail) return "AD";
-    
-    // Si c'est un nom complet (ex: "John Doe")
-    const names = nameOrEmail.split(' ');
-    if (names.length > 1) {
-      return `${names[0][0]}${names[1][0]}`.toUpperCase();
-    }
-    
-    // Si c'est un email (ex: "john@exemple.com") → prend les 2 premières lettres
-    return nameOrEmail.slice(0, 2).toUpperCase();
-  };
+  // Échap ferme le menu mobile
+  useEffect(() => {
+    if (!ouvert) return undefined;
+    const surTouche = (e) => e.key === "Escape" && setOuvert(false);
+    document.addEventListener("keydown", surTouche);
+    return () => document.removeEventListener("keydown", surTouche);
+  }, [ouvert]);
 
   return (
     <>
-      {/* Bouton Burger Mobile */}
-      <button 
-        onClick={() => setIsMobileOpen(!isMobileOpen)}
-        className="lg:hidden fixed top-4 left-4 z-50 p-2 bg-gray-800 rounded-md text-white shadow-lg"
+      <button
+        type="button"
+        onClick={() => setOuvert(!ouvert)}
+        aria-label={ouvert ? "Fermer le menu" : "Ouvrir le menu"}
+        aria-expanded={ouvert}
+        aria-controls="menu-principal"
+        className="fixed left-4 top-3 z-50 rounded-[var(--radius-control)] border border-line bg-surface p-2 text-fg shadow-lg lg:hidden"
       >
-        <Menu size={24} />
+        {ouvert ? <X size={22} aria-hidden /> : <Menu size={22} aria-hidden />}
       </button>
 
-      {/* Sidebar Container */}
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 border-r border-slate-800 transition-transform duration-300 ease-in-out lg:translate-x-0",
-        isMobileOpen ? "translate-x-0" : "-translate-x-full"
-      )}>
-        
-        {/* Logo */}
-        <div className="h-16 flex items-center px-6 border-b border-slate-800">
-          <div className="w-8 h-8 bg-green-600 rounded-lg flex items-center justify-center mr-3 shadow-lg shadow-green-900/50">
-            <span className="text-white font-bold">G</span>
-          </div>
-          <h1 className="text-xl font-bold text-white tracking-tight">
-            Green<span className="text-green-500">Tech</span>
-          </h1>
+      <aside
+        id="menu-principal"
+        className={cn(
+          "sidebar fixed inset-y-0 left-0 z-40 flex w-64 flex-col border-r border-line bg-surface transition-transform duration-300 lg:translate-x-0",
+          ouvert ? "translate-x-0" : "-translate-x-full"
+        )}
+      >
+        <div className="flex h-16 items-center border-b border-line px-6">
+          <Logo compact />
         </div>
 
-        {/* Navigation - 100% INCHANGÉE */}
-        <nav className="p-4 space-y-2">
-          {navigation.map((item) => (
+        <nav aria-label="Navigation principale" className="flex-1 space-y-1 overflow-y-auto p-4">
+          {NAVIGATION.map((item) => (
             <NavLink
-              key={item.name}
+              key={item.href}
               to={item.href}
-              onClick={() => setIsMobileOpen(false)}
+              onClick={() => setOuvert(false)}
               className={({ isActive }) => cn(
-                "flex items-center px-4 py-3 text-sm font-medium rounded-xl transition-all duration-200 group",
-                isActive 
-                  ? "bg-green-600/10 text-green-400 border border-green-600/20 shadow-sm" 
-                  : "text-slate-400 hover:bg-slate-800 hover:text-white"
+                "flex items-center rounded-[var(--radius-control)] px-4 py-3 text-sm font-medium transition-colors",
+                isActive ? "bg-success-soft font-semibold text-success" : "text-fg-muted hover:bg-surface-raised hover:text-fg"
               )}
             >
-              <item.icon className="mr-3 h-5 w-5" />
+              <item.icon className="mr-3 h-5 w-5" aria-hidden />
               {item.name}
             </NavLink>
           ))}
         </nav>
 
-        {/* PROFIL UTILISATEUR AVEC LOGOUT */}
-        <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-slate-800 bg-slate-900/80 backdrop-blur-sm">
-          <div className="flex items-center gap-3 px-2 p-2 rounded-xl transition-all">
-            {/* Avatar avec Initiales */}
-            <div className="w-9 h-9 rounded-full bg-gradient-to-tr from-green-500 to-emerald-700 border border-slate-600 flex items-center justify-center text-xs font-bold text-white shadow-md shrink-0">
-              {getInitials(user?.name || user?.email)}
+        <div className="border-t border-line p-4">
+          <div className="flex items-center gap-3 p-2">
+            <div aria-hidden className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary text-xs font-bold text-on-accent">
+              {initiales(user?.name || user?.email)}
             </div>
-            
-            {/* Infos Textuelles */}
-            <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">
-                {user?.name || user?.email?.split('@')[0] || "Admin Principal"}
-              </p>
-              <p className="text-[10px] uppercase tracking-wider font-bold text-slate-500 truncate">
-                {user?.role || "Responsable SE"}
-              </p>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-semibold text-fg">{user?.name || user?.email}</p>
+              <p className="truncate text-xs text-fg-muted">{LIBELLES_ROLES[user?.role] ?? user?.role}</p>
             </div>
-
-            {/* BOUTON DECONNEXION */}
-            <button 
+            <button
+              type="button"
               onClick={logout}
-              className="p-2 text-slate-500 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
-              title="Déconnexion"
+              aria-label="Se déconnecter"
+              title="Se déconnecter"
+              className="rounded-[var(--radius-control)] p-2 text-fg-muted transition-colors hover:bg-danger-soft hover:text-danger"
             >
-              <LogOut size={18} />
+              <LogOut size={18} aria-hidden />
             </button>
           </div>
         </div>
       </aside>
 
-      {/* Overlay Mobile */}
-      {isMobileOpen && (
-        <div 
-          className="fixed inset-0 z-30 bg-black/60 lg:hidden backdrop-blur-sm transition-opacity"
-          onClick={() => setIsMobileOpen(false)}
-        />
+      {ouvert && (
+        <div aria-hidden className="fixed inset-0 z-30 bg-black/60 lg:hidden" onClick={() => setOuvert(false)} />
       )}
     </>
   );

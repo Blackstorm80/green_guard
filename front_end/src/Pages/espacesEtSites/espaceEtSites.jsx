@@ -6,10 +6,12 @@ import { motion, AnimatePresence } from "framer-motion";
 
 const MotionButton = motion.button;
 import { api } from "../../services/api";
+import { useTitrePage } from "../../lib/hooks";
 import AddSpaceModal from "./AddSpaceModal";
 import EditSpaceModal from "./EditSpaceModal"; // 1. Importer le nouveau composant
 
 export default function EspacesSites() {
+  useTitrePage("Espaces et zones");
   const [espaces, setEspaces] = useState([]);
   const [clusters, setClusters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -80,16 +82,16 @@ export default function EspacesSites() {
       {/* HEADER */}
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">Espaces et zones</h1>
-          <p className="text-slate-400 mt-1">Vos espaces verts regroupés par zone géographique</p>
-          {recalcul.message && <p role="status" className="text-sm text-slate-300 mt-2">{recalcul.message}</p>}
+          <h1 className="text-3xl font-bold text-fg tracking-tight">Espaces et zones</h1>
+          <p className="text-fg-muted mt-1">Vos espaces verts regroupés par zone géographique</p>
+          {recalcul.message && <p role="status" className="text-sm text-fg-soft mt-2">{recalcul.message}</p>}
         </div>
         <div className="flex gap-3">
         <button
           type="button"
           onClick={recalculerZones}
           disabled={recalcul.enCours || espaces.length === 0}
-          className="hidden md:flex items-center gap-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white px-5 py-2 rounded-xl font-bold transition-all"
+          className="hidden md:flex items-center gap-2 bg-surface-raised hover:bg-surface-strong disabled:opacity-50 text-fg px-5 py-2 rounded-xl font-bold transition-all"
         >
           <Layers size={18} aria-hidden />
           <span>{recalcul.enCours ? "Calcul…" : "Recalculer les zones"}</span>
@@ -97,7 +99,7 @@ export default function EspacesSites() {
 
         <button 
           onClick={() => setIsAddModalOpen(true)}
-          className="hidden md:flex items-center gap-2 bg-green-600 hover:bg-green-500 text-white px-5 py-2 rounded-xl font-bold transition-all shadow-lg"
+          className="hidden md:flex items-center gap-2 bg-primary hover:bg-primary-hover text-on-accent px-5 py-2 rounded-xl font-bold transition-all shadow-lg"
         >
           <Plus size={20} />
           <span>Ajouter un espace</span>
@@ -112,14 +114,14 @@ export default function EspacesSites() {
           aria-pressed={!activeClusterId}
           onClick={() => setActiveClusterId(null)}
           className={`text-left p-4 rounded-2xl border transition-all ${
-            !activeClusterId ? "bg-slate-800 border-green-500 shadow-lg" : "bg-slate-900 border-slate-800 hover:border-slate-700"
+            !activeClusterId ? "bg-surface-raised border-success shadow-lg" : "bg-surface border-line hover:border-line-strong"
           }`}
         >
           <div className="flex justify-between items-center">
-             <span className="text-xs font-bold text-slate-500 uppercase">Vue Globale</span>
-             <Layers size={16} className={!activeClusterId ? "text-green-500" : "text-slate-600"} />
+             <span className="text-xs font-bold text-fg-muted uppercase">Vue Globale</span>
+             <Layers size={16} className={!activeClusterId ? "text-success" : "text-fg-subtle"} />
           </div>
-          <p className="text-2xl font-black text-white mt-2">{espaces.length}</p>
+          <p className="text-2xl font-black text-fg mt-2">{espaces.length}</p>
         </button>
 
         {clusters.map((cluster) => {
@@ -132,17 +134,17 @@ export default function EspacesSites() {
               aria-pressed={isActive}
               onClick={() => setActiveClusterId(cluster.id)}
               className={`text-left p-4 rounded-2xl border transition-all relative overflow-hidden ${
-                isActive ? "bg-slate-800 border-white/20 shadow-xl scale-[1.02]" : "bg-slate-900 border-slate-800 hover:border-slate-700"
+                isActive ? "bg-surface-raised border-white/20 shadow-xl scale-[1.02]" : "bg-surface border-line hover:border-line-strong"
               }`}
             >
               <div className="flex justify-between items-start relative z-10">
                 <div className="max-w-[70%]">
-                  <span className="text-[10px] font-bold text-slate-500 uppercase truncate block">{cluster.nom}</span>
-                  <p className="text-2xl font-black text-white mt-1">{cluster.nb_espaces}</p>
+                  <span className="text-xs font-bold text-fg-muted uppercase truncate block">{cluster.nom}</span>
+                  <p className="text-2xl font-black text-fg mt-1">{cluster.nb_espaces}</p>
                 </div>
                 <div className="relative w-12 h-12 flex items-center justify-center">
                    <svg className="w-full h-full transform -rotate-90">
-                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-800" />
+                      <circle cx="24" cy="24" r="20" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-fg-subtle" />
                       <circle 
                         cx="24" cy="24" r="20" stroke={couleur} strokeWidth="4" fill="transparent" 
                         strokeDasharray={125}
@@ -150,7 +152,7 @@ export default function EspacesSites() {
                         strokeLinecap="round"
                       />
                    </svg>
-                   <span className="absolute text-[9px] font-bold text-white">{typeof cluster.sante_moyenne === "number" ? `${Math.round(cluster.sante_moyenne)}%` : "–"}</span>
+                   <span className="absolute text-xs font-bold text-fg">{typeof cluster.sante_moyenne === "number" ? `${Math.round(cluster.sante_moyenne)}%` : "–"}</span>
                 </div>
               </div>
             </button>
@@ -159,26 +161,27 @@ export default function EspacesSites() {
       </div>
 
       {/* BARRE DE RECHERCHE  ... */}
-      <div className="flex flex-col md:flex-row gap-4 items-center bg-slate-900/50 p-4 rounded-2xl border border-slate-800">
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-surface/50 p-4 rounded-2xl border border-line">
         <div className="relative flex-1">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" size={18} />
+          <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-fg-muted" size={18} />
           <input 
-            type="text"
-            placeholder="Rechercher par nom..."
-            className="w-full bg-slate-950 border border-slate-800 rounded-xl py-3 pl-12 pr-4 text-white outline-none focus:ring-1 focus:ring-green-500"
+            type="search"
+            aria-label="Rechercher un espace par nom"
+            placeholder="Rechercher par nom…"
+            className="w-full bg-canvas border border-line rounded-xl py-3 pl-12 pr-4 text-fg outline-none focus:ring-1 focus:ring-focus"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex bg-slate-950 p-1 rounded-lg border border-slate-800">
-          <button type="button" aria-label="Affichage en grille" aria-pressed={viewMode === "grid"} onClick={() => setViewMode("grid")} className={`p-2 rounded ${viewMode === "grid" ? "bg-slate-800 text-white" : "text-slate-500"}`}><LayoutGrid size={18} /></button>
-          <button type="button" aria-label="Affichage en liste" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`p-2 rounded ${viewMode === "list" ? "bg-slate-800 text-white" : "text-slate-500"}`}><List size={18} /></button>
+        <div className="flex bg-canvas p-1 rounded-lg border border-line">
+          <button type="button" aria-label="Affichage en grille" aria-pressed={viewMode === "grid"} onClick={() => setViewMode("grid")} className={`p-2 rounded ${viewMode === "grid" ? "bg-surface-raised text-fg" : "text-fg-muted"}`}><LayoutGrid size={18} /></button>
+          <button type="button" aria-label="Affichage en liste" aria-pressed={viewMode === "list"} onClick={() => setViewMode("list")} className={`p-2 rounded ${viewMode === "list" ? "bg-surface-raised text-fg" : "text-fg-muted"}`}><List size={18} /></button>
         </div>
       </div>
 
-      {loading && <p role="status" className="text-slate-400 text-sm">Chargement des espaces…</p>}
+      {loading && <p role="status" className="text-fg-muted text-sm">Chargement des espaces…</p>}
       {!loading && espaces.length === 0 && (
-        <p className="text-slate-400 text-sm">Aucun espace vert pour le moment : ajoutez votre premier site.</p>
+        <p className="text-fg-muted text-sm">Aucun espace vert pour le moment : ajoutez votre premier site.</p>
       )}
 
       {/* LISTE DES SITES */}
@@ -190,16 +193,16 @@ export default function EspacesSites() {
             key={site.id}
             onClick={() => handleEditClick(site)}
             aria-label={`Modifier ${site.nom}`}
-            className="text-left w-full bg-slate-900 border border-slate-800 rounded-2xl p-5 hover:border-green-500/50 transition-all group cursor-pointer"
+            className="text-left w-full bg-surface border border-line rounded-2xl p-5 hover:border-success/50 transition-all group cursor-pointer"
           >
-            <h3 className="text-xl font-bold text-white mb-1">{site.nom}</h3>
-            <div className="flex items-center gap-2 text-slate-500 text-sm mb-4">
+            <h3 className="text-xl font-bold text-fg mb-1">{site.nom}</h3>
+            <div className="flex items-center gap-2 text-fg-muted text-sm mb-4">
               <MapPin size={14} />
               <span>{site.ville}</span>
             </div>
-            <div className="pt-4 border-t border-slate-800 flex justify-between items-center text-[10px] text-slate-500 font-bold uppercase">
+            <div className="pt-4 border-t border-line flex justify-between items-center text-xs text-fg-muted font-bold uppercase">
                <span>Zone : {nomZone(site.zone_id)}</span>
-               <span className={site.sante_percent >= 85 ? "text-green-500" : "text-amber-500"}>
+               <span className={site.sante_percent >= 85 ? "text-success" : "text-warning"}>
                  {typeof site.sante_percent === "number" ? `${Math.round(site.sante_percent)} % santé` : "Santé : en attente"}
                </span>
             </div>
@@ -218,7 +221,7 @@ export default function EspacesSites() {
           transition={{ repeat: Infinity, duration: 2 }}
           onClick={() => setIsAddModalOpen(true)}
           aria-label="Ajouter un espace"
-          className="md:hidden fixed bottom-6 right-6 z-50 bg-green-600 text-white p-4 rounded-full shadow-2xl"
+          className="md:hidden fixed bottom-6 right-6 z-50 bg-primary text-on-accent p-4 rounded-full shadow-2xl"
         >
           <Plus size={28} />
         </MotionButton>

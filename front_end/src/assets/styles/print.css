@@ -1,50 +1,37 @@
+/* Impression (rapports) : contenu seul, noir sur blanc, sans navigation ni boutons */
 @media print {
-  /* Cache la Sidebar, le Header et les boutons non essentiels */
   .sidebar,
   .header,
+  .lien-evitement,
   .no-print,
-  button,
-  [data-no-print="true"] {
+  button {
     display: none !important;
   }
 
-  /* Assure que le contenu principal prend toute la largeur */
-  body,
-  #root,
+  :root,
+  :root[data-theme="dark"] {
+    --gg-canvas: #ffffff;
+    --gg-surface: #ffffff;
+    --gg-surface-raised: #f1f5f9;
+    --gg-fg: #000000;
+    --gg-fg-soft: #000000;
+    --gg-fg-muted: #334155;
+    --gg-line: #cbd5e1;
+  }
+
   .main-content {
-    width: 100% !important;
-    margin: 0 !important;
     padding: 0 !important;
-    box-shadow: none !important;
   }
-  
-  /* Force les graphiques Recharts à 100% de largeur et ajuste leur rendu */
-  .recharts-wrapper,
-  .recharts-surface {
-    width: 100% !important;
-    height: auto !important;
+
+  .lg\:ml-64 {
+    margin-left: 0 !important;
   }
-  
-  /* Passe en Noir sur Blanc */
-  body,
-  div,
-  p,
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  span,
-  text {
-    background-color: white !important;
-    color: black !important;
-    box-shadow: none !important;
-    border: none !important;
+
+  table {
+    page-break-inside: auto;
   }
-  
-  /* Style spécifique pour les textes dans les graphiques Recharts */
-  .recharts-text {
-    fill: black !important;
+
+  tr {
+    page-break-inside: avoid;
   }
 }
