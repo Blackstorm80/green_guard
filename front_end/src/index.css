@@ -1,4 +1,152 @@
 @import "tailwindcss";
-@tailwind utilities;
 
+/*
+ * Design system GreenGuard : tokens sémantiques (ADR-7).
+ * Les composants n'utilisent jamais de couleur brute (slate-900, red-400…) pour le texte,
+ * les fonds ou les bordures : ils utilisent ces tokens, qui changent avec le thème.
+ * Contrastes vérifiés WCAG 2.1 AA (texte ≥ 4,5:1 sur canvas et surface, dans les deux thèmes).
+ */
 
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+@theme inline {
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+
+  /* Fonds et bordures */
+  --color-canvas: var(--gg-canvas);
+  --color-surface: var(--gg-surface);
+  --color-surface-raised: var(--gg-surface-raised);
+  --color-surface-strong: var(--gg-surface-strong);
+  --color-line: var(--gg-line);
+  --color-line-strong: var(--gg-line-strong);
+
+  /* Texte */
+  --color-fg: var(--gg-fg);
+  --color-fg-soft: var(--gg-fg-soft);
+  --color-fg-muted: var(--gg-fg-muted);
+  --color-fg-subtle: var(--gg-fg-subtle);   /* décoratif uniquement, jamais pour du texte utile */
+
+  /* Action principale (texte blanc dessus : 5:1) */
+  --color-primary: var(--gg-primary);
+  --color-primary-hover: var(--gg-primary-hover);
+  --color-on-accent: #ffffff;
+  --color-focus: var(--gg-focus);
+
+  /* États */
+  --color-success: var(--gg-success);
+  --color-danger: var(--gg-danger);
+  --color-warning: var(--gg-warning);
+  --color-info: var(--gg-info);
+  --color-success-soft: var(--gg-success-soft);
+  --color-danger-soft: var(--gg-danger-soft);
+  --color-warning-soft: var(--gg-warning-soft);
+  --color-info-soft: var(--gg-info-soft);
+  --color-danger-line: var(--gg-danger-line);
+
+  /* Santé (jauges) */
+  --color-sante-bonne: #0cb95d;
+  --color-sante-moyenne: #e77c02;
+  --color-sante-mauvaise: #df1b1b;
+  --color-sante-inconnue: #64748b;
+
+  --radius-card: 1rem;
+  --radius-control: 0.75rem;
+}
+
+/* Thème clair (par défaut) */
+:root {
+  color-scheme: light;
+  --gg-canvas: #f8fafc;
+  --gg-surface: #ffffff;
+  --gg-surface-raised: #f1f5f9;
+  --gg-surface-strong: #e2e8f0;
+  --gg-line: #e2e8f0;
+  --gg-line-strong: #cbd5e1;
+  --gg-fg: #0f172a;
+  --gg-fg-soft: #334155;
+  --gg-fg-muted: #475569;
+  --gg-fg-subtle: #94a3b8;
+  --gg-primary: #15803d;
+  --gg-primary-hover: #166534;
+  --gg-focus: #15803d;
+  --gg-success: #15803d;
+  --gg-danger: #b91c1c;
+  --gg-warning: #b45309;
+  --gg-info: #1d4ed8;
+  --gg-success-soft: rgb(22 163 74 / 0.1);
+  --gg-danger-soft: rgb(220 38 38 / 0.08);
+  --gg-warning-soft: rgb(217 119 6 / 0.1);
+  --gg-info-soft: rgb(37 99 235 / 0.08);
+  --gg-danger-line: rgb(220 38 38 / 0.3);
+}
+
+/* Thème sombre : choix explicite, ou préférence système en l'absence de choix */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --gg-canvas: #020617;
+  --gg-surface: #0f172a;
+  --gg-surface-raised: #1e293b;
+  --gg-surface-strong: #334155;
+  --gg-line: #1e293b;
+  --gg-line-strong: #334155;
+  --gg-fg: #f8fafc;
+  --gg-fg-soft: #cbd5e1;
+  --gg-fg-muted: #94a3b8;
+  --gg-fg-subtle: #475569;
+  --gg-primary: #15803d;
+  --gg-primary-hover: #166534;
+  --gg-focus: #4ade80;
+  --gg-success: #4ade80;
+  --gg-danger: #f87171;
+  --gg-warning: #fbbf24;
+  --gg-info: #60a5fa;
+  --gg-success-soft: rgb(34 197 94 / 0.12);
+  --gg-danger-soft: rgb(239 68 68 / 0.12);
+  --gg-warning-soft: rgb(245 158 11 / 0.12);
+  --gg-info-soft: rgb(59 130 246 / 0.12);
+  --gg-danger-line: rgb(239 68 68 / 0.3);
+}
+
+@layer base {
+  html {
+    font-family: var(--font-sans);
+    background-color: var(--color-canvas);
+    color: var(--color-fg);
+  }
+
+  /* Focus toujours visible au clavier (WCAG 2.4.7) */
+  :focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+
+  /* Respect de la préférence « réduire les animations » (WCAG 2.3.3) */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Lien d'évitement : visible uniquement au focus clavier */
+  .lien-evitement {
+    position: absolute;
+    left: 0.5rem;
+    top: -3rem;
+    z-index: 200;
+    padding: 0.5rem 1rem;
+    border-radius: var(--radius-control);
+    background: var(--color-primary);
+    color: var(--color-on-accent);
+    font-weight: 700;
+  }
+  .lien-evitement:focus {
+    top: 0.5rem;
+  }
+}
