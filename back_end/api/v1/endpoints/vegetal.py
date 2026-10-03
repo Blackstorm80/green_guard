@@ -11,7 +11,7 @@ from api.deps.auth import require_role
 from domain.models import User
 from domain.models import EspaceVert
 
-router = APIRouter(prefix="/vegetal", tags=["Indicateurs Végétaux"])
+router = APIRouter()
 
 def get_repos(db: Session = Depends(get_db)):
     return {

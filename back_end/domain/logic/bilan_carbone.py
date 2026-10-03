@@ -23,7 +23,7 @@ def estimer_co2_absorbe_jour(
     # On s'assure que le facteur reste positif
     facteur_stress = max(0.0, facteur_stress)
 
-    return espace_vert.surface_m2 * facteur_base_kg_m2 * facteur_stress
+    return (espace_vert.surface_m2 or 0.0) * facteur_base_kg_m2 * facteur_stress
 
 
 def estimer_o2_produit_jour(

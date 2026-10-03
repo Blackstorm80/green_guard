@@ -1,122 +1,72 @@
-# Fichier: domain/logic/clustering.py
+"""Regroupement géographique des espaces verts (logique pure, sans base de données).
+
+Algorithme : K-Means sur les coordonnées projetées en km (équirectangulaire locale),
+ce qui donne des distances homogènes en latitude et en longitude. Les centroïdes
+sont recalculés sur les coordonnées réelles des espaces de chaque groupe.
+Base d'apprentissage : https://fr.python-3.com/?p=4563
+"""
+import math
+from dataclasses import dataclass
+from typing import List, Optional, Sequence, Tuple
+
 import numpy as np
 from sklearn.cluster import KMeans
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import silhouette_score
-from typing import List
-from sqlalchemy.orm import Session
 
-# IMPORTS DÉFINITIFS - TOUT ICI
-from domain.models import EspaceVert, ZoneIntelligente, ClusteringConfig
+RAYON_TERRE_KM = 6371.0
+COULEUR_INCONNUE = "#64748B"
 
 
+@dataclass(frozen=True)
+class Groupe:
+    indices: List[int]           # positions des points dans la liste d'entrée
+    centroid_lat: float
+    centroid_lon: float
+    rayon_km: float              # distance max centroïde → point du groupe
 
-""" l'algorithme a été dev a partir de celui de https://fr.python-3.com/?p=4563 , qui a servi de base d'apprentissage et de comprenhension pour coder mon clusturing "  """
-def calculer_features_espaces(espaces: List[EspaceVert]) -> np.ndarray:
-    """Extrait et normalise les features pour K-Means."""
-    features = []
-    
-    for espace in espaces:
-        # 1. Géolocalisation (prioritaire)
-        # On utilise directement les champs latitude/longitude du modèle
-        lat = getattr(espace, 'latitude', 0.0) or 0.0
-        lon = getattr(espace, 'longitude', 0.0) or 0.0
-        
-        # 2. Caractéristiques structurelles (encodage simple)
-        type_espace_code = {"parc": 1, "jardin": 2, "square": 3, "rue": 4}.get(
-            espace.type_espace.lower() if espace.type_espace else "square", 3
-        )
-        
-        features.append([lat, lon, type_espace_code])
-    
-    #  pour que K-Means traite toutes les features 
-    scaler = StandardScaler()
-    return scaler.fit_transform(features)
 
-def creer_noms_zones_generiques(n_clusters: int, granularite: str) -> List[str]:
-    """Génère des noms génériques et non-trompeurs pour les zones."""
-    noms = []
-    # NOTE: La logique précédente de nommage basée sur les arrondissements était incorrecte
-    # car elle créait une fausse corrélation géographique. Une vraie solution
-    # nécessiterait un service de reverse-geocoding sur les coordonnées du centroïde.
-    # En attendant, nous utilisons un nommage neutre.
-    for i in range(n_clusters):
-        prefix = "Quartier" if granularite == "quartier" else "Zone"
-        if granularite == "quartier":
-            noms.append(f"{prefix} Intelligent {i+1}")
-        else:
-            noms.append(f"{prefix} Intelligente {i+1}")
-    return noms
+def distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
+    """Distance orthodromique (haversine)."""
+    p1, p2 = math.radians(lat1), math.radians(lat2)
+    dp, dl = p2 - p1, math.radians(lon2 - lon1)
+    a = math.sin(dp / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
+    return 2 * RAYON_TERRE_KM * math.asin(math.sqrt(a))
 
-def executer_clustering_intelligent(
-    db: Session,
-    user_id: int
-):
-    # Retire complètement -> List[ZoneIntelligente]
-    # Garde le reste de ton code IDENTIQUE
 
-    """
-    Exécute le clustering complet :
-    1. Lit la config utilisateur.
-    2. Récupère les espaces et calcule les features.
-    3. Exécute K-Means et calcule le score de silhouette.
-    4. Persiste les nouvelles zones et leurs métriques.
-    """
-    config = db.query(ClusteringConfig).filter(ClusteringConfig.user_id == user_id).first()
-    if not config:
-        raise ValueError("Aucune config de clustering trouvée pour cet utilisateur")
-    
-    espaces = db.query(EspaceVert).filter(EspaceVert.user_id == user_id).all()
-    if len(espaces) < config.n_clusters:
-        raise ValueError("Pas assez d'espaces à clusteriser pour le nombre de clusters configuré")
-    
-    X = calculer_features_espaces(espaces)
-    
-    kmeans = KMeans(n_clusters=config.n_clusters, random_state=42, n_init=10)
-    labels = kmeans.fit_predict(X)
-    
-    # Le score de silhouette est un métrique globale pour la qualité du clustering.
-    # Il ne doit pas être stocké sur chaque zone individuelle.
-    silhouette = silhouette_score(X, labels)
-    print(f"Clustering exécuté avec un score de silhouette global de : {silhouette:.4f}")
-    
-    # Nettoyage des anciennes zones pour cet utilisateur
-    db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == user_id).delete()
-    db.commit()
-    
-    nouvelles_zones = []
-    # Utilisation de la nouvelle fonction de nommage générique
-    noms_zones = creer_noms_zones_generiques(config.n_clusters, config.granularite)
-    
-    for i in range(config.n_clusters):
-        indices_cluster = [j for j, label in enumerate(labels) if label == i]
-        if not indices_cluster: continue
+def _projeter_km(points: Sequence[Tuple[float, float]]) -> np.ndarray:
+    lat_ref = math.radians(sum(p[0] for p in points) / len(points))
+    km_par_degre = math.pi * RAYON_TERRE_KM / 180
+    return np.array([[lat * km_par_degre, lon * km_par_degre * math.cos(lat_ref)] for lat, lon in points])
 
-        espaces_cluster = [espaces[j] for j in indices_cluster]
-        
-        zone = ZoneIntelligente(
-            nom=noms_zones[i],
-            user_id=user_id,
-            centroid_lat=float(kmeans.cluster_centers_[i][0]),
-            centroid_lon=float(kmeans.cluster_centers_[i][1]),
-            rayon_km=config.rayon_max_km,
-            sante_moyenne=None,  # La santé sera calculée par un autre processus
-            nb_espaces=len(espaces_cluster),
-            granularite=config.granularite
-        )
-        db.add(zone)
-        db.flush()
-        
-        for espace in espaces_cluster:
-            zone.espaces.append(espace)
-        
-        nouvelles_zones.append(zone)
-    
-    db.commit()
-    return nouvelles_zones
 
-def calculer_couleur_gauge(sante: float) -> str:
-    """Détermine la couleur de jauge en fonction du score de santé."""
-    if sante >= 85: return "#0CB95D"  # Vert
-    if sante >= 65: return "#E77C02"  # Orange
-    return "#DF1B1B"  # Rouge
+def regrouper(points: Sequence[Tuple[float, float]], n_groupes: int) -> List[Groupe]:
+    """Regroupe des (lat, lon) en au plus n_groupes groupes non vides."""
+    if not points:
+        return []
+    n = max(1, min(n_groupes, len(points)))
+    labels = KMeans(n_clusters=n, random_state=42, n_init=10).fit_predict(_projeter_km(points))
+
+    groupes = []
+    for label in sorted(set(labels)):
+        indices = [i for i, l in enumerate(labels) if l == label]
+        lat = sum(points[i][0] for i in indices) / len(indices)
+        lon = sum(points[i][1] for i in indices) / len(indices)
+        rayon = max(distance_km(lat, lon, *points[i]) for i in indices)
+        groupes.append(Groupe(indices=indices, centroid_lat=lat, centroid_lon=lon, rayon_km=round(rayon, 3)))
+    return groupes
+
+
+def nommer_zones(n: int, granularite: Optional[str]) -> List[str]:
+    """Noms neutres (un vrai nommage demanderait un géocodage inverse)."""
+    prefixe = "Quartier" if granularite == "quartier" else "Zone"
+    return [f"{prefixe} {i + 1}" for i in range(n)]
+
+
+def calculer_couleur_gauge(sante: Optional[float]) -> str:
+    """Couleur de jauge selon le score de santé ; gris quand il n'y a pas encore de donnée."""
+    if sante is None:
+        return COULEUR_INCONNUE
+    if sante >= 85:
+        return "#0CB95D"
+    if sante >= 65:
+        return "#E77C02"
+    return "#DF1B1B"

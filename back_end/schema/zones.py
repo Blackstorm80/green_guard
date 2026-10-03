@@ -1,19 +1,20 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List
+from typing import List, Optional
+
+from pydantic import BaseModel
+
 
 class ZoneIntelligenteRead(BaseModel):
     id: int
     nom: str
-    sante_moyenne: float
+    sante_moyenne: Optional[float] = None
     nb_espaces: int
-    centroid_lat: float
-    centroid_lon: float
+    centroid_lat: Optional[float] = None
+    centroid_lon: Optional[float] = None
+    rayon_km: Optional[float] = None
+    granularite: Optional[str] = None
     couleur_gauge: str
-    granularite: str
-    
-    model_config = ConfigDict(from_attributes=True)
 
-class ClusteringConfigRead(BaseModel):
-    n_clusters: int
-    granularite: str
-    rayon_max_km: float
+
+class ReconstructionZonesRead(BaseModel):
+    message: str
+    zones: List[str]

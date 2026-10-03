@@ -1,108 +1,61 @@
-# back_end/application/use_cases/interventions.py
+from datetime import datetime, timezone
 from typing import List
-from datetime import datetime
 
 from application.dto.intervention import (
-    InterventionsUrgentesDTO, 
-    InterventionUrgenteDTO, 
-    PrioriteIntervention, 
-    TypeIntervention
+    InterventionsUrgentesDTO, InterventionUrgenteDTO, PrioriteIntervention, TypeIntervention,
 )
-from domain.ports.capteurs import ICapteurService, LectureCapteur
-from domain.ports.espace_vert_repository import IEspaceVertRepository
-from application.dto.user import UserDTO
 from domain.models import EspaceVert
+from domain.ports.capteurs import ICapteurService, LectureCapteur
+
+SEUIL_CO2_PPM = 1200
+SEUIL_CHALEUR_C = 32
+# Rang explicite : un tri alphabétique placerait "low" avant "critical"
+RANG_PRIORITE = {PrioriteIntervention.CRITICAL: 0, PrioriteIntervention.HIGH: 1, PrioriteIntervention.LOW: 2}
+_ORDRE_TYPES = list(TypeIntervention)
 
 
-class InterventionInterne:
-    """Structure interne pour les calculs avant la création du DTO final."""
-    def __init__(self, espace_id: int, espace_nom: str, type: TypeIntervention,
-                 label: str, description: str, priorite: PrioriteIntervention, created_at: datetime):
-        self.espace_id = espace_id
-        self.espace_nom = espace_nom
-        self.type = type
-        self.label = label
-        self.description = description
-        self.priorite = priorite
-        self.created_at = created_at
-        self.is_read = False
+def _detecter_problemes(espace: EspaceVert, lecture: LectureCapteur, maintenant: datetime) -> List[InterventionUrgenteDTO]:
+    """Plusieurs alertes possibles pour un même espace (pas de elif)."""
+    problemes = []
 
-
-def _detecter_problemes_critiques(
-    espace: EspaceVert, 
-    lecture: LectureCapteur
-) -> List[InterventionInterne]:
-    """
-    Détecte les seuils critiques à partir d'une lecture capteur.
-    Utilise des `if` au lieu de `elif` pour pouvoir remonter plusieurs alertes pour un même espace.
-    """
-    problèmes = []
-    now = datetime.utcnow()
-    
-    # STRESS HYDRIQUE CRITIQUE
-    if lecture.reserve_eau_mm < 15:
-        problèmes.append(InterventionInterne(
+    def ajouter(type_: TypeIntervention, label: str, description: str, priorite: PrioriteIntervention):
+        problemes.append(InterventionUrgenteDTO(
+            # Identifiant stable : un même problème garde le même id entre deux appels
+            id=espace.id * 10 + _ORDRE_TYPES.index(type_),
             espace_id=espace.id,
             espace_nom=espace.nom,
-            type=TypeIntervention.STRESS_HYDRIQUE,
-            label="Sec",
-            description=f"Réserve eau critique : {lecture.reserve_eau_mm:.0f}mm",
-            priorite=PrioriteIntervention.CRITICAL,
-            created_at=now
+            type=type_,
+            label=label,
+            description=description,
+            priorite=priorite,
+            created_at=lecture.timestamp or maintenant,
         ))
-    
-    # HYPERCAPNIE (CO2 > 1200ppm)
-    if lecture.co2_ppm > 1200:
-        problèmes.append(InterventionInterne(
-            espace_id=espace.id,
-            espace_nom=espace.nom,
-            type=TypeIntervention.HYPERCAPNIE,
-            label="CO₂",
-            description=f"CO₂ élevé : {lecture.co2_ppm}ppm",
-            priorite=PrioriteIntervention.HIGH,
-            created_at=now
-        ))
-    
-    # CHALEUR EXCESSIVE
-    if lecture.temperature_c > 32:
-        problèmes.append(InterventionInterne(
-            espace_id=espace.id,
-            espace_nom=espace.nom,
-            type=TypeIntervention.CANICULE,
-            label="Chaleur",
-            description=f"Température seuil : {lecture.temperature_c:.1f}°C",
-            priorite=PrioriteIntervention.HIGH,
-            created_at=now
-        ))
-    
-    return problèmes
+
+    if lecture.statut == "Critique":
+        reserve = f" ({lecture.reserve_eau_mm:.0f} mm)" if lecture.reserve_eau_mm is not None else ""
+        ajouter(TypeIntervention.STRESS_HYDRIQUE, "Sec", f"Stress hydrique critique{reserve}", PrioriteIntervention.CRITICAL)
+    if lecture.co2_ppm is not None and lecture.co2_ppm > SEUIL_CO2_PPM:
+        ajouter(TypeIntervention.HYPERCAPNIE, "CO₂", f"CO₂ élevé : {lecture.co2_ppm:.0f} ppm", PrioriteIntervention.HIGH)
+    if lecture.temperature_c is not None and lecture.temperature_c > SEUIL_CHALEUR_C:
+        ajouter(TypeIntervention.CANICULE, "Chaleur", f"Température : {lecture.temperature_c:.1f} °C", PrioriteIntervention.HIGH)
+    return problemes
 
 
 def lister_interventions_urgentes(
-    user: UserDTO,
+    espaces: List[EspaceVert],
     capteur_service: ICapteurService,
-    espace_repo: IEspaceVertRepository,
     limit: int = 5,
-    depuis_heures: int = 24
 ) -> InterventionsUrgentesDTO:
-    """
-    Liste les interventions urgentes pour l'utilisateur connecté,
-    basé sur les lectures capteurs récentes et des seuils critiques.
-    """
-    espaces_user = espace_repo.list_by_user(user.id)
-    
-    interventions = []
-    for espace in espaces_user:
-        lecture = capteur_service.lecture_actuelle(espace.id)
-        if lecture:
-            interventions.extend(_detecter_problemes_critiques(espace, lecture))
-    
-    interventions.sort(key=lambda i: (i.priorite.value, i.created_at), reverse=True)
-    
-    interventions_dto = [InterventionUrgenteDTO(id=hash(f"{i.espace_id}-{i.type}-{i.created_at}"), **i.__dict__) for i in interventions[:limit]]
-    
+    """Interventions urgentes détectées sur les espaces fournis (déjà filtrés sur l'utilisateur)."""
+    maintenant = datetime.now(timezone.utc)
+    interventions: List[InterventionUrgenteDTO] = []
+    for espace in espaces:
+        interventions.extend(_detecter_problemes(espace, capteur_service.lecture_actuelle(espace), maintenant))
+
+    interventions.sort(key=lambda i: (RANG_PRIORITE[i.priorite], -i.created_at.timestamp()))
+    retenues = interventions[:limit]
     return InterventionsUrgentesDTO(
-        interventions=interventions_dto,
+        interventions=retenues,
         total=len(interventions),
-        non_lues=len([i for i in interventions_dto if not i.is_read])
+        non_lues=sum(1 for i in retenues if not i.is_read),
     )

@@ -1,31 +1,20 @@
-# back_end/application/use_cases/meteo.py
-from datetime import datetime
-from domain.ports.meteo import IMeteoService
+from datetime import datetime, timezone
+
 from application.dto.meteo import MeteoDTO
+from domain.ports.meteo import IMeteoService
 
 
-def obtenir_meteo_actuelle(
-    latitude: float,
-    longitude: float,
-    meteo_service: IMeteoService,
-) -> MeteoDTO:
-    """
-    Use case : retourne la météo actuelle pour une position (lat, lon)
-    sous forme de DTO pour le front.
-    """
-
-    maintenant = datetime.utcnow()
+def obtenir_meteo_actuelle(latitude: float, longitude: float, meteo_service: IMeteoService) -> MeteoDTO:
+    """Météo actuelle d'un point. Propage MeteoIndisponibleError."""
     conditions = meteo_service.recuperer_conditions_actuelles(
         latitude=latitude,
         longitude=longitude,
-        maintenant=maintenant,
+        maintenant=datetime.now(timezone.utc),
     )
-
-    # Mapping ConditionsMeteo -> MeteoDTO
     return MeteoDTO(
         city=conditions.city,
         temperature_c=conditions.temperature_c,
         condition=conditions.condition,
-        icon=None,  #  mapper condition -> icône côté front bientot
+        icon=None,
         ensoleillement_fort=conditions.ensoleillement_fort,
     )

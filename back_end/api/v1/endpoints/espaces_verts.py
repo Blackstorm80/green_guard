@@ -1,66 +1,64 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
 from typing import List
 
-from infrastructure.database import get_db
+from fastapi import APIRouter, Depends, HTTPException, Response, status
+from sqlalchemy.orm import Session
+
 from api.deps.auth import get_current_user
-from domain import models 
-from schema.espaces_verts import EspaceVertRead, EspaceVertCreate, EspaceVertUpdate
+from domain import models
+from infrastructure.database import get_db
+from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
+from schema.espaces_verts import EspaceVertCreate, EspaceVertRead, EspaceVertUpdate
 
 router = APIRouter()
 
-@router.post("/", response_model=EspaceVertRead)
+
+def _espace_de_l_utilisateur(espace_id: int, db: Session, user: models.User) -> models.EspaceVert:
+    """404 aussi bien pour un espace inexistant que pour celui d'un autre compte (pas de fuite d'existence)."""
+    espace = EspaceVertRepositoryImpl(db).get_for_user(espace_id, user.id)
+    if espace is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Espace vert introuvable")
+    return espace
+
+
+@router.get("/", response_model=List[EspaceVertRead])
+def get_espaces_verts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    """Espaces verts de l'utilisateur connecté."""
+    return EspaceVertRepositoryImpl(db).list_by_user(current_user.id)
+
+
+@router.post("/", response_model=EspaceVertRead, status_code=status.HTTP_201_CREATED)
 def create_espace_vert(
     espace_data: EspaceVertCreate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
 ):
-    """
-    Crée un nouvel espace vert pour l'utilisateur connecté.
-    """
-    # Assure que le nouvel espace est bien lié à l'utilisateur qui le crée
-    if espace_data.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Vous ne pouvez créer des espaces que pour vous-même.")
+    """Crée un espace vert ; le propriétaire est toujours l'utilisateur connecté."""
+    espace = models.EspaceVert(**espace_data.model_dump(exclude_none=True), user_id=current_user.id)
+    return EspaceVertRepositoryImpl(db).save(espace)
 
-    db_espace = models.EspaceVert(**espace_data.model_dump())
-    db.add(db_espace)
-    db.commit()
-    db.refresh(db_espace)
-    return db_espace
 
-@router.get("/", response_model=List[EspaceVertRead])
-def get_espaces_verts(
-    db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
-):
-    """
-    Récupère uniquement les espaces verts appartenant à l'utilisateur connecté.
-    """
-    return db.query(models.EspaceVert).filter(models.EspaceVert.user_id == current_user.id).all()
+@router.get("/{espace_id}", response_model=EspaceVertRead)
+def get_espace_vert(espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    return _espace_de_l_utilisateur(espace_id, db, current_user)
+
 
 @router.put("/{espace_id}", response_model=EspaceVertRead)
 def update_espace_vert(
     espace_id: int,
     espace_data: EspaceVertUpdate,
     db: Session = Depends(get_db),
-    current_user: models.User = Depends(get_current_user)
+    current_user: models.User = Depends(get_current_user),
 ):
-    """
-    Met à jour les données (notamment agronomiques) d'un espace vert.
-    """
-    db_espace = db.query(models.EspaceVert).filter(models.EspaceVert.id == espace_id).first()
+    """Mise à jour partielle : seuls les champs envoyés sont modifiés."""
+    espace = _espace_de_l_utilisateur(espace_id, db, current_user)
+    for key, value in espace_data.model_dump(exclude_unset=True).items():
+        setattr(espace, key, value)
+    return EspaceVertRepositoryImpl(db).save(espace)
 
-    if not db_espace:
-        raise HTTPException(status_code=404, detail="Espace vert non trouvé")
 
-    if db_espace.user_id != current_user.id:
-        raise HTTPException(status_code=403, detail="Vous n'êtes pas autorisé à modifier cet espace")
-
-    update_data = espace_data.model_dump(exclude_unset=True)
-    for key, value in update_data.items():
-        setattr(db_espace, key, value)
-
-    db.add(db_espace)
+@router.delete("/{espace_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_espace_vert(espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    espace = _espace_de_l_utilisateur(espace_id, db, current_user)
+    db.delete(espace)
     db.commit()
-    db.refresh(db_espace)
-    return db_espace
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

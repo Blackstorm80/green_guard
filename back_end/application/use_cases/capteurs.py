@@ -1,63 +1,76 @@
-# back_end/application/use_cases/capteurs.py
-from datetime import datetime
-from typing import List
+from typing import List, Optional
 
-from domain.ports.capteurs import ICapteurService
-from domain.ports.meteo import IMeteoService
-from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO
+from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO, MetriquesDashboardDTO
+from application.dto.meteo import MeteoDTO
+from application.use_cases.meteo import obtenir_meteo_actuelle
+from domain.models import EspaceVert
+from domain.ports.capteurs import STATUT_SANS_DONNEE, ICapteurService
+from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
+
+SEUIL_CO2_MOYEN_PPM = 800
+SEUIL_CO2_MAUVAIS_PPM = 1200
+# Point de repli pour la météo extérieure quand l'utilisateur n'a aucun espace (Lyon)
+LATITUDE_PAR_DEFAUT, LONGITUDE_PAR_DEFAUT = 45.764, 4.8357
 
 
-def _calculer_sante_globale(capteurs: List[LectureCapteurDTO]) -> float:
-    """Calcule un score de santé global basé sur la réserve en eau moyenne."""
-    if not capteurs:
-        return 100.0
-    # On suppose que la réserve max est 100mm. Le score est la moyenne des réserves.
-    total_reserve = sum(c.reserve_eau_mm for c in capteurs)
-    sante = (total_reserve / len(capteurs))
-    return round(sante, 1)
+def _moyenne(valeurs: List[float]) -> Optional[float]:
+    return round(sum(valeurs) / len(valeurs), 1) if valeurs else None
 
-def _determiner_qualite_air(capteurs: List[LectureCapteurDTO]) -> str:
-    """Détermine la qualité de l'air globale basée sur le CO2 moyen."""
-    if not capteurs:
+
+def _qualite_air(co2_moyen: Optional[float]) -> str:
+    if co2_moyen is None:
         return "Inconnue"
-    co2_moyen = sum(c.co2_ppm for c in capteurs) / len(capteurs)
-    if co2_moyen < 800:
+    if co2_moyen < SEUIL_CO2_MOYEN_PPM:
         return "Bonne"
-    if co2_moyen < 1200:
+    if co2_moyen < SEUIL_CO2_MAUVAIS_PPM:
         return "Moyenne"
     return "Mauvaise"
 
+
+def _synthese(metrics: MetriquesDashboardDTO) -> tuple[str, str]:
+    if metrics.espaces_suivis == 0:
+        return "En attente", "Aucun espace vert enregistré pour le moment."
+    if metrics.espaces_avec_donnees == 0:
+        return "En attente", "Aucune mesure reçue : les premiers relevés arrivent au prochain cycle."
+    if metrics.espaces_critiques:
+        return "Critique", f"{metrics.espaces_critiques} espace(s) en stress hydrique critique."
+    if metrics.espaces_stress:
+        return "Attention", f"{metrics.espaces_stress} espace(s) à surveiller."
+    return "Sain", "Tous les espaces suivis sont dans des conditions optimales."
+
+
 def obtenir_dashboard_capteurs(
-    espace_ids: List[int],
+    espaces: List[EspaceVert],
     capteur_service: ICapteurService,
     meteo_service: IMeteoService,
-    latitude: float = 45.7640,  # Lyon
-    longitude: float = 4.8357
 ) -> DashboardCapteursDTO:
-    
-    # Météo réelle
-    meteo_reelle = meteo_service.recuperer_conditions_actuelles(latitude, longitude, datetime.utcnow())
-    
-    # Lectures capteurs
-    capteurs = []
-    for espace_id in espace_ids:
-        lecture = capteur_service.lecture_actuelle(espace_id)
-        if lecture:
-                capteurs.append(LectureCapteurDTO(**lecture))    
-    # Metrics agrégés
-    metrics = {
-        "sante_globale_percent": _calculer_sante_globale(capteurs),
-        "espaces_stress": sum(1 for c in capteurs if c.reserve_eau_mm < 20),
-        "co2_moyen_ppm": int(sum(c.co2_ppm for c in capteurs) / len(capteurs)) if capteurs else 0,
-        "qualite_air": _determiner_qualite_air(capteurs)
-    }
-    
+    """Tableau de bord des espaces fournis (déjà filtrés sur l'utilisateur par l'appelant)."""
+    lectures = [LectureCapteurDTO.model_validate(capteur_service.lecture_actuelle(e)) for e in espaces]
+    avec_donnees = [l for l in lectures if l.statut != STATUT_SANS_DONNEE]
+
+    co2_moyen = _moyenne([l.co2_ppm for l in lectures if l.co2_ppm is not None])
+    metrics = MetriquesDashboardDTO(
+        sante_globale_percent=_moyenne([l.sante_percent for l in avec_donnees if l.sante_percent is not None]),
+        espaces_suivis=len(lectures),
+        espaces_avec_donnees=len(avec_donnees),
+        espaces_stress=sum(1 for l in avec_donnees if l.statut != "Optimal"),
+        espaces_critiques=sum(1 for l in avec_donnees if l.statut == "Critique"),
+        co2_moyen_ppm=co2_moyen,
+        qualite_air=_qualite_air(co2_moyen),
+    )
+    statut, message = _synthese(metrics)
+
+    lat, lon = (espaces[0].latitude, espaces[0].longitude) if espaces else (LATITUDE_PAR_DEFAUT, LONGITUDE_PAR_DEFAUT)
+    meteo: Optional[MeteoDTO]
+    try:
+        meteo = obtenir_meteo_actuelle(lat, lon, meteo_service)
+    except MeteoIndisponibleError:
+        meteo = None
+
     return DashboardCapteursDTO(
-        meteo_exterieure={
-            "city": meteo_reelle.city,
-            "temperature_c": meteo_reelle.temperature_c,
-            "condition": meteo_reelle.condition
-        },
-        capteurs=capteurs,
-        metrics=metrics
+        statut=statut,
+        message=message,
+        meteo_exterieure=meteo,
+        capteurs=lectures,
+        metrics=metrics,
     )

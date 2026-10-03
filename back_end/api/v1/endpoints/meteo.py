@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 
+from api.deps.auth import get_current_user
 from application.dto.meteo import MeteoDTO
 from application.use_cases.meteo import obtenir_meteo_actuelle
+from domain.models import User
+from domain.ports.meteo import MeteoIndisponibleError
 from infrastructure.services.meteo_open_meteo import OpenMeteoService
 
-router = APIRouter(prefix="/meteo", tags=["Météo Réelle"])
+router = APIRouter()
 
 # Coordonnées de secours — utilisées uniquement si la géolocalisation du client échoue
 COORDONNEES_VILLES = {
@@ -14,6 +17,7 @@ COORDONNEES_VILLES = {
     "Marseille":     {"lat": 43.29, "lon": 5.36},
 }
 VILLE_PAR_DEFAUT = "Lyon"
+ERREUR_METEO = "Service météo momentanément indisponible."
 
 
 def get_meteo_service() -> OpenMeteoService:
@@ -22,29 +26,27 @@ def get_meteo_service() -> OpenMeteoService:
 
 @router.get("/actuelle", response_model=MeteoDTO)
 def get_meteo_actuelle(
-    lat: float = Query(..., description="Latitude"),
-    lon: float = Query(..., description="Longitude"),
+    lat: float = Query(..., ge=-90, le=90, description="Latitude"),
+    lon: float = Query(..., ge=-180, le=180, description="Longitude"),
     meteo_service: OpenMeteoService = Depends(get_meteo_service),
+    current_user: User = Depends(get_current_user),
 ):
     """Météo en temps réel par coordonnées GPS (Open-Meteo, sans clé API)."""
     try:
         return obtenir_meteo_actuelle(latitude=lat, longitude=lon, meteo_service=meteo_service)
-    except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Erreur technique météo: {e}")
+    except MeteoIndisponibleError:
+        raise HTTPException(status_code=502, detail=ERREUR_METEO)
 
 
 @router.get("/{ville}", response_model=MeteoDTO)
 def get_meteo_ville(
     ville: str,
     meteo_service: OpenMeteoService = Depends(get_meteo_service),
+    current_user: User = Depends(get_current_user),
 ):
-    """Météo par nom de ville (fallback géolocalisation refusée côté client)."""
+    """Météo par nom de ville (repli quand la géolocalisation est refusée côté client)."""
     coords = COORDONNEES_VILLES.get(ville, COORDONNEES_VILLES[VILLE_PAR_DEFAUT])
     try:
-        return obtenir_meteo_actuelle(
-            latitude=coords["lat"],
-            longitude=coords["lon"],
-            meteo_service=meteo_service,
-        )
-    except Exception as e:
-        raise HTTPException(status_code=502, detail="Impossible de joindre le service météo.")
+        return obtenir_meteo_actuelle(latitude=coords["lat"], longitude=coords["lon"], meteo_service=meteo_service)
+    except MeteoIndisponibleError:
+        raise HTTPException(status_code=502, detail=ERREUR_METEO)

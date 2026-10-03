@@ -100,6 +100,6 @@ def calculer_impact_carbone(
     return ImpactCarboneDTO(
         total_oxygen_kg=round(total_o2 * facteur_projection, 1),
         total_carbon_absorbed_kg=round(total_co2 * facteur_projection, 1),
-        periode="Projection Annuelle (2025)",
+        periode="Projection annuelle (estimation journalière × 365)",
         detail_par_zone=details
     )

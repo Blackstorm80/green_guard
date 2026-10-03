@@ -36,7 +36,7 @@ def calculer_besoin_arrosage_mm(
     seuil_declenchement_ratio = max(0.0, seuil_declenchement_ratio)
     cible_remplissage_ratio = max(0.0, cible_remplissage_ratio)
 
-    reserve_actuelle = bilan.reserve_eau
+    reserve_actuelle = bilan.reserve_utile_fin_journee
     ru_max = espace.reserve_utile_max
 
     # Seuil en mm (ex: 50 % de 100 mm = 50 mm)

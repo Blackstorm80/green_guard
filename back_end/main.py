@@ -1,18 +1,41 @@
-import os
 import logging
+import os
+from contextlib import asynccontextmanager
+
+from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from infrastructure.database import engine, Base
-from domain import models
-from apscheduler.schedulers.background import BackgroundScheduler
-from infrastructure.services.capteur_hybrid_service import run_update
 
-# Création des tables au lancement
-Base.metadata.create_all(bind=engine)
+from api.v1.endpoints import (
+    auth, capteurs, catalogue, espaces_verts, health, interventions, meteo, notifications, user, vegetal, zones,
+)
+from infrastructure.jobs.mise_a_jour_capteurs import INTERVALLE_MINUTES, run_update
 
-app = FastAPI(title="Green Guard API")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+logger = logging.getLogger("greenguard")
 
-# Configuration CORS pour React
+# Le schéma de la base est géré exclusivement par Alembic (`alembic upgrade head`).
+# Le job planifié ne doit tourner que dans UN processus : le désactiver (ENABLE_SCHEDULER=false)
+# sur les workers d'API multiples ; un service worker dédié est prévu (ADR-5).
+ENABLE_SCHEDULER = os.getenv("ENABLE_SCHEDULER", "true").lower() == "true"
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    scheduler = None
+    if ENABLE_SCHEDULER:
+        scheduler = BackgroundScheduler()
+        scheduler.add_job(run_update, "interval", minutes=INTERVALLE_MINUTES, id="mise_a_jour_capteurs",
+                          max_instances=1, coalesce=True)
+        scheduler.start()
+        logger.info("Scheduler démarré (mise à jour capteurs toutes les %d min).", INTERVALLE_MINUTES)
+    yield
+    if scheduler:
+        scheduler.shutdown()
+
+
+app = FastAPI(title="GreenGuard API", version="0.9.0", lifespan=lifespan)
+
 _allowed_origins = ["http://localhost:3000", "http://localhost:5173"]
 _frontend_url = os.getenv("FRONTEND_URL")
 if _frontend_url:
@@ -26,43 +49,21 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type"],
 )
 
-# Imports des routers
-from api.v1.endpoints import (
-    espaces_verts, zones, user, auth, capteurs, vegetal, 
-    meteo, plants, catalogue, interventions, health, notifications
-)
+# ADR-1 : le préfixe d'un router est défini ici et nulle part ailleurs.
+API = "/api/v1"
+app.include_router(auth.router, prefix=f"{API}/auth", tags=["Auth"])
+app.include_router(user.router, prefix=f"{API}/users", tags=["Utilisateurs"])
+app.include_router(espaces_verts.router, prefix=f"{API}/espaces-verts", tags=["Espaces verts"])
+app.include_router(zones.router, prefix=f"{API}/zones", tags=["Zones intelligentes"])
+app.include_router(capteurs.router, prefix=f"{API}/capteurs", tags=["Capteurs"])
+app.include_router(catalogue.router, prefix=f"{API}/catalogue", tags=["Catalogue botanique"])
+app.include_router(interventions.router, prefix=f"{API}/interventions", tags=["Interventions"])
+app.include_router(notifications.router, prefix=f"{API}/notifications", tags=["Notifications"])
+app.include_router(meteo.router, prefix=f"{API}/meteo", tags=["Météo"])
+app.include_router(vegetal.router, prefix=f"{API}/vegetal", tags=["Indicateurs végétaux"])
+app.include_router(health.router, prefix=f"{API}/health", tags=["Santé"])
 
-# Branchement des routes
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Auth"])
-app.include_router(user.router, prefix="/api/v1/users", tags=["Users"])
-app.include_router(espaces_verts.router, prefix="/api/v1/espaces-verts", tags=["Espaces Verts"])
-app.include_router(zones.router, prefix="/api/v1/zones", tags=["Zones Intelligentes"])
-app.include_router(capteurs.router, prefix="/api/v1/capteurs", tags=["Capteurs"])
-app.include_router(catalogue.router, prefix="/api/v1/catalogue", tags=["Catalogue Botanique"])
-app.include_router(interventions.router, prefix="/api/v1/interventions", tags=["Interventions"])
-app.include_router(notifications.router, prefix="/api/v1/notifications", tags=["Notifications"])
-app.include_router(meteo.router, prefix="/api/v1/meteo", tags=["Météo"])
-app.include_router(plants.router, prefix="/api/v1/plants", tags=["Plants"])
-app.include_router(vegetal.router, prefix="/api/v1/vegetal", tags=["Végétal"])
-app.include_router(health.router, prefix="/api/v1/health", tags=["Health"])
 
-scheduler = BackgroundScheduler()
-
-@app.on_event("startup")
-def startup_event():
-    # 2. On programme la mise à jour (ex: toutes les 30 minutes)
-    # Pour tes tests, tu peux mettre minutes=1 pour voir les changements vite
-    scheduler.add_job(run_update, "interval", minutes=2)
-    
-    # 3. On lance le moteur
-    scheduler.start()
-    logging.info("Système de simulation actif — scheduler démarré.")
-
-@app.on_event("shutdown")
-def shutdown_event():
-    # On arrête proprement le moteur quand on coupe le serveur
-    scheduler.shutdown()
-
-@app.get("/")
-def health():
-    return {"status": "online", "project": "Green Guard"}
+@app.get("/", include_in_schema=False)
+def racine():
+    return {"status": "online", "project": "GreenGuard"}

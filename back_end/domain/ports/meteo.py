@@ -1,34 +1,28 @@
-# back_end/domain/ports/meteo.py
 from __future__ import annotations
+
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from datetime import datetime
+from typing import Optional
 
 
+class MeteoIndisponibleError(Exception):
+    """Le fournisseur météo n'a pas pu répondre (réseau, quota, format)."""
+
+
+@dataclass(frozen=True)
 class ConditionsMeteo:
-    def __init__(
-        self,
-        city: str,
-        temperature_c: float,
-        condition: str,
-        ensoleillement_fort: bool,
-        humidite: float,  # Ajout de l'humidité en %
-        pluie: float,     # Ajout de la pluie en mm
-        et0: float = None # Evapotranspiration
-    ) -> None:
-        self.city = city
-        self.temperature_c = temperature_c
-        self.condition = condition
-        self.ensoleillement_fort = ensoleillement_fort
-        self.humidite = humidite
-        self.pluie = pluie
-        self.et0 = et0
+    city: str
+    temperature_c: float
+    condition: str
+    ensoleillement_fort: bool
+    humidite: Optional[float]   # humidité relative de l'air (%)
+    pluie_jour_mm: float        # cumul de précipitations du jour (mm)
+    et0_jour_mm: Optional[float] = None  # évapotranspiration de référence du jour (mm)
 
 
 class IMeteoService(ABC):
-    """
-    Port domaine pour récupérer des infos météo utiles au pilotage :
-    température, ensoleillement, vent, etc.
-    """
+    """Port domaine : conditions météo utiles au pilotage."""
 
     @abstractmethod
     def recuperer_conditions_actuelles(
@@ -37,4 +31,4 @@ class IMeteoService(ABC):
         longitude: float,
         maintenant: datetime,
     ) -> ConditionsMeteo:
-        ...
+        """Lève MeteoIndisponibleError si le fournisseur ne répond pas."""

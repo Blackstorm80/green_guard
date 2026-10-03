@@ -1,54 +1,50 @@
-from pydantic import BaseModel, ConfigDict
+from datetime import date, datetime
 from typing import Optional
-from datetime import datetime
 
-class EspaceVertBase(BaseModel):
-    """ On ne garde en obligatoire que le strict nécessaire."""
-    nom: str
-    ville: Optional[str] = None
-    latitude: float
-    longitude: float
-    surface_m2: Optional[float] = None
-    user_id: int 
-    
-    #  Données Agronomiques (Optionnelles pour éviter les crashs 500) 
-    type_espace: Optional[str] = "Jardin"
-    exposition_reelle: Optional[str] = "Ensoleillé"
-    type_sol: Optional[str] = "Argileux"
-    ph_sol: Optional[float] = 7.0
-    reserve_utile_max: Optional[float] = 0.0
-    coefficient_cultural: Optional[float] = 1.0
-    zone: Optional[str] = None
-    gerant_id: Optional[int] = None
-    plante_id: Optional[int] = None
+from pydantic import BaseModel, ConfigDict, Field
 
-class EspaceVertCreate(EspaceVertBase):
-    """Utilisé lors de l'envoi du formulaire par le Front-end."""
-    pass
 
-class EspaceVertRead(EspaceVertBase):
-    """Utilisé par l'API pour renvoyer les données à React."""
-    id: int
-    # On ajoute les champs calculés ou automatiques
-    sante_percent: Optional[float] = 100.0
-    cree_le: Optional[datetime] = None
+class EspaceVertAgronomie(BaseModel):
+    """Paramètres agronomiques communs à la création et à la mise à jour."""
+    ville: Optional[str] = Field(None, max_length=120)
+    zone: Optional[str] = Field(None, max_length=120)
+    surface_m2: Optional[float] = Field(None, ge=0)
+    type_espace: Optional[str] = Field(None, max_length=50)
+    type_sol: Optional[str] = Field(None, max_length=50)
+    ph_actuel: Optional[float] = Field(None, ge=0, le=14)
+    exposition: Optional[str] = Field(None, max_length=50)
+    drainage: Optional[str] = Field(None, max_length=50)
+    humidite_cible: Optional[float] = Field(None, ge=0, le=100)
+    frequence_arrosage_auto: Optional[int] = Field(None, ge=0)
+    profondeur_racinaire: Optional[float] = Field(None, ge=0)
+    type_irrigation: Optional[str] = Field(None, max_length=50)
+    date_derniere_fertilisation: Optional[date] = None
+    reserve_utile_max: Optional[float] = Field(None, gt=0)
+    coefficient_cultural: Optional[float] = Field(None, gt=0, le=3)
 
-    # Crucial pour la compatibilité avec SQLAlchemy
+
+class EspaceVertCreate(EspaceVertAgronomie):
+    """Création : le propriétaire est toujours l'utilisateur authentifié (jamais fourni par le client)."""
+    nom: str = Field(..., min_length=1, max_length=120)
+    latitude: float = Field(..., ge=-90, le=90)
+    longitude: float = Field(..., ge=-180, le=180)
+
+
+class EspaceVertUpdate(EspaceVertAgronomie):
+    """Mise à jour partielle : seuls les champs envoyés sont modifiés."""
+    nom: Optional[str] = Field(None, min_length=1, max_length=120)
+    latitude: Optional[float] = Field(None, ge=-90, le=90)
+    longitude: Optional[float] = Field(None, ge=-180, le=180)
+
+
+class EspaceVertRead(EspaceVertAgronomie):
     model_config = ConfigDict(from_attributes=True)
 
-class EspaceVertUpdate(BaseModel):
-    """Pour les modifications partielles des données agronomiques."""
-    nom: Optional[str] = None
-    ville: Optional[str] = None
-    surface_m2: Optional[float] = None
-    
-    # --- 9 Champs Agronomiques ---
-    type_sol: Optional[str] = None
-    ph_actuel: Optional[float] = None
-    exposition: Optional[str] = None
-    drainage: Optional[str] = None
-    humidite_cible: Optional[float] = None
-    frequence_arrosage_auto: Optional[int] = None
-    profondeur_racinaire: Optional[float] = None
-    type_irrigation: Optional[str] = None
-    date_derniere_fertilisation: Optional[datetime] = None
+    id: int
+    nom: str
+    latitude: float
+    longitude: float
+    user_id: int
+    zone_id: Optional[int] = None
+    sante_percent: Optional[float] = None
+    cree_le: Optional[datetime] = None

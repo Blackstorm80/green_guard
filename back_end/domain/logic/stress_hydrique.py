@@ -60,7 +60,7 @@ def calculer_bilan_hydrique_simplifie(
 
     # 9. Détermination du statut hydrique à partir de l'indice
     if indice_stress < 0.3:
-        statut = "Confort"
+        statut = "Optimal"
     elif indice_stress < 0.6:
         statut = "A surveiller"
     else:  # indice_stress >= 0.6
