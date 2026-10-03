@@ -1,3 +1,5 @@
+# Pile complète : docker compose up --build  →  front http://localhost:3000, API http://localhost:8000/docs
+# Variables lues depuis .env à la racine (voir .env.example). SECRET_KEY est obligatoire.
 services:
 
   db:
@@ -8,7 +10,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-greenguard_dev}
       POSTGRES_DB: greenguard
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"   # accessible depuis le poste uniquement, jamais depuis le réseau
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,32 +22,26 @@ services:
   backend:
     build:
       context: ./back_end
-      dockerfile: Dockerfile
+    restart: unless-stopped
     ports:
       - "8000:8000"
-    volumes:
-      - ./back_end:/app
     environment:
       DATABASE_URL: postgresql://greenguard:${POSTGRES_PASSWORD:-greenguard_dev}@db:5432/greenguard
-      SECRET_KEY: ${SECRET_KEY}
+      SECRET_KEY: ${SECRET_KEY:?Définir SECRET_KEY dans .env (voir .env.example)}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+      ENABLE_SCHEDULER: "true"   # un seul processus API : le job planifié tourne ici
     depends_on:
       db:
         condition: service_healthy
-    command: >
-      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
       context: ./front_end
-      dockerfile: Dockerfile
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
+    restart: unless-stopped
     ports:
       - "3000:80"
-    environment:
-      - VITE_API_URL=http://localhost:8000/api/v1
-    volumes:
-      - ./front_end:/app
-      - /app/node_modules
     depends_on:
       - backend
 
