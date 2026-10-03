@@ -251,6 +251,20 @@ Hypothèse : un développeur à temps plein accompagné de l'architecte. Chaque 
 6. **Observabilité** : `/health` (liveness) et `/ready` (BDD), logs JSON, Sentry en option.
 7. Documentation : README d'installation fiable, `Doc_back_end.md` à jour, contrat OpenAPI publié.
 
+**Suivi au 2026-10-04** (branche `feat/phase-3-qualite`) : **phase 3 terminée**, avec six semaines d'avance.
+- ✅ **Design system** : tokens sémantiques (Tailwind 4 `@theme`), thèmes clair, sombre et système, composants Button, Field, Modal, Card, Badge, Alert et Logo. Toutes les couleurs brutes ont été migrées. Guide : `documentation/design_system.md`.
+- ✅ **Accessibilité WCAG AA** :
+  - contrastes calculés (texte ≥ 4,5:1 dans les deux thèmes) ;
+  - libellés reliés à leurs champs, focus visible, lien d'évitement, repères `nav`/`main`, `aria-current` ;
+  - modales accessibles, texte de 12 px minimum, `prefers-reduced-motion` respecté, titre par page.
+  - Vérifié au clavier et au lecteur d'accessibilité dans le navigateur.
+- ✅ **Identité** : marque unique « GreenGuard », `lang="fr"`, favicon, textes en français, plus aucun jargon anglais ni donnée factice.
+- ✅ **Rapports** (D-6, version minimale) : historique réel des interventions, filtres, export CSV, impression. **Paramètres** réels. Catalogue paginé.
+- ✅ **Données front** : hook `useRequete` (chargement annulable) au lieu de TanStack Query. Le volume actuel ne justifie pas une dépendance de plus ; à réévaluer après la v1.
+- ✅ **Observabilité** : sondes `/health/live` et `/health/ready`, logs JSON (phase 2). Sentry reporté (optionnel).
+- ✅ **Documentation** : `Doc_back_end.md` et `Documentation_Usecases.md` réécrits ; contrat d'API publié par OpenAPI (`/docs`).
+- ⏳ À valider par le porteur de projet : la version minimale des Rapports (D-6) et les seuils agronomiques (D-4).
+
 **20 novembre : gel des fonctionnalités.**
 
 ### Phase 4 : release candidate et recette (23 → 27 novembre)
