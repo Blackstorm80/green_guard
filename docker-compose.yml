@@ -1,4 +1,22 @@
 services:
+
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: greenguard
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-greenguard_dev}
+      POSTGRES_DB: greenguard
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U greenguard -d greenguard"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
   backend:
     build:
       context: ./back_end
@@ -6,24 +24,30 @@ services:
     ports:
       - "8000:8000"
     volumes:
-      # Monter le code local dans le conteneur pour le live-reload
-      # On monte dans /app/back_end pour respecter la structure de package
-      - ./back_end:/app/back_end
-    command: uvicorn back_end.main:app --host 0.0.0.0 --port 8000 --reload
+      - ./back_end:/app
+    environment:
+      DATABASE_URL: postgresql://greenguard:${POSTGRES_PASSWORD:-greenguard_dev}@db:5432/greenguard
+      SECRET_KEY: ${SECRET_KEY}
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: >
+      sh -c "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --reload"
 
   frontend:
     build:
-      context: ./front_end # Assurez-vous que ce chemin est correct
+      context: ./front_end
       dockerfile: Dockerfile
     ports:
-      - "3000:80" # On accède au frontend via http://localhost:3000
+      - "3000:80"
+    environment:
+      - VITE_API_URL=http://localhost:8000/api/v1
     volumes:
       - ./front_end:/app
-      - /app/node_modules # Ne pas écraser les node_modules du conteneur
+      - /app/node_modules
     depends_on:
       - backend
 
-# Plus tard, vous pourrez ajouter d'autres services ici, comme une base de données PostgreSQL
-#  database:
-#    image: "postgres:15-alpine"
-#    ...
+volumes:
+  postgres_data:

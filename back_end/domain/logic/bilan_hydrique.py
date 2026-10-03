@@ -33,7 +33,7 @@ def calculer_bilan_hydrique_pour_jour(
     # Étape 1 : Déterminer la réserve en eau au debut.
     # Si  premier calcul, on  considére que la réserve est pleine.
     reserve_eau_veille = (
-        bilan_precedent.reserve_eau
+        bilan_precedent.reserve_utile_fin_journee
         if bilan_precedent is not None
         else espace_vert.reserve_utile_max
     )
@@ -53,12 +53,11 @@ def calculer_bilan_hydrique_pour_jour(
 
     # 3) Construction de l'entité métier
     nouveau_bilan = BilanHydriqueJournalier(
-        id=0,  # id géré par la persistance
         date=date_du_jour,
-        reserve_eau=nouvelle_reserve,
+        reserve_utile_fin_journee=nouvelle_reserve,
         indice_stress=indice_stress,
         statut_hydrique=statut,
-        stress_sanitaire=stress_sanitaire_jour,  # Nouveau champ
+        stress_sanitaire=stress_sanitaire_jour,
         espace_id=espace_vert.id,
     )
 

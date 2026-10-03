@@ -1,20 +1,27 @@
 import os
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
+from dotenv import load_dotenv
 
-# Localisation de la DB
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-DATABASE_PATH = os.path.join(BASE_DIR, "green_guard.db")
-DATABASE_URL = f"sqlite:///{DATABASE_PATH}"
+load_dotenv()
 
-# Configuration SQLAlchemy
-engine = create_engine(
-    DATABASE_URL, connect_args={"check_same_thread": False}
-)
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise RuntimeError(
+        "Variable d'environnement DATABASE_URL manquante. "
+        "Exemple: postgresql://greenguard:secret@localhost:5432/greenguard"
+    )
+
+# PostgreSQL : pas besoin de connect_args check_same_thread
+connect_args = {}
+if DATABASE_URL.startswith("sqlite"):
+    connect_args = {"check_same_thread": False}
+
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
-# UNIQUE SOURCE DE LA BASE
 Base = declarative_base()
+
 
 def get_db():
     db = SessionLocal()
