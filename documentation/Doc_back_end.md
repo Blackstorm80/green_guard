@@ -1,146 +1,129 @@
+# Documentation technique du back-end GreenGuard
 
-# Documentation Technique Back-End - GreenGuard
+> À jour au 2026-10-04 (phase 3). Le **contrat d'API de référence** est le schéma OpenAPI
+> généré par FastAPI : `http://localhost:8000/docs` (Swagger) ou `/openapi.json`.
 
-## 1. Architecture Logicielle
-Le système est construit sur le modèle de l'**Architecture Oignon (Onion Architecture)**. Ce choix garantit que la logique métier est indépendante des frameworks, de l'interface utilisateur et de la base de données.
+## 1. Architecture
 
-### Couches du système
-* **Domaine (Cœur)** : Contient les entités métier, les modèles SQLAlchemy et la logique pure (calculs, algorithmes).
-* **Infrastructure** : Gère la persistance des données (Repositories) et les services externes (Adapteurs API Météo).
-* **Application (API)** : Définit les points d'entrée (Endpoints) via FastAPI et les contrats d'échange (Schémas Pydantic).
+Architecture en couches (Onion) : les dépendances vont toujours vers le domaine.
 
----
+| Couche | Dossier | Rôle |
+|---|---|---|
+| Domaine | `domain/logic/`, `domain/ports/`, `domain/models.py` | Calculs purs (bilan hydrique, stress, clustering, arrosage, carbone) et interfaces (ports) |
+| Application | `application/use_cases/`, `application/dto/` | Orchestration des cas d'usage, objets de sortie |
+| Infrastructure | `infrastructure/` | Base de données, repositories, services externes (Open-Meteo), job planifié, logs |
+| API | `api/`, `schema/`, `main.py` | Routes FastAPI, authentification, middlewares, schémas de validation |
 
-## 2. Structure du Projet
+Écart connu (ADR-3, post-v1) : les entités du domaine sont encore des modèles SQLAlchemy
+(`domain/models.py`). La logique de `domain/logic/` n'accède jamais à la base, ce qui la
+rend testable sans base (voir `tests/test_domaine.py`).
 
 ```text
 back_end/
-├── api/v1/endpoints/   # Contrôleurs FastAPI par domaine (auth, espaces, capteurs)
-├── domain/
-│   ├── logic/          # Algorithmes de clustering, santé et bilan hydrique
-│   ├── models.py       # Définition des tables de la base de données
-│   ├── entities.py     # Classes métier pures
-│   └── ports/          # Interfaces pour les services externes
+├── main.py                      # Application FastAPI : middlewares, CORS, routes (préfixe unique /api/v1)
+├── worker.py                    # Service worker : tâches planifiées (une seule instance)
+├── config.py                    # Seul module qui lit les variables d'environnement
+├── api/
+│   ├── deps/auth.py             # bcrypt, JWT (PyJWT), cookie de session, CSRF, rôles
+│   ├── deps/rate_limit.py       # Limitation de débit (login, inscription)
+│   ├── middleware.py            # En-têtes de sécurité, X-Request-ID, journal d'accès, erreur 500 générique
+│   └── v1/endpoints/            # Une ressource par fichier
+├── application/use_cases/       # capteurs, interventions, zones, météo, végétal, bilans journaliers
+├── domain/logic/                # stress_hydrique, bilan_hydrique, stress_sanitaire, arrosage, bilan_carbone, clustering
 ├── infrastructure/
-│   ├── repositories/   # Implémentations concrètes de l'accès aux données
-│   └── services/       # Implémentations des services tiers (Météo)
-└── schemas/            # Modèles de validation de données (Pydantic)
+│   ├── database.py              # Moteur SQLAlchemy, convention de nommage des contraintes
+│   ├── jobs/mise_a_jour_capteurs.py
+│   ├── repositories/            # espaces verts, bilans hydriques
+│   └── services/                # Open-Meteo (avec cache), lecture capteurs groupée
+├── alembic/                     # Migrations : seule source du schéma
+├── scripts/load/taxonomy.py     # Chargement du catalogue iNaturalist
+└── tests/                       # pytest (SQLite par défaut, PostgreSQL via TEST_DATABASE_URL)
 ```
 
----
+## 2. Ressources de l'API (`/api/v1`)
 
-## 3. Composants Algorithmiques
+| Préfixe | Accès | Contenu |
+|---|---|---|
+| `/auth` | public (limité en débit) | `POST /login` (formulaire OAuth2), `POST /register` (JSON), `POST /logout` |
+| `/users` | connecté | `GET /me`, `GET /me/notifications` |
+| `/espaces-verts` | connecté, ses espaces uniquement | CRUD complet |
+| `/zones` | connecté | `GET /`, `POST /clustering/rebuild` |
+| `/capteurs` | connecté | `GET /dashboard` (synthèse, lectures, météo extérieure) |
+| `/interventions` | connecté, ses espaces uniquement | `GET /urgent`, CRUD |
+| `/notifications` | connecté | liste, `POST /{id}/mark-as-read` |
+| `/catalogue` | connecté | `GET /plantes`, `GET /auxiliaires` (pagination `offset`/`limit`) |
+| `/meteo` | connecté | `GET /actuelle?lat&lon`, `GET /{ville}` |
+| `/vegetal` | administrateur | `GET /etat-global`, `GET /impact-carbone` |
+| `/health` | public / connecté | `GET /live`, `GET /ready` (base), `POST /diagnostic` |
 
-### Clustering Spatial (DBSCAN)
-Le système gère l'affichage de plus de 200 capteurs grâce à l'algorithme DBSCAN.
-* **Localisation** : `domain/logic/clustering.py`
-* **Fonctionnement** : Groupe les capteurs par densité géographique pour éviter la surcharge de l'interface.
-* **Paramètre Clé** : `distance_max` (Epsilon) réglé à 0.02 pour une précision à l'échelle du quartier.
+Règle d'isolation : toute ressource rattachée à un espace est filtrée sur le propriétaire.
+Un espace d'un autre compte répond **404** (et non 403), pour ne pas révéler son existence.
 
-### Calcul du Score de Santé
-Le score de santé est calculé par une pondération des données de télémétrie.
-* **Localisation** : `domain/logic/sante.py`
-* **Facteurs** : Humidité du sol, température et historique d'arrosage.
+## 3. Sécurité
 
-### Bilan Hydrique
-Détermine le besoin en eau en fonction de l'évapotranspiration et des précipitations.
-* **Localisation** : `domain/logic/bilan_hydrique.py`
+- **Session** : JWT HS256 (60 min, `iat`, `jti`, `type`) dans le cookie `gg_session`
+  (`HttpOnly`, `Secure`, `SameSite=Lax`, chemin `/api`). L'en-tête `Authorization: Bearer`
+  reste accepté pour Swagger et les scripts.
+- **CSRF** : une écriture authentifiée par cookie exige l'en-tête `X-Requested-With`.
+- **Mots de passe** : bcrypt, 12 caractères minimum. **`SECRET_KEY`** : 32 caractères minimum.
+- **Rôles** (`admin`, `manager`, `user`) relus en base à chaque requête ; un compte désactivé
+  perd l'accès immédiatement.
+- **En-têtes** : CSP stricte (sauf `/docs`), `X-Frame-Options: DENY`, `nosniff`,
+  `Referrer-Policy`, HSTS si `HSTS=true`. Les erreurs 500 ne renvoient qu'un message
+  générique et un `request_id` à retrouver dans les logs.
 
----
+## 4. Métier
 
-## 4. Sécurité et Authentification
+### Bilan hydrique journalier
+`application/use_cases/generer_bilans_hydriques_journaliers.py`, appelé chaque heure par le worker.
 
-### Gestion des accès
-* **Mécanisme** : OAuth2 avec jetons JWT (JSON Web Tokens).
-* **Routes** : `/api/v1/auth/auth/register` pour l'inscription et `/api/v1/auth/auth/login` pour l'authentification.
-* **Rôles** : Support des rôles 'admin' et 'user' pour la restriction des endpoints.
+1. Météo du jour (Open-Meteo) : ET0 et cumul de pluie, mis en cache par point (~10 km, 15 min).
+2. Point de départ : dernier bilan **antérieur** au jour (réserve pleine s'il n'y en a pas).
+3. `réserve = réserve_veille + pluie + arrosage − ET0 × Kc × facteur_sol`, bornée à [0, RU max].
+4. `indice de stress = 1 − réserve / RU max` → *Optimal* (< 0,3), *A surveiller* (< 0,6), *Critique*.
+5. Le bilan du jour est **remplacé** s'il existe déjà (idempotent : relancer ne décompte pas deux fois).
+6. Une mesure est enregistrée ; un espace *Critique* déclenche une notification (une par jour).
 
-### Protection des données
-Le fichier `.env` à la racine du dossier `back_end` contient les secrets (SECRET_KEY, API_KEYS). Ce fichier est exclu du contrôle de version.
+Les seuils (0,3 / 0,6) et les facteurs de sol restent **à faire valider par un agronome** (décision D-4).
 
----
+### Zones intelligentes
+`domain/logic/clustering.py` : K-Means sur les coordonnées projetées en km. Nombre de zones
+dans `clustering_configs.n_clusters` (configuration de l'utilisateur, sinon celle de l'instance,
+sinon 5). Les centroïdes et rayons sont en coordonnées réelles.
 
-## 5. Base de Données
+## 5. Configuration (variables d'environnement)
 
-* **Moteur** : SQLite (environnement de développement).
-* **ORM** : SQLAlchemy.
-* **Initialisation** : La configuration du clustering doit être injectée manuellement dans la table `clustering_configs` pour activer les fonctions de regroupement.
+| Variable | Défaut | Rôle |
+|---|---|---|
+| `DATABASE_URL` | — (obligatoire) | Connexion PostgreSQL |
+| `SECRET_KEY` | — (obligatoire, ≥ 32) | Signature des JWT |
+| `FRONTEND_URL` | — | Origine CORS supplémentaire |
+| `COOKIE_SECURE` | `true` | Cookie de session réservé à HTTPS (localhost accepté) |
+| `ACCESS_TOKEN_MINUTES` | `60` | Durée de session |
+| `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_S` | `10` / `60` | Tentatives autorisées par IP et par fenêtre |
+| `ENABLE_SCHEDULER` | `false` | Job intégré à l'API (développement sans worker) |
+| `LOG_FORMAT` / `LOG_LEVEL` | `text` / `INFO` | `json` en production |
+| `HSTS` | `false` | À activer derrière HTTPS |
 
----
+## 6. Exploitation
 
-## 6. Maintenance et Évolution
+- **Migrations** : `alembic upgrade head` (lancé automatiquement au démarrage du conteneur).
+  Après toute modification de `domain/models.py` : `alembic revision --autogenerate -m "…"`,
+  relire le fichier généré, puis vérifier `alembic check`.
+- **Worker** : un seul `python worker.py` (service `worker` de docker-compose).
+- **Catalogue** : `python -m scripts.load.taxonomy [--dry-run]` (idempotent).
+- **Administrateur** : `python create_user.py --email … --password …`.
+- **Sondes** : `/api/v1/health/live` (processus) et `/api/v1/health/ready` (base).
+- **Qualité** : `ruff check .` et `pytest --cov=…` (seuil CI : 85 %). La CI rejoue les tests et
+  les migrations sur PostgreSQL et audite les dépendances.
 
-### Ajout d'une fonctionnalité métier
-1. Définir l'entité dans `domain/entities.py`.
-2. Créer le modèle dans `domain/models.py`.
-3. Implémenter la logique dans `domain/logic/`.
-4. Exposer via un nouvel endpoint dans `api/v1/endpoints/`.
+## 7. Dépannage
 
-### Modification des paramètres IA
-Toute modification de la sensibilité du clustering ou des seuils de santé doit être effectuée directement dans les fichiers de la couche `domain/logic/`.
-
-
-1. Précision sur le format des requêtes (Authentication)
-
-Il est crucial de noter que ton API utilise deux formats de données différents, ce qui est une source d'erreur fréquente :
-
-    Login : Reçoit des données au format application/x-www-form-urlencoded (standard OAuth2).
-
-    Register et reste de l'API : Reçoit et envoie du application/json.
-
-2. Le cycle de vie des données de Télémétrie
-
-Puisque tu as 200 espaces, il faut préciser comment le backend gère les performances :
-
-    Agrégation : Le backend ne doit pas renvoyer 200 objets complets pour le Dashboard, mais un résumé (KPIs) calculé via les fonctions de la couche domain/logic/sante.py.
-
-    Calcul à la volée : Le score de santé n'est pas stocké de manière statique, il est recalculé lors de l'appel à l'endpoint pour garantir la fraîcheur des données météo.
-
-3. Guide de dépannage rapide (Troubleshooting)
-
-Ajoute cette section courte pour résoudre les blocages que nous avons rencontrés :
-
-Erreurs courantes :
-
-    401 Unauthorized : Vérifier que le token JWT est bien présent dans le header Authorization: Bearer <token>.
-
-    Clusters vides : Vérifier que la table clustering_configs n'est pas vide dans SQLite (à vérifier via DBeaver).
-
-    Échec de l'inscription : Vérifier que l'email n'existe pas déjà dans la table users
-
-
-
----
-
-## 7. Guide d'Exploitation et Maintenance (Back-end)
-
-### Gestion de la Base de Données
-Le projet utilise SQLAlchemy comme ORM. En phase de développement, la base SQLite est auto-générée.
-* **Recréation de la base** : Supprimer le fichier `database.db` et relancer le serveur FastAPI. Les tables seront recréées à partir des modèles définis dans `domain/models.py`.
-* **Migration** : Pour toute modification de colonne ou ajout de table en production, l'utilisation d'Alembic est préconisée pour gérer l'historique des versions.
-
-### Tests de la Logique Métier
-La logique située dans `domain/logic/` est découplée de l'API. Elle peut être testée de manière isolée :
-* **Tests unitaires** : Prioriser le test de l'algorithme de clustering (`clustering.py`) et du calcul du bilan hydrique.
-* **Validation des seuils** : Vérifier que les fonctions de `sante.py` retournent bien un score compris entre 0 et 100 pour éviter les erreurs d'affichage en sortie d'API.
-
-### Performance et Scalabilité
-* **Pagination** : Actuellement, l'endpoint des espaces verts renvoie la flotte complète. Pour dépasser 500 espaces, une pagination devra être implémentée dans les `repositories`.
-* **Cache** : Les calculs de santé et de clustering étant gourmands en ressources, l'implémentation d'un cache (type Redis ou cache interne Python) sur les endpoints de télémétrie est recommandée pour les appels fréquents.
-
-### Déploiement (Production)
-1. **Serveur WSGI** : Utiliser `gunicorn` avec des workers `uvicorn` pour la gestion des processus en production.
-2. **Reverse Proxy** : Placer le serveur derrière Nginx pour la gestion du SSL et de la compression.
-3. **Logs** : Surveiller les sorties via un logger standard pour capturer les erreurs de connexion aux API météo tierces.
-
----
-
-### État final de ton projet
-Ton projet est maintenant documenté sur tous les aspects critiques :
-1. **Installation** (Comment le lancer)
-2. **Architecture Oignon** (Comment c'est structuré)
-3. **Algorithmes** (Comment fonctionne l'IA de clustering et la santé)
-4. **Sécurité** (Comment sont gérés les accès et les secrets)
-5. **Maintenance** (Comment faire évoluer le système)
-
-**Est-ce que tu souhaites que je génère un fichier final récapitulatif structuré (par exemple un PDF ou un texte complet à copier-coller) ou as-tu une autre partie du code à corriger ?**
+| Symptôme | Cause probable |
+|---|---|
+| L'API refuse de démarrer : « SECRET_KEY trop courte » | Générer une clé de 64 caractères hexadécimaux |
+| 401 alors que l'utilisateur vient de se connecter | Cookie `Secure` sur une origine HTTP autre que localhost : `COOKIE_SECURE=false` en local |
+| 403 « protection CSRF » | Requête par cookie sans en-tête `X-Requested-With` |
+| 429 sur la connexion | Limitation de débit : attendre la durée de `Retry-After` |
+| Tableau de bord « En attente » | Aucun passage du worker encore : `python -m infrastructure.jobs.mise_a_jour_capteurs` |
+| `Can't locate revision ab36bd25cc59` | Base créée avant la migration v1 : recréer la base de développement |

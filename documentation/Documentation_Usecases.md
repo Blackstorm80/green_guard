@@ -1,84 +1,44 @@
-# Use cases - Bilan hydrique
+# Cas d'usage
 
-## 1. Générer les bilans pour tous les espaces
+> Source de vérité : le code (`back_end/application/use_cases/`). Ce document en est le résumé
+> fonctionnel, mis à jour le 2026-10-04 (décision HR-5 : le code fait foi).
 
-**Nom technique**  
-`generer_bilans_hydriques_pour_tous_les_espaces`
+## 1. Générer les bilans hydriques du jour
 
-**But métier**  
-Calculer le bilan hydrique d’une date donnée pour tous les espaces verts gérés, enregistrer ces bilans, et renvoyer un résumé pour le tableau de bord.
+**Fonction** : `generer_bilans_hydriques_journaliers` (`generer_bilans_hydriques_journaliers.py`)
+**Déclencheur** : service worker, toutes les heures (premier passage au démarrage).
 
-**Entrées**
+**Entrées** : espaces à traiter, repository des bilans, service météo, fonction donnant le cumul
+d'arrosage du jour par espace, date du calcul (aujourd'hui par défaut).
 
-- `date_du_calcul: date`
-- `espace_vert_repo: IEspaceVertRepository`
-- `bilan_repo: IBilanHydriqueRepository`
-- `meteo_service: IMeteoService`
-- `notification_service: INotificationService | None`
-- `arrosage_par_defaut_mm: float` (optionnel, par défaut 0.0)
+**Sortie** : `RapportGeneration` : espaces traités (espace, bilan, conditions météo) et identifiants
+des espaces ignorés.
 
-**Sortie**
+**Étapes**
+1. Pour chaque espace, récupérer la météo du jour (ET0 et pluie cumulée).
+   Météo indisponible ou ET0 absente : l'espace est ignoré pour ce passage, sans erreur.
+2. Calculer le bilan à partir du dernier bilan **antérieur** à la date.
+3. Créer le bilan du jour, ou **remplacer** celui qui existe déjà (idempotence).
 
-- `list[BilanHydriqueEspaceDTO]`  
-  Pour chaque espace :
-  - `espace_id: int`
-  - `nom_espace: str`
-  - `type_espace: str`
-  - `date_bilan: date`
-  - `statut_hydrique: str`
-  - `indice_stress: float`
-  - `localisation: str | None`
+**Suite (job)** : enregistrement d'une mesure par espace et notification du propriétaire si
+l'espace est *Critique* (au plus une par espace et par jour).
 
-**Étapes principales**
+## 2. Tableau de bord
 
-1. Récupérer tous les espaces via `espace_vert_repo.list_tous()`.
-2. Pour chaque espace :
-   - Récupérer le dernier bilan via `bilan_repo.get_dernier_bilan_pour_espace(espace.id)`.
-   - Appeler `calculer_bilan_hydrique_pour_jour(...)` avec la date du calcul.
-   - Sauvegarder le bilan via `bilan_repo.sauvegarder(...)`.
-   - Construire un `BilanHydriqueEspaceDTO` avec les infos utiles.
-3. Retourner la liste des DTO.
+**Fonction** : `obtenir_dashboard_capteurs` (`capteurs.py`), route `GET /capteurs/dashboard`.
+Lecture groupée des dernières mesures et des derniers bilans des espaces de l'utilisateur
+(2 requêtes au total), métriques agrégées (santé, espaces en stress ou critiques, CO₂),
+synthèse (*Sain*, *Attention*, *Critique*, *En attente*) et météo extérieure.
+Sans mesure, un espace est marqué *Sans donnée* : aucune valeur n'est inventée.
 
-**Erreurs / cas particuliers**
+## 3. Interventions urgentes
 
-- Erreurs des services externes (météo, notifications) gérées au niveau application ou API.
+**Fonction** : `lister_interventions_urgentes` (`interventions.py`), route `GET /interventions/urgent`.
+Détection à partir des lectures : stress hydrique *Critique* (priorité critique), CO₂ > 1 200 ppm
+et température > 32 °C (priorité haute). Tri par priorité réelle puis par date, identifiants stables.
 
+## 4. Zones intelligentes
 
-## 2. Générer le bilan pour un espace
-
-**Nom technique**  
-`generer_bilan_hydrique_pour_un_espace`
-
-**But métier**  
-Calculer le bilan hydrique d’une date donnée pour un espace précis, par exemple pour une fiche détaillée ou un recalcul ciblé.
-
-**Entrées**
-
-- `espace_id: int`
-- `date_du_calcul: date`
-- `espace_vert_repo: IEspaceVertRepository`
-- `bilan_repo: IBilanHydriqueRepository`
-- `meteo_service: IMeteoService`
-- `notification_service: INotificationService | None`
-- `arrosage_jour_mm: float` (optionnel)
-
-**Sortie**
-
-- `BilanHydriqueEspaceDTO` pour cet espace :
-  - `espace_id`
-  - `nom_espace`
-  - `type_espace`
-  - `date_bilan`
-  - `statut_hydrique`
-  - `indice_stress`
-  - `localisation`
-
-**Étapes principales**
-
-1. Récupérer l’espace via `espace_vert_repo.get_by_id(espace_id)`.
-   - Si aucun espace trouvé : lever une exception métier (par ex. `EspaceVertIntrouvableError`).
-2. Récupérer le dernier bilan via `bilan_repo.get_dernier_bilan_pour_espace(espace_id)`.
-3. Appeler `calculer_bilan_hydrique_pour_jour(...)` avec la date du calcul.
-4. Sauvegarder le bilan via `bilan_repo.sauvegarder(...)`.
-5. Construire et retourner un `BilanHydriqueEspaceDTO`.
-
+**Fonction** : `reconstruire_zones` (`zones.py`), route `POST /zones/clustering/rebuild`.
+Regroupe les espaces de l'utilisateur (K-Means géographique), remplace ses zones, calcule pour
+chacune centroïde, rayon et santé moyenne.
