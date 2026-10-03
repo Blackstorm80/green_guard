@@ -8,11 +8,14 @@ import pytest
 _DB_FILE = os.path.join(tempfile.mkdtemp(prefix="greenguard-tests-"), "test.db")
 # TEST_DATABASE_URL permet de rejouer la suite sur PostgreSQL (CI) ; SQLite par défaut
 os.environ["DATABASE_URL"] = os.getenv("TEST_DATABASE_URL", f"sqlite:///{_DB_FILE}")
-os.environ["SECRET_KEY"] = "cle-de-test-uniquement"
+os.environ["SECRET_KEY"] = "cle-de-test-uniquement-0123456789abcdef"
 os.environ["ENABLE_SCHEDULER"] = "false"
+# TestClient parle HTTP : un cookie Secure ne serait jamais renvoyé
+os.environ["COOKIE_SECURE"] = "false"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from api.v1.endpoints.auth import limiteur_auth  # noqa: E402
 from api.v1.endpoints.meteo import get_meteo_service  # noqa: E402
 from domain.ports.meteo import ConditionsMeteo, IMeteoService, MeteoIndisponibleError  # noqa: E402
 from infrastructure.database import Base, SessionLocal, engine  # noqa: E402
@@ -42,6 +45,7 @@ class FausseMeteo(IMeteoService):
 def base_vierge():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
+    limiteur_auth.reinitialiser()
     yield
     app.dependency_overrides.clear()
 

@@ -2,12 +2,12 @@
 import os
 import tempfile
 
+from sqlalchemy import create_engine
+
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.config import Config
 from alembic.migration import MigrationContext
-from sqlalchemy import create_engine
-
 from infrastructure.database import Base
 
 BACKEND = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
