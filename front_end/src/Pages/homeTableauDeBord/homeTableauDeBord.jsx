@@ -1,281 +1,272 @@
-import { useState, useEffect } from "react";
-import { 
-  Activity, CheckCircle, AlertTriangle, Thermometer, 
-  Droplets, Wind, ChevronDown, ChevronUp, Sun, Cpu, Zap, 
-  Clock, ShieldAlert, Wrench, Target
+import { useCallback, useEffect, useState } from "react";
+import {
+  Activity, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Clock, Cpu, Droplets,
+  ShieldAlert, Stethoscope, Sun, Target, Thermometer, Umbrella, Wind,
 } from "lucide-react";
 import { api } from "../../services/api";
 
+const INTERVALLE_RAFRAICHISSEMENT_MS = 30000;
+const STATUTS_EN_ALERTE = ["Critique", "A surveiller"];
+const ACTIONS = [
+  { type: "arrosage", label: "Arroser", icon: Droplets, classe: "bg-blue-600 hover:bg-blue-500 text-white" },
+  { type: "ombrage", label: "Ombrager", icon: Umbrella, classe: "bg-orange-600 hover:bg-orange-500 text-white" },
+  { type: "diagnostic", label: "Diagnostic", icon: Stethoscope, classe: "bg-slate-700 hover:bg-slate-600 text-white" },
+];
+
+const formatNombre = (v, decimales = 0) =>
+  typeof v === "number" ? v.toLocaleString("fr-FR", { maximumFractionDigits: decimales }) : "--";
+
 export default function HomeTableauDeBord() {
-  const [diagnostic, setDiagnostic] = useState(null);
-  const [espaces, setEspaces] = useState([]);
+  const [dashboard, setDashboard] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [afficherPlus, setAfficherPlus] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  const [feedback, setFeedback] = useState(null);
+  const [ouverts, setOuverts] = useState({});
+  const [actionEnCours, setActionEnCours] = useState(null);
 
-  useEffect(() => {
-    initialiserDashboard();
-    const interval = setInterval(initialiserDashboard, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const initialiserDashboard = async () => {
+  const charger = useCallback(async (signal) => {
     try {
-      const stats = await api.getDashboardStats(); 
-
-      if (stats && Array.isArray(stats.capteurs) && stats.capteurs.length > 0) {
-        setEspaces(stats.capteurs);
-        setDiagnostic(stats);
-      } else {
-        setEspaces([]);
-        setDiagnostic({ statut: "En attente", message: "Aucune donnée télémétrique reçue." });
-      }
-
-      setLastUpdate(new Date().toLocaleTimeString());
+      const data = await api.getDashboardStats([], signal);
+      setDashboard(data);
+      setLastUpdate(new Date().toLocaleTimeString("fr-FR"));
       setError(null);
     } catch (err) {
-      console.error("ERREUR_SYNCHRO_TACTIQUE :", err);
-      setError("Rupture de liaison avec le centre de données.");
-      setEspaces([]);
+      if (err.name === "AbortError") return;
+      setError("Impossible de récupérer les données du tableau de bord.");
     } finally {
-      setLoading(false);
+      if (!signal?.aborted) setLoading(false);
     }
-  };
+  }, []);
 
-  const executerActionRapide = async (id, action) => {
-    setIsProcessing(true);
+  useEffect(() => {
+    const controller = new AbortController();
+    charger(controller.signal);
+    // Pas de rafraîchissement quand l'onglet est masqué
+    const interval = setInterval(() => {
+      if (document.visibilityState === "visible") charger(controller.signal);
+    }, INTERVALLE_RAFRAICHISSEMENT_MS);
+    return () => {
+      controller.abort();
+      clearInterval(interval);
+    };
+  }, [charger]);
+
+  const declencherIntervention = async (site, action) => {
+    setActionEnCours(`${site.espace_id}-${action.type}`);
+    setFeedback(null);
     try {
-      await api.triggerAction({ espace_id: id, type: action });
-      await initialiserDashboard();
+      await api.createIntervention({
+        espace_id: site.espace_id,
+        type: action.type,
+        description: `Déclenchée depuis le tableau de bord (statut : ${site.statut})`,
+      });
+      setFeedback({ ok: true, message: `Intervention « ${action.label} » planifiée pour ${site.nom}.` });
     } catch (err) {
-      console.error("ECHEC_INTERVENTION :", err);
+      setFeedback({ ok: false, message: err.message });
     } finally {
-      setIsProcessing(false);
+      setActionEnCours(null);
     }
   };
 
-  if (loading && !diagnostic) {
+  if (loading && !dashboard) {
     return (
-      <div className="flex flex-col items-center justify-center h-64 space-y-4">
-        <div className="w-10 h-10 border-2 border-green-500/20 border-t-green-500 rounded-full animate-spin"></div>
-        <p className="text-[10px] font-mono text-green-500 uppercase tracking-[0.3em]">Sync_Bio_Kernel...</p>
+      <div role="status" className="flex flex-col items-center justify-center h-64 space-y-4">
+        <div className="w-10 h-10 border-2 border-green-500/20 border-t-green-500 rounded-full animate-spin" />
+        <p className="text-sm text-green-500">Chargement du tableau de bord…</p>
       </div>
     );
   }
 
-  // --- SÉCURITÉ & CALCULS DES KPIs ---
-  const isSain = diagnostic?.statut === "Sain";
-  
-  const validHealthNodes = espaces.filter(e => typeof e.sante_percent === 'number');
-  const santeGlobale = validHealthNodes.length > 0 
-    ? Math.round(validHealthNodes.reduce((acc, curr) => acc + curr.sante_percent, 0) / validHealthNodes.length)
-    : "--"; 
-
-  const sitesEnAlerte = espaces.filter(e => {
-    const sante = typeof e.sante_percent === 'number' ? e.sante_percent : 100;
-    return sante < 70;
-  });
-
-  // Nouveaux KPIs Globaux (Zéro-Hardcode, basés sur le tableau espaces)
-  const saturationGlobale = espaces.length > 0 
-    ? Math.round(espaces.reduce((acc, curr) => acc + (curr.humidite_percent || 0), 0) / espaces.length) 
-    : "--";
-
-  const co2Moyen = espaces.length > 0 
-    ? Math.round(espaces.reduce((acc, curr) => acc + (curr.co2_ppm || 0), 0) / espaces.length) 
-    : "--";
-
-  const noeudsEnStressThermique = espaces.filter(e => 
-    typeof e.temperature_c === 'number' && (e.temperature_c < 15 || e.temperature_c > 30)
+  const capteurs = dashboard?.capteurs ?? [];
+  const metrics = dashboard?.metrics;
+  const sitesEnAlerte = capteurs.filter((c) => STATUTS_EN_ALERTE.includes(c.statut));
+  const isSain = dashboard?.statut === "Sain";
+  const sante = metrics?.sante_globale_percent;
+  const humiditeMoyenne = (() => {
+    const valeurs = capteurs.map((c) => c.humidite_percent).filter((v) => typeof v === "number");
+    return valeurs.length ? valeurs.reduce((a, b) => a + b, 0) / valeurs.length : null;
+  })();
+  const stressThermique = capteurs.filter(
+    (c) => typeof c.temperature_c === "number" && (c.temperature_c < 15 || c.temperature_c > 30)
   ).length;
+  const vulnerabilite = metrics?.espaces_avec_donnees
+    ? (metrics.espaces_stress / metrics.espaces_avec_donnees) * 100
+    : null;
 
   return (
-    <div className="space-y-6 font-mono text-slate-300 animate-in fade-in duration-700">
-      
-      {/* BARRE DE STATUT SYSTÈME */}
-      <div className="flex justify-between items-center bg-slate-900/50 border border-slate-800 p-3 rounded-lg text-[10px] font-black uppercase tracking-widest">
+    <div className="space-y-6 text-slate-300">
+      {/* BARRE DE STATUT */}
+      <div className="flex flex-wrap gap-3 justify-between items-center bg-slate-900/50 border border-slate-800 p-3 rounded-lg text-xs font-bold uppercase tracking-wide">
         <div className="flex gap-6">
-          <div className="flex items-center gap-2"><Cpu size={14} className="text-green-500"/> Nodes_Active: {espaces.length}</div>
-          <div className="flex items-center gap-2 text-blue-400"><Zap size={14}/> Live_Telemetry</div>
+          <span className="flex items-center gap-2"><Cpu size={14} className="text-green-500" /> Espaces suivis : {metrics?.espaces_suivis ?? 0}</span>
+          {dashboard?.meteo_exterieure && (
+            <span className="flex items-center gap-2 text-blue-300">
+              <Sun size={14} /> Extérieur : {formatNombre(dashboard.meteo_exterieure.temperature_c, 1)} °C, {dashboard.meteo_exterieure.condition}
+            </span>
+          )}
         </div>
-        <div className="flex items-center gap-2 text-white bg-slate-800 px-3 py-1 rounded border border-slate-700">
+        <span className="flex items-center gap-2 text-white bg-slate-800 px-3 py-1 rounded border border-slate-700">
           <Clock size={12} /> {lastUpdate || "--:--:--"}
-        </div>
+        </span>
       </div>
 
       {error && (
-        <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-3 rounded-lg text-xs font-bold flex items-center gap-2">
+        <div role="alert" className="bg-red-500/10 border border-red-500/20 text-red-300 p-3 rounded-lg text-sm font-bold flex items-center gap-2">
           <AlertTriangle size={16} /> {error}
         </div>
       )}
+      {feedback && (
+        <div role="status" className={`p-3 rounded-lg text-sm font-bold border ${feedback.ok ? "bg-green-500/10 border-green-500/20 text-green-300" : "bg-red-500/10 border-red-500/20 text-red-300"}`}>
+          {feedback.message}
+        </div>
+      )}
 
-      {/* KPI GLOBAL & ÉTAT UNITÉ */}
+      {/* SYNTHÈSE */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="lg:col-span-2 p-6 rounded-2xl border-2 transition-all bg-slate-900 border-slate-800 relative overflow-hidden">
+        <div className="lg:col-span-2 p-6 rounded-2xl border-2 bg-slate-900 border-slate-800 relative overflow-hidden">
           <div className="flex items-center gap-6 relative z-10">
             <div className={`p-4 rounded-xl ${isSain ? "bg-green-500 text-slate-950" : "bg-amber-500 text-slate-950"}`}>
-              {isSain ? <CheckCircle size={32} /> : <AlertTriangle size={32} />}
+              {isSain ? <CheckCircle size={32} aria-hidden /> : <AlertTriangle size={32} aria-hidden />}
             </div>
             <div>
-              <h2 className="text-3xl font-black text-white tracking-tighter uppercase italic">{diagnostic?.statut || "Inconnu"}</h2>
-              <p className="text-slate-500 text-xs mt-1">{diagnostic?.message || "En attente d'analyse du cœur algorithmique."}</p>
+              <h2 className="text-3xl font-black text-white tracking-tight">{dashboard?.statut ?? "Inconnu"}</h2>
+              <p className="text-slate-400 text-sm mt-1">{dashboard?.message}</p>
             </div>
           </div>
-          <Activity size={100} className="absolute -right-4 -bottom-4 text-slate-800/20" />
+          <Activity size={100} className="absolute -right-4 -bottom-4 text-slate-800/20" aria-hidden />
         </div>
 
         <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl flex flex-col justify-center text-center">
-          <span className="text-[10px] text-slate-500 font-black uppercase mb-2">Fleet_Integrity</span>
-          <span className="text-5xl font-black text-white italic">{santeGlobale}{santeGlobale !== "--" ? "%" : ""}</span>
-          <div className="w-full bg-slate-800 h-1.5 mt-4 rounded-full overflow-hidden">
-            <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${santeGlobale === "--" ? 0 : santeGlobale}%` }}></div>
+          <span className="text-xs text-slate-400 font-bold uppercase mb-2">Santé globale</span>
+          <span className="text-5xl font-black text-white">{formatNombre(sante)}{typeof sante === "number" ? " %" : ""}</span>
+          <div className="w-full bg-slate-800 h-1.5 mt-4 rounded-full overflow-hidden" role="progressbar"
+               aria-valuenow={sante ?? 0} aria-valuemin={0} aria-valuemax={100} aria-label="Santé globale">
+            <div className="bg-green-500 h-full transition-all duration-1000" style={{ width: `${sante ?? 0}%` }} />
           </div>
         </div>
       </div>
 
-      {/* MATRICE D'INTERVENTION TACTIQUE */}
+      {/* INTERVENTIONS REQUISES */}
       {sitesEnAlerte.length > 0 && (
-        <section className="space-y-4">
-          <div className="flex items-center gap-2 text-rose-500 text-[10px] font-black uppercase tracking-widest">
-            <ShieldAlert size={16} /> Interventions_Requises
-          </div>
+        <section className="space-y-4" aria-labelledby="titre-interventions">
+          <h2 id="titre-interventions" className="flex items-center gap-2 text-rose-400 text-sm font-black uppercase tracking-wide">
+            <ShieldAlert size={16} aria-hidden /> Interventions requises
+          </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {sitesEnAlerte.map((site, idx) => (
-              <ActionCard key={site.espace_id || idx} site={site} onAction={executerActionRapide} disabled={isProcessing} />
+            {sitesEnAlerte.map((site) => (
+              <ActionCard key={site.espace_id} site={site} onAction={declencherIntervention} actionEnCours={actionEnCours} />
             ))}
           </div>
         </section>
       )}
 
-      {/* --- SÉPARATION 50/50 : TÉLÉMÉTRIE VS KPIs GLOBAUX --- */}
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start pt-4">
-        
-        {/* COLONNE GAUCHE : LISTE DE TÉLÉMÉTRIE (50%) */}
-        <div className="space-y-6">
-          <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-800 pb-2">
-            <Activity size={16} className="text-green-500" /> Télémétrie par Nœud
+        {/* TÉLÉMÉTRIE PAR ESPACE */}
+        <section className="space-y-6" aria-labelledby="titre-telemetrie">
+          <h2 id="titre-telemetrie" className="text-sm font-black text-white uppercase tracking-wide flex items-center gap-2 border-b border-slate-800 pb-2">
+            <Activity size={16} className="text-green-500" aria-hidden /> Télémétrie par espace
           </h2>
-          
-          <div className="space-y-6">
-            {espaces.map((capteur, index) => (
-              <div key={capteur.espace_id || index} className="bg-slate-900/30 p-6 rounded-2xl border border-slate-800/50">
-                <h3 className="text-xs font-black text-slate-500 uppercase tracking-widest mb-4">Telemetry_Node_{capteur.espace_id || index}</h3>
-                
+          {capteurs.length === 0 && (
+            <p className="text-slate-400 text-sm">Ajoutez un espace vert pour commencer le suivi.</p>
+          )}
+          {capteurs.map((capteur) => {
+            const ouvert = Boolean(ouverts[capteur.espace_id]);
+            return (
+              <article key={capteur.espace_id} className="bg-slate-900/30 p-6 rounded-2xl border border-slate-800/50">
+                <header className="flex justify-between items-center mb-4">
+                  <h3 className="text-sm font-black text-slate-200">{capteur.nom}</h3>
+                  <span className="text-xs font-bold text-slate-400">{capteur.statut}</span>
+                </header>
                 <div className="flex flex-col gap-3">
-                  <MetricCard icon={<Thermometer className="text-orange-400" />} label="Temp_Core" value={capteur.temperature_c} unit="°C" />
-                  <MetricCard icon={<Wind className="text-blue-400" />} label="O2_Level" value={capteur.o2_percent} unit="%" />
-                  <MetricCard icon={<Droplets className="text-teal-400" />} label="Soil_Sat" value={capteur.humidite_percent} unit="%" />
-                  <MetricCard icon={<Activity className="text-purple-400" />} label="CO2_Level" value={capteur.co2_ppm} unit="ppm" />
+                  <MetricCard icon={<Thermometer className="text-orange-400" />} label="Température" value={formatNombre(capteur.temperature_c, 1)} unit="°C" />
+                  <MetricCard icon={<Droplets className="text-teal-400" />} label="Humidité du sol" value={formatNombre(capteur.humidite_percent, 1)} unit="%" />
+                  <MetricCard icon={<Wind className="text-blue-400" />} label="Humidité de l'air" value={formatNombre(capteur.humidite_air_percent)} unit="%" />
                 </div>
-
                 <div className="flex flex-col items-center mt-6 border-t border-slate-800/50 pt-6">
-                  <button 
-                    onClick={() => setAfficherPlus(!afficherPlus)}
-                    className="group flex items-center gap-2 px-6 py-2 bg-slate-900 hover:bg-slate-800 text-[10px] font-black uppercase tracking-[0.2em] rounded-full border border-slate-700 transition-all shadow-xl"
+                  <button
+                    type="button"
+                    aria-expanded={ouvert}
+                    onClick={() => setOuverts((o) => ({ ...o, [capteur.espace_id]: !ouvert }))}
+                    className="flex items-center gap-2 px-6 py-2 bg-slate-900 hover:bg-slate-800 text-xs font-bold uppercase tracking-wide rounded-full border border-slate-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-green-500"
                   >
-                    {afficherPlus ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    {afficherPlus ? "Close_Buffer" : "Open_Extended_Data"}
+                    {ouvert ? <ChevronUp size={14} aria-hidden /> : <ChevronDown size={14} aria-hidden />}
+                    {ouvert ? "Masquer le détail" : "Voir le détail"}
                   </button>
-
-                  {afficherPlus && (
-                    <div className="flex flex-col gap-3 w-full mt-6 animate-in slide-in-from-top-4 duration-300">
-                      <MetricCard icon={<Sun className="text-yellow-400" />} label="Lux_Index" value={capteur.luminosite_lux} unit="lx" isSmall />
-                      <MetricCard icon={<Droplets className="text-indigo-400" />} label="Res_Eau" value={capteur.reserve_eau_mm} unit="mm" isSmall />
+                  {ouvert && (
+                    <div className="flex flex-col gap-3 w-full mt-6">
+                      <MetricCard icon={<Droplets className="text-indigo-400" />} label="Réserve en eau" value={formatNombre(capteur.reserve_eau_mm, 1)} unit="mm" />
+                      <MetricCard icon={<Activity className="text-purple-400" />} label="CO₂" value={formatNombre(capteur.co2_ppm)} unit="ppm" />
                     </div>
                   )}
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
+              </article>
+            );
+          })}
+        </section>
 
-        {/* COLONNE DROITE : TOUR DE CONTRÔLE / KPIs (50%) */}
-        <div className="space-y-6 sticky top-6">
-          <h2 className="text-sm font-black text-white uppercase tracking-widest flex items-center gap-2 border-b border-slate-800 pb-2">
-             <Target size={16} className="text-blue-500" /> Analyse de la Flotte
+        {/* ANALYSE DU PARC */}
+        <section className="space-y-6 xl:sticky xl:top-6" aria-labelledby="titre-analyse">
+          <h2 id="titre-analyse" className="text-sm font-black text-white uppercase tracking-wide flex items-center gap-2 border-b border-slate-800 pb-2">
+            <Target size={16} className="text-blue-500" aria-hidden /> Analyse du parc
           </h2>
-          
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            
-            <GlobalKpiCard 
-              title="sat_du_sol" 
-              value={saturationGlobale} 
-              unit="%" 
-              icon={<Droplets size={24} className="text-teal-400" />} 
-              status={saturationGlobale !== "--" && saturationGlobale < 40 ? "warning" : "ok"}
-            />
-            
-            <GlobalKpiCard 
-              title="Global_CO2_Avg" 
-              value={co2Moyen} 
-              unit="ppm" 
-              icon={<Wind size={24} className="text-purple-400" />} 
-              status="ok"
-            />
-
-            <GlobalKpiCard 
-              title="stress_Thermique" 
-              value={noeudsEnStressThermique} 
-              unit="Node(s)" 
-              icon={<Thermometer size={24} className={noeudsEnStressThermique > 0 ? "text-red-500" : "text-slate-400"} />} 
-              status={noeudsEnStressThermique > 0 ? "critical" : "ok"}
-            />
-
-            <GlobalKpiCard 
-              title="Vulnerabilité" 
-              value={espaces.length > 0 ? Math.round((sitesEnAlerte.length / espaces.length) * 100) : 0} 
-              unit="%" 
-              icon={<ShieldAlert size={24} className="text-rose-400" />} 
-              status={sitesEnAlerte.length > 0 ? "warning" : "ok"}
-            />
-
+            <GlobalKpiCard title="Humidité moyenne du sol" value={formatNombre(humiditeMoyenne)} unit="%"
+              icon={<Droplets size={24} className="text-teal-400" />}
+              status={humiditeMoyenne !== null && humiditeMoyenne < 40 ? "warning" : "ok"} />
+            <GlobalKpiCard title={`Qualité de l'air (${metrics?.qualite_air ?? "Inconnue"})`} value={formatNombre(metrics?.co2_moyen_ppm)} unit="ppm"
+              icon={<Wind size={24} className="text-purple-400" />} status="ok" />
+            <GlobalKpiCard title="Stress thermique" value={stressThermique} unit="espace(s)"
+              icon={<Thermometer size={24} className={stressThermique > 0 ? "text-red-500" : "text-slate-400"} />}
+              status={stressThermique > 0 ? "critical" : "ok"} />
+            <GlobalKpiCard title="Espaces en alerte" value={formatNombre(vulnerabilite)} unit="%"
+              icon={<ShieldAlert size={24} className="text-rose-400" />}
+              status={sitesEnAlerte.length > 0 ? "warning" : "ok"} />
           </div>
-
-          {/* Espace réservé pour de futurs contrôles ou graphiques */}
-          <div className="bg-slate-900/30 border border-dashed border-slate-700/50 rounded-2xl p-8 flex flex-col items-center justify-center text-center mt-8">
-            <Activity size={32} className="text-slate-700 mb-3" />
-            <p className="text-slate-500 text-xs uppercase tracking-widest font-black">System_Ready</p>
-            <p className="text-slate-600 text-[10px] mt-2 max-w-xs">Espace disponible pour de futurs modules de prédiction IA ou contrôles d'irrigation globale.</p>
-          </div>
-
-        </div>
-
+        </section>
       </div>
     </div>
   );
 }
 
-function ActionCard({ site, onAction, disabled }) {
+function ActionCard({ site, onAction, actionEnCours }) {
   return (
     <div className="bg-slate-900/80 border-l-4 border-l-rose-500 border border-slate-800 p-4 rounded-lg">
       <div className="flex justify-between items-center mb-3">
-        <span className="text-[10px] font-black text-white truncate w-2/3">{site.nom || `Node_${site.espace_id}`}</span>
-        <span className="text-[9px] font-bold text-rose-500">{site.sante_percent ?? "--"}% HP</span>
+        <span className="text-sm font-bold text-white truncate w-2/3">{site.nom}</span>
+        <span className="text-xs font-bold text-rose-400">{formatNombre(site.sante_percent)} % santé</span>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <button onClick={() => onAction(site.espace_id, 'water')} disabled={disabled} className="bg-blue-600 hover:bg-blue-500 text-[9px] font-black py-2 rounded uppercase text-white transition-all">Water</button>
-        <button onClick={() => onAction(site.espace_id, 'heat')} disabled={disabled} className="bg-orange-600 hover:bg-orange-500 text-[9px] font-black py-2 rounded uppercase text-white transition-all">Heat</button>
-        <button onClick={() => onAction(site.espace_id, 'cover')} disabled={disabled} className="bg-slate-700 hover:bg-slate-600 text-[9px] font-black py-2 rounded uppercase text-white transition-all">Cover</button>
-        <button onClick={() => onAction(site.espace_id, 'repair')} disabled={disabled} className="bg-slate-800 hover:bg-slate-700 text-[9px] font-black py-2 rounded uppercase text-slate-400 transition-all flex items-center justify-center gap-1"><Wrench size={10}/> Expert</button>
+      <div className="grid grid-cols-3 gap-2">
+        {ACTIONS.map((action) => {
+          const Icone = action.icon;
+          const enCours = actionEnCours === `${site.espace_id}-${action.type}`;
+          return (
+            <button
+              key={action.type}
+              type="button"
+              onClick={() => onAction(site, action)}
+              disabled={Boolean(actionEnCours)}
+              className={`${action.classe} text-xs font-bold py-2 rounded flex items-center justify-center gap-1 disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-white`}
+            >
+              <Icone size={12} aria-hidden /> {enCours ? "…" : action.label}
+            </button>
+          );
+        })}
       </div>
     </div>
   );
 }
 
-function MetricCard({ icon, label, value, unit, isSmall = false }) {
-  const displayValue = (value !== null && value !== undefined && value !== "") ? value : "--";
-  
+function MetricCard({ icon, label, value, unit }) {
   return (
-    <div className={`bg-slate-950/50 p-4 rounded-xl border border-slate-800 flex items-center gap-4 group hover:border-slate-500 transition-all ${isSmall ? 'opacity-70' : ''}`}>
-      <div className="p-3 bg-slate-900 rounded-lg group-hover:scale-110 transition-transform">{icon}</div>
+    <div className="bg-slate-950/50 p-4 rounded-xl border border-slate-800 flex items-center gap-4">
+      <div className="p-3 bg-slate-900 rounded-lg" aria-hidden>{icon}</div>
       <div>
-        <p className="text-[8px] text-slate-500 font-black uppercase tracking-widest">{label}</p>
-        <div className="flex items-baseline gap-1">
-          <p className="text-xl font-black text-white italic">{displayValue}</p>
-          <span className="text-[10px] text-slate-600 font-bold">{displayValue !== "--" ? unit : ""}</span>
-        </div>
+        <p className="text-xs text-slate-400 font-bold uppercase tracking-wide">{label}</p>
+        <p className="flex items-baseline gap-1">
+          <span className="text-xl font-black text-white">{value}</span>
+          <span className="text-xs text-slate-500 font-bold">{value !== "--" ? unit : ""}</span>
+        </p>
       </div>
     </div>
   );
@@ -285,23 +276,16 @@ function GlobalKpiCard({ title, value, unit, icon, status }) {
   const statusColors = {
     ok: "border-slate-800",
     warning: "border-amber-500/50 bg-amber-500/5",
-    critical: "border-red-500/50 bg-red-500/5"
+    critical: "border-red-500/50 bg-red-500/5",
   };
-
   return (
-    <div className={`p-6 rounded-2xl border transition-colors ${statusColors[status] || statusColors.ok} bg-slate-900`}>
-      <div className="flex justify-between items-start mb-4">
-        <div className="p-2 bg-slate-950 rounded-lg border border-slate-800">
-          {icon}
-        </div>
-      </div>
-      <div>
-        <div className="flex items-baseline gap-1">
-          <span className="text-3xl font-black text-white italic">{value}</span>
-          <span className="text-xs text-slate-500 font-bold">{value !== "--" ? unit : ""}</span>
-        </div>
-        <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mt-1">{title}</p>
-      </div>
+    <div className={`p-6 rounded-2xl border bg-slate-900 ${statusColors[status] || statusColors.ok}`}>
+      <div className="p-2 bg-slate-950 rounded-lg border border-slate-800 w-fit mb-4" aria-hidden>{icon}</div>
+      <p className="flex items-baseline gap-1">
+        <span className="text-3xl font-black text-white">{value}</span>
+        <span className="text-xs text-slate-500 font-bold">{value !== "--" ? unit : ""}</span>
+      </p>
+      <p className="text-xs text-slate-400 font-bold uppercase tracking-wide mt-1">{title}</p>
     </div>
   );
 }

@@ -76,7 +76,7 @@ const Breadcrumbs = () => {
             processedPathnames = [processedPathnames[processedPathnames.length - 2]];
         }
 
-        processedPathnames.forEach((item, index) => {
+        processedPathnames.forEach((item) => {
             items.push(
                 <li key={item.to}>
                     <div className="flex items-center">

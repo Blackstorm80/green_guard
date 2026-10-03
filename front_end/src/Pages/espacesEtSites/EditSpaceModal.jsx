@@ -1,38 +1,48 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { X } from "lucide-react";
 import { api } from "../../services/api";
 
-export default function EditSpaceModal({ espace, onClose, onSuccess }) {
-  const [formData, setFormData] = useState({});
+const CHAMPS_NUMERIQUES = new Set([
+  "surface_m2", "ph_actuel", "humidite_cible", "frequence_arrosage_auto", "profondeur_racinaire",
+]);
 
-  useEffect(() => {
-    // Pré-remplir le formulaire avec les données de l'espace
-    if (espace) {
-      setFormData({
-        nom: espace.nom || "",
-        ville: espace.ville || "",
-        surface_m2: espace.surface_m2 || "",
-        type_sol: espace.type_sol || "Limon-Argileux",
-        ph_actuel: espace.ph_actuel || 7.0,
-        exposition: espace.exposition || "Soleil",
-        drainage: espace.drainage || "Moyen",
-        humidite_cible: espace.humidite_cible || 60,
-        frequence_arrosage_auto: espace.frequence_arrosage_auto || 48,
-        profondeur_racinaire: espace.profondeur_racinaire || 30,
-        type_irrigation: espace.type_irrigation || "Goutte-à-goutte",
-        date_derniere_fertilisation: espace.date_derniere_fertilisation ? new Date(espace.date_derniere_fertilisation).toISOString().split('T')[0] : "",
-      });
-    }
-  }, [espace]);
+const valeursInitiales = (espace) => ({
+  nom: espace?.nom || "",
+  ville: espace?.ville || "",
+  surface_m2: espace?.surface_m2 ?? "",
+  type_sol: espace?.type_sol || "Limon-Argileux",
+  ph_actuel: espace?.ph_actuel ?? 7.0,
+  exposition: espace?.exposition || "Soleil",
+  drainage: espace?.drainage || "Moyen",
+  humidite_cible: espace?.humidite_cible ?? 60,
+  frequence_arrosage_auto: espace?.frequence_arrosage_auto ?? 48,
+  profondeur_racinaire: espace?.profondeur_racinaire ?? 30,
+  type_irrigation: espace?.type_irrigation || "Goutte-à-goutte",
+  date_derniere_fertilisation: espace?.date_derniere_fertilisation
+    ? new Date(espace.date_derniere_fertilisation).toISOString().split("T")[0]
+    : "",
+});
+
+export default function EditSpaceModal({ espace, onClose, onSuccess }) {
+  // Le parent monte la modale avec l'espace sélectionné : l'état initial suffit
+  const [formData, setFormData] = useState(() => valeursInitiales(espace));
+  const [erreur, setErreur] = useState("");
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setErreur("");
+    // Champs vides omis (inchangés côté serveur), champs numériques convertis
+    const payload = Object.fromEntries(
+      Object.entries(formData)
+        .filter(([, v]) => v !== "" && v !== null && v !== undefined)
+        .map(([k, v]) => [k, CHAMPS_NUMERIQUES.has(k) ? Number(v) : v])
+    );
     try {
-      await api.updateEspace(espace.id, formData);
+      await api.updateEspace(espace.id, payload);
       onSuccess(); // Recharge la liste
       onClose();   // Ferme la modale
     } catch (err) {
-      console.error("Erreur lors de la mise à jour :", err);
+      setErreur(err.message);
     }
   };
   
@@ -127,8 +137,11 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
                     </div>
                  </div>
             </div>
-          
-          <button 
+
+          {erreur && (
+            <p role="alert" className="bg-red-500/10 border border-red-500/20 text-red-300 p-3 rounded-xl text-sm">{erreur}</p>
+          )}
+          <button
             type="submit"
             className="w-full bg-green-600 hover:bg-green-500 text-white font-bold py-4 rounded-xl shadow-lg transition-all mt-4"
           >

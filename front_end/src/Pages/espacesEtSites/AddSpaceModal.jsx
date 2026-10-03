@@ -1,59 +1,50 @@
 import { useState } from "react";
 import { X, Sprout, MapPin, Activity } from "lucide-react";
 import { api } from "../../services/api";
-import { useAuth } from "../../context/AuthContext";
+
+/** Nombre saisi, ou undefined si le champ est vide (le champ est alors omis du payload). */
+const nombreOuVide = (valeur) => (valeur === "" || valeur === null ? undefined : Number(valeur));
 
 export default function AddSpaceModal({ onClose, onSuccess }) {
-  const { user } = useAuth();
-  
+  const [erreur, setErreur] = useState("");
+  const [envoi, setEnvoi] = useState(false);
   const [formData, setFormData] = useState({
-    // 1. Général & DTO
     nom: "",
     type_espace: "Parc",
-    localisation: "", // Sera rempli par ville + coordonées
     ville: "",
     latitude: "",
     longitude: "",
-    
-    // 2. Agronomie (Champs requis par ton DTO)
-    plante_id: 1, 
     surface_m2: "",
-    type_sol: "argileux",
-    ph_sol: 7.0,
-    exposition_reelle: "Soleil",
-    
-    // 3. Paramètres Techniques
+    type_sol: "Argileux",
+    ph_actuel: 7.0,
     reserve_utile_max: 100,
     coefficient_cultural: 0.8,
-    zone: "",
-    gerant_id: null
   });
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    if (!user?.id) return;
-
+    setErreur("");
+    setEnvoi(true);
     try {
-      const payload = {
-        ...formData,
-        user_id: user.id,
-        // Conversion explicite pour le DTO (Strings -> Numbers)
-        surface_m2: parseFloat(formData.surface_m2) || 0,
-        latitude: parseFloat(formData.latitude) || 0,
-        longitude: parseFloat(formData.longitude) || 0,
-        ph_sol: parseFloat(formData.ph_sol) || 7.0,
-        reserve_utile_max: parseFloat(formData.reserve_utile_max) || 100,
-        coefficient_cultural: parseFloat(formData.coefficient_cultural) || 0.8,
-        plante_id: parseInt(formData.plante_id) || 1,
-        // Fusion pour le champ 'localisation' du DTO
-        localisation: `${formData.ville} (${formData.latitude}, ${formData.longitude})`
-      };
-
-      await api.createEspace(payload);
+      // Le propriétaire est déduit du jeton côté serveur : aucun user_id envoyé
+      await api.createEspace({
+        nom: formData.nom.trim(),
+        type_espace: formData.type_espace,
+        ville: formData.ville.trim() || undefined,
+        type_sol: formData.type_sol,
+        latitude: Number(formData.latitude),
+        longitude: Number(formData.longitude),
+        surface_m2: nombreOuVide(formData.surface_m2),
+        ph_actuel: nombreOuVide(formData.ph_actuel),
+        reserve_utile_max: nombreOuVide(formData.reserve_utile_max),
+        coefficient_cultural: nombreOuVide(formData.coefficient_cultural),
+      });
       onSuccess();
       onClose();
     } catch (err) {
-      console.error("Erreur DTO détaillée :", err);
+      setErreur(err.message);
+    } finally {
+      setEnvoi(false);
     }
   };
 
@@ -124,7 +115,7 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
             <div>
               <label className="block text-[10px] font-bold text-green-500 uppercase mb-2">pH Sol</label>
               <input type="number" step="0.1" defaultValue="7.0" className="w-full bg-slate-950 border border-slate-800 rounded-xl p-3 text-white"
-                onChange={(e) => setFormData({...formData, ph_sol: e.target.value})} />
+                onChange={(e) => setFormData({...formData, ph_actuel: e.target.value})} />
             </div>
             <div>
               <label className="block text-[10px] font-bold text-amber-500 uppercase mb-2">Réserv. Utile (mm)</label>
@@ -138,8 +129,11 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
             </div>
           </div>
 
-          <button type="submit" className="w-full bg-green-600 hover:bg-green-500 text-white font-black py-4 rounded-2xl shadow-xl transition-all mt-4 uppercase tracking-widest">
-            Enregistrer le site 
+          {erreur && (
+            <p role="alert" className="bg-red-500/10 border border-red-500/20 text-red-300 p-3 rounded-xl text-sm">{erreur}</p>
+          )}
+          <button type="submit" disabled={envoi} className="w-full bg-green-600 hover:bg-green-500 disabled:opacity-50 text-white font-black py-4 rounded-2xl shadow-xl transition-all mt-4 uppercase tracking-widest">
+            {envoi ? "Enregistrement…" : "Enregistrer le site"}
           </button>
         </form>
       </div>

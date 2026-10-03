@@ -18,7 +18,7 @@ export function Sidebar() {
   const { user, logout } = useAuth(); // RÉCUPÉRATION DU LOGOUT
 
   const navigation = [
-    { name: "Tableau de bord", href: "/", icon: LayoutDashboard },
+    { name: "Tableau de bord", href: "/dashboard", icon: LayoutDashboard },
     { name: "Espaces & Sites", href: "/espaces", icon: Trees },
     { name: "Catalogue", href: "/catalogues", icon: Sprout },
     { name: "Rapports", href: "/rapports", icon: FileText },

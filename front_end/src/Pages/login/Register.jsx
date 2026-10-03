@@ -96,7 +96,11 @@ const Register = () => {
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" size={18}/>
                 <input
                   type="password"
-                  placeholder="Pass"
+                  placeholder="Mot de passe"
+                  aria-label="Mot de passe"
+                  aria-describedby="regle-mot-de-passe"
+                  autoComplete="new-password"
+                  minLength={12}
                   required
                   className="w-full bg-slate-950/50 border border-slate-800 rounded-xl pl-11 pr-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
                   onChange={(e) => setFormData({...formData, password: e.target.value})}
@@ -105,13 +109,17 @@ const Register = () => {
               <div className="relative">
                 <input
                   type="password"
-                  placeholder="Confirm"
+                  placeholder="Confirmation"
+                  aria-label="Confirmation du mot de passe"
+                  autoComplete="new-password"
+                  minLength={12}
                   required
                   className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-4 py-3 text-white focus:ring-2 focus:ring-green-500 outline-none transition-all"
                   onChange={(e) => setFormData({...formData, confirmPassword: e.target.value})}
                 />
               </div>
             </div>
+            <p id="regle-mot-de-passe" className="text-xs text-slate-500">12 caractères minimum.</p>
           </div>
 
           {error && (

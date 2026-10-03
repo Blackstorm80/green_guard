@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
-import { AuthProvider } from './context/AuthContext'; // On garde l'import
 
-// Layouts & Guards
+// Layouts & garde (l'AuthProvider est monté une seule fois, dans main.jsx)
 import DashboardLayout from "./layouts/DashboardLayout";
 import ProtectedRoute from "./components/auth/ProtectedRoute";
 
@@ -12,31 +11,29 @@ import HomeTableauDeBord from "./Pages/homeTableauDeBord/homeTableauDeBord";
 import EspacesEtSites from "./Pages/espacesEtSites/espaceEtSites";
 import Catalogues from "./Pages/catalogues/catalogues";
 import Rapports from "./Pages/rapports/rapports";
+import Parametres from "./Pages/parametres/parametres";
+import PageIntrouvable from "./Pages/PageIntrouvable";
 
 function App() {
   return (
-    // ON ENVELOPPE TOUT ICI
-    <AuthProvider> 
-      <Routes>
-        {/* --- ZONE PUBLIQUE --- */}
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
+    <Routes>
+      {/* --- ZONE PUBLIQUE --- */}
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
 
-        {/* --- ZONE PRIVÉE --- */}
-        <Route element={<ProtectedRoute />}>
-          <Route element={<DashboardLayout />}>
-            <Route path="/" element={<Navigate to="/dashboard" replace />} />
-            <Route path="/dashboard" element={<HomeTableauDeBord />} />
-            <Route path="/espaces" element={<EspacesEtSites />} />
-            <Route path="/catalogues" element={<Catalogues />} />
-            <Route path="/rapports" element={<Rapports />} />
-          </Route>
+      {/* --- ZONE PRIVÉE --- */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<DashboardLayout />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<HomeTableauDeBord />} />
+          <Route path="/espaces" element={<EspacesEtSites />} />
+          <Route path="/catalogues" element={<Catalogues />} />
+          <Route path="/rapports" element={<Rapports />} />
+          <Route path="/parametres" element={<Parametres />} />
+          <Route path="*" element={<PageIntrouvable />} />
         </Route>
-
-        {/* CATCH-ALL */}
-        <Route path="*" element={<Navigate to="/login" replace />} />
-      </Routes>
-    </AuthProvider>
+      </Route>
+    </Routes>
   );
 }
 
