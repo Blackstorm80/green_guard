@@ -45,6 +45,8 @@ Pour gérer la montée en charge (flotte de **200+ espaces verts**), GreenGuard 
 ## Sécurité et Environnement
 
 * Aucun secret n'est versionné : les fichiers `.env` sont ignorés par git et la CI (`.github/workflows/securite.yml`) échoue si un `.env`, une base SQLite ou `node_modules` est commité, et lance un scan **gitleaks**.
+* **Session** : jeton JWT (PyJWT, HS256, 60 min) dans un cookie `httpOnly` + `SameSite=Lax` + `Secure`, illisible par JavaScript. Toute écriture authentifiée par cookie exige l'en-tête `X-Requested-With` (anti-CSRF). L'en-tête `Authorization: Bearer` reste accepté pour Swagger et les scripts.
+* **Protections** : limitation de débit sur la connexion et l'inscription, mot de passe de 12 caractères minimum, `SECRET_KEY` de 32 caractères minimum, en-têtes de sécurité et CSP (API et front), erreurs 500 génériques avec identifiant de requête.
 * Chaque dossier fournit un modèle sans valeur réelle à copier :
 
 | Modèle | Copier en | Usage |
@@ -69,7 +71,7 @@ Générer une clé JWT : `python -c "import secrets; print(secrets.token_hex(32)
 cp .env.example .env       # puis renseigner SECRET_KEY et POSTGRES_PASSWORD
 docker compose up --build -d
 ```
-Front : http://localhost:3000 — API : http://localhost:8000/docs. Les migrations s'appliquent au démarrage du backend.
+Front : http://localhost:3000 — API : http://localhost:8000/docs. Les migrations s'appliquent au démarrage du backend ; le service `worker` exécute le bilan hydrique toutes les heures (premier passage au démarrage).
 
 > Base créée avant octobre 2026 : le schéma de référence a été remplacé (`0001_schema_v1`).
 > Recréer la base de développement : `docker compose down -v` puis `docker compose up --build -d`.
@@ -87,9 +89,10 @@ cd back_end
 python -m venv venv
 source venv/bin/activate  # venv\Scripts\activate sur Windows
 pip install -r requirements.txt
-cp .env.example .env       # puis renseigner SECRET_KEY
+cp .env.example .env       # puis renseigner SECRET_KEY (ENABLE_SCHEDULER=true : job intégré en dev)
 alembic upgrade head
 uvicorn main:app --reload
+# ou, comme en production : ENABLE_SCHEDULER=false et `python worker.py` dans un second terminal
 ```
 *Accès Swagger : [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)*
 
@@ -105,9 +108,12 @@ npm run dev
 ```bash
 cd back_end
 pip install -r requirements-dev.txt
-pytest                                   # SQLite, sans réseau
+ruff check .                             # lint (dont règles de sécurité)
+pytest --cov=domain --cov=application --cov=api --cov=infrastructure   # SQLite, sans réseau
 TEST_DATABASE_URL=postgresql://user:mdp@localhost:5432/base_de_test pytest   # sur PostgreSQL
 ```
+
+La CI (`.github/workflows/ci.yml`) rejoue tout cela à chaque PR, plus les migrations et la suite sur PostgreSQL, les audits `pip-audit`/`npm audit` et la construction des images.
 
 ### 4. Créer un administrateur
 ```bash

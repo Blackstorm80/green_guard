@@ -222,6 +222,26 @@ Hypothèse : un développeur à temps plein accompagné de l'architecte. Chaque 
    - gitleaks ;
    - vérification « migration Alembic à jour ».
 
+**Suivi au 2026-10-04** (branche `feat/phase-2-fiabilite`, au-dessus des phases 0 et 1) : **phase 2 terminée**, avec un mois d'avance sur le calendrier.
+- ✅ **Tests** : 69 tests, **96 % de couverture** sur le domaine, l'application, l'API et l'infrastructure (objectif : 70 %). Suite verte sur SQLite et PostgreSQL 16.
+- ✅ **Sécurité** :
+  - PyJWT ;
+  - session par cookie httpOnly avec protection CSRF ;
+  - limitation de débit sur la connexion et l'inscription ;
+  - en-têtes de sécurité et CSP sur l'API et le front ;
+  - erreurs 500 génériques ;
+  - `SECRET_KEY` de 32 caractères minimum ;
+  - 4 CVE Python et 5 vulnérabilités npm hautes corrigées (pip-audit et npm audit à zéro).
+- ✅ **ADR-5** : service worker dédié, logs JSON, plus de `print` dans l'application.
+- ✅ **Métier** :
+  - alertes de stress critique persistées sous forme de notifications ;
+  - lectures capteurs sans N+1 ;
+  - facteur de sol branché sur les types saisis dans l'interface.
+- ✅ **CI** (`ci.yml`) : ruff, pytest avec seuil de couverture, migrations et tests sur PostgreSQL, audits, build des images. Lint front à 0 erreur.
+- ✅ **ADR-8** : configuration centralisée (`config.py`).
+- ⚠️ Développement local sans worker : ajouter `ENABLE_SCHEDULER=true` dans `back_end/.env` (voir `.env.example`).
+- ⏳ La CI ne tournera qu'après le push (point 2 de la phase 0, toujours en attente).
+
 ### Phase 3 : qualité produit (9 → 20 novembre)
 1. **Design system** : tokens `@theme` (couleurs, typo, espacements, rayons), clair et sombre via `ThemeProvider`, composants de base (Button, Input avec label, Card, Modal, Badge, Toast).
 2. **Accessibilité** WCAG 2.1 AA : labels, `aria-*`, focus visible, taille de texte minimale 12 px, navigation clavier, contrastes.
