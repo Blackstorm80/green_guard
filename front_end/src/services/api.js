@@ -1,4 +1,4 @@
-const BASE_URL = "http://localhost:8000/api/v1";
+const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
 
 export const api = {
   // --- AUTHENTIFICATION & UTILISATEURS ---
@@ -23,7 +23,6 @@ export const api = {
       name: userData.name,
       email: userData.email,
       password: userData.password,
-      role: "admin" 
     };
 
     const response = await fetch(`${BASE_URL}/auth/auth/register`, {
@@ -45,6 +44,7 @@ export const api = {
     const response = await fetch(`${BASE_URL}/users/me`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 
@@ -71,6 +71,7 @@ export const api = {
     const response = await fetch(`${BASE_URL}/espaces-verts/`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 
@@ -79,23 +80,40 @@ export const api = {
     const response = await fetch(`${BASE_URL}/zones/zones`, {
       headers: { "Authorization": `Bearer ${token}` },
     });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 
   // --- CATALOGUES ---
-  
+
   getCataloguePlantes: async () => {
     const response = await fetch(`${BASE_URL}/catalogue/plantes`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 
   getCatalogueAuxiliaires: async () => {
     const response = await fetch(`${BASE_URL}/catalogue/auxiliaires`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  // --- MÉTÉO (source unique : backend Open-Meteo) ---
+
+  getMeteoByCoords: async (lat, lon) => {
+    const response = await fetch(`${BASE_URL}/meteo/actuelle?lat=${lat}&lon=${lon}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return response.json();
+  },
+
+  getMeteo: async (ville) => {
+    const response = await fetch(`${BASE_URL}/meteo/${encodeURIComponent(ville)}`);
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
     return response.json();
   },
 
   // --- LOGOUT ---
-  
+
   logout: () => {
     localStorage.removeItem("access_token");
   }

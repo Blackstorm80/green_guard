@@ -1,6 +1,6 @@
 import React, { useState, useEffect, Fragment } from 'react';
 import { useAuth } from '../../context/AuthContext'; 
-import api from '../../services/api'; 
+import { api } from '../../services/api';
 import { BellIcon } from '@heroicons/react/24/outline';
 import { Menu, Transition } from '@headlessui/react';
 
