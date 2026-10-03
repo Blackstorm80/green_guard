@@ -17,11 +17,11 @@ class User(BaseModel):
         from_attributes = True  # Pour SQLAlchemy -> Pydantic v2
 
 # Schéma pour la création d'utilisateur (via endpoint)
+# Le rôle est assigné par le backend uniquement, jamais fourni par le client
 class UserCreate(BaseModel):
     name: str
     email: EmailStr
     password: str
-    role: str = "user"
 
 # Schéma pour mise à jour
 class UserUpdate(BaseModel):

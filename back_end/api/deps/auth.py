@@ -1,3 +1,4 @@
+import os
 import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional, List
@@ -12,7 +13,9 @@ from domain.models import User
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 
 # Configuration
-SECRET_KEY = "SECRET_SUPER_PRIVE_GREEN_GUARD"
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("Variable d'environnement SECRET_KEY manquante")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60
 
@@ -99,14 +102,14 @@ def register(
     # Verifier si l'utilisateur existe deja
     user = db.query(User).filter(User.email == user_in.email).first()
     if user:
-        raise HTTPException(status_code=400, detail="Cet email est deja utilise")
+        raise HTTPException(status_code=400, detail="Impossible de créer ce compte.")
 
-    # Logique de creation d'un user 
+    # Logique de creation d'un user — rôle toujours "user"
     new_user = User(
         name=user_in.name,
         email=user_in.email,
         hashed_password=get_password_hash(user_in.password),
-        role=user_in.role
+        role="user"
     )
     
     db.add(new_user)

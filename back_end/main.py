@@ -1,3 +1,5 @@
+import os
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from infrastructure.database import engine, Base
@@ -11,12 +13,17 @@ Base.metadata.create_all(bind=engine)
 app = FastAPI(title="Green Guard API")
 
 # Configuration CORS pour React
+_allowed_origins = ["http://localhost:3000", "http://localhost:5173"]
+_frontend_url = os.getenv("FRONTEND_URL")
+if _frontend_url:
+    _allowed_origins.append(_frontend_url)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=_allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 # Imports des routers
@@ -49,7 +56,7 @@ def startup_event():
     
     # 3. On lance le moteur
     scheduler.start()
-    print("SYSTÈME DE SIMULATION ACTIF (Le coeur bat) ")
+    logging.info("Système de simulation actif — scheduler démarré.")
 
 @app.on_event("shutdown")
 def shutdown_event():

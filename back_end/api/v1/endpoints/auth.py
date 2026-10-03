@@ -37,16 +37,17 @@ def register(user_in: UserCreate, db: Session = Depends(get_db)):
     if user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Cet email est déjà utilisé.",
+            detail="Impossible de créer ce compte.",
         )
     
     # Hacher le mot de passe et créer le nouvel utilisateur
+    # Le rôle est toujours "user" — jamais fourni par le client
     hashed_password = get_password_hash(user_in.password)
     new_user = User(
         name=user_in.name,
         email=user_in.email,
         hashed_password=hashed_password,
-        role=user_in.role
+        role="user"
     )
     
     db.add(new_user)

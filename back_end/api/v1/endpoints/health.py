@@ -1,7 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import random
+from api.deps.auth import get_current_active_user
+from domain.models import User
 
 router = APIRouter(prefix="/health", tags=["Diagnostic"])
 
@@ -11,7 +13,7 @@ class DiagnosticRequest(BaseModel):
     mesures: Optional[Dict[str, Any]] = None 
 
 @router.post("/diagnostic")
-def run_diagnostic(payload: DiagnosticRequest):
+def run_diagnostic(payload: DiagnosticRequest, current_user: User = Depends(get_current_active_user)):
     """
     Récupère le diagnostic. Si aucune mesure n'est fournie, 
     le système génère des données réelles simulées ou lit la DB.

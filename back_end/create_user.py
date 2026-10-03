@@ -29,5 +29,10 @@ def create_user(email: str, password: str, name: str = "Admin"):
         db.close()
 
 if __name__ == "__main__":
-    print("Création de l'utilisateur de démo...")
-    create_user(email="admin@demo.com", password="admin123", name="Admin Demo")
+    import argparse
+    parser = argparse.ArgumentParser(description="Crée un utilisateur admin en base.")
+    parser.add_argument("--email", required=True, help="Email de l'administrateur")
+    parser.add_argument("--password", required=True, help="Mot de passe de l'administrateur")
+    parser.add_argument("--name", default="Admin", help="Nom affiché")
+    args = parser.parse_args()
+    create_user(email=args.email, password=args.password, name=args.name)
