@@ -1,5 +1,24 @@
 # Fichier calcul : domain/logic/stress_hydrique.py
 
+# Classes de rétention : "riche" retient l'eau (consommation de la réserve ralentie),
+# "pauvre" draine vite (consommation accélérée).
+FACTEUR_SOL = {"riche": 0.8, "moyen": 1.0, "pauvre": 1.2}
+
+# Types de sol saisis dans l'interface → classe de rétention.
+# Argile : forte rétention ; sable : drainant ; limon et mélanges : intermédiaire.
+CLASSE_PAR_TYPE_SOL = {
+    "riche": "riche", "moyen": "moyen", "pauvre": "pauvre",
+    "argileux": "riche", "argile": "riche",
+    "sableux": "pauvre", "sable": "pauvre",
+    "limoneux": "moyen", "limon": "moyen", "limon-argileux": "moyen",
+}
+
+
+def classe_sol(type_sol: str | None) -> str:
+    """Classe de rétention d'un type de sol (insensible à la casse) ; "moyen" si inconnu."""
+    return CLASSE_PAR_TYPE_SOL.get((type_sol or "").strip().lower(), "moyen")
+
+
 def calculer_bilan_hydrique_simplifie(
     reserve_eau_veille: float,
     pluie_et_arrosage_jour: float,
@@ -29,13 +48,8 @@ def calculer_bilan_hydrique_simplifie(
     # 1. Calcul du besoin théorique de la plante pour la journée (ETc)
     besoin_plante_par_jour = evapotranspiration_reference_jour * coefficient_cultural
 
-    # 2. Déterminer un facteur_sol selon le type de sol
-    if type_sol == "riche":
-        facteur_sol = 0.8  # Le sol retient mieux l'eau, la plante consomme moins vite la réserve
-    elif type_sol == "pauvre":
-        facteur_sol = 1.2  # Le sol draine vite, la plante doit puiser plus
-    else:  # "moyen" ou non spécifié
-        facteur_sol = 1.0
+    # 2. Facteur de sol (valeurs historiques du modèle, à faire valider : décision D-4 / HR-1)
+    facteur_sol = FACTEUR_SOL.get(classe_sol(type_sol), 1.0)
 
     # 3. Déterminer un facteur_meteo simple (placeholder pour de futures améliorations)
     facteur_meteo = 1.0

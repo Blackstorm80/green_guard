@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO, MetriquesDashboardDTO
 from application.dto.meteo import MeteoDTO
 from application.use_cases.meteo import obtenir_meteo_actuelle
@@ -13,11 +11,11 @@ SEUIL_CO2_MAUVAIS_PPM = 1200
 LATITUDE_PAR_DEFAUT, LONGITUDE_PAR_DEFAUT = 45.764, 4.8357
 
 
-def _moyenne(valeurs: List[float]) -> Optional[float]:
+def _moyenne(valeurs: list[float]) -> float | None:
     return round(sum(valeurs) / len(valeurs), 1) if valeurs else None
 
 
-def _qualite_air(co2_moyen: Optional[float]) -> str:
+def _qualite_air(co2_moyen: float | None) -> str:
     if co2_moyen is None:
         return "Inconnue"
     if co2_moyen < SEUIL_CO2_MOYEN_PPM:
@@ -40,12 +38,12 @@ def _synthese(metrics: MetriquesDashboardDTO) -> tuple[str, str]:
 
 
 def obtenir_dashboard_capteurs(
-    espaces: List[EspaceVert],
+    espaces: list[EspaceVert],
     capteur_service: ICapteurService,
     meteo_service: IMeteoService,
 ) -> DashboardCapteursDTO:
     """Tableau de bord des espaces fournis (déjà filtrés sur l'utilisateur par l'appelant)."""
-    lectures = [LectureCapteurDTO.model_validate(capteur_service.lecture_actuelle(e)) for e in espaces]
+    lectures = [LectureCapteurDTO.model_validate(l) for l in capteur_service.lectures_actuelles(espaces)]
     avec_donnees = [l for l in lectures if l.statut != STATUT_SANS_DONNEE]
 
     co2_moyen = _moyenne([l.co2_ppm for l in lectures if l.co2_ppm is not None])
@@ -61,7 +59,7 @@ def obtenir_dashboard_capteurs(
     statut, message = _synthese(metrics)
 
     lat, lon = (espaces[0].latitude, espaces[0].longitude) if espaces else (LATITUDE_PAR_DEFAUT, LONGITUDE_PAR_DEFAUT)
-    meteo: Optional[MeteoDTO]
+    meteo: MeteoDTO | None
     try:
         meteo = obtenir_meteo_actuelle(lat, lon, meteo_service)
     except MeteoIndisponibleError:
