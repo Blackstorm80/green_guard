@@ -25,14 +25,30 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
-    environment:
+    environment: &env_backend
       DATABASE_URL: postgresql://greenguard:${POSTGRES_PASSWORD:-greenguard_dev}@db:5432/greenguard
       SECRET_KEY: ${SECRET_KEY:?Définir SECRET_KEY dans .env (voir .env.example)}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
-      ENABLE_SCHEDULER: "true"   # un seul processus API : le job planifié tourne ici
+      COOKIE_SECURE: ${COOKIE_SECURE:-true}   # http://localhost est un contexte sécurisé pour les navigateurs
+      HSTS: ${HSTS:-false}                    # true uniquement derrière HTTPS
+      LOG_FORMAT: json
+      ENABLE_SCHEDULER: "false"               # le job tourne dans le service worker (ADR-5)
     depends_on:
       db:
         condition: service_healthy
+
+  # Tâches planifiées (bilan hydrique horaire) : UNE seule instance
+  worker:
+    build:
+      context: ./back_end
+    restart: unless-stopped
+    command: ["python", "worker.py"]
+    environment: *env_backend
+    healthcheck:
+      disable: true            # pas de serveur HTTP dans le worker
+    depends_on:
+      backend:
+        condition: service_healthy   # le backend applique les migrations au démarrage
 
   frontend:
     build:
@@ -40,6 +56,8 @@ services:
       args:
         VITE_API_URL: ${VITE_API_URL:-http://localhost:8000/api/v1}
     restart: unless-stopped
+    environment:
+      API_ORIGIN: ${API_ORIGIN:-http://localhost:8000}   # autorisée par la CSP (connect-src)
     ports:
       - "3000:80"
     depends_on:
