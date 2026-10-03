@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from application.dto.meteo import MeteoDTO
 from domain.ports.meteo import IMeteoService
@@ -9,7 +9,7 @@ def obtenir_meteo_actuelle(latitude: float, longitude: float, meteo_service: IMe
     conditions = meteo_service.recuperer_conditions_actuelles(
         latitude=latitude,
         longitude=longitude,
-        maintenant=datetime.now(timezone.utc),
+        maintenant=datetime.now(UTC),
     )
     return MeteoDTO(
         city=conditions.city,

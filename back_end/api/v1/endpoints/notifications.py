@@ -1,15 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import List
 
-from infrastructure.database import get_db
 from api.deps.auth import get_current_user
 from domain import models
+from infrastructure.database import get_db
 from schema.notifications import NotificationRead
 
 router = APIRouter()
 
-@router.get("/", response_model=List[NotificationRead])
+@router.get("/", response_model=list[NotificationRead])
 def get_notifications(
     db: Session = Depends(get_db),
     current_user: models.User = Depends(get_current_user)
@@ -46,5 +45,5 @@ def mark_notification_as_read(
         db.add(db_notification)
         db.commit()
         db.refresh(db_notification)
-    
+
     return db_notification

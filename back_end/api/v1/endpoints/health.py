@@ -44,7 +44,9 @@ def readiness(db: Session = Depends(get_db)):
     try:
         db.execute(text("SELECT 1"))
     except Exception:
-        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Base de données indisponible")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="Base de données indisponible"
+        ) from None
     return {"status": "ok"}
 
 

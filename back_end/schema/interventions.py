@@ -1,6 +1,6 @@
 """Schémas des interventions terrain (repris du travail de la branche feature/Lucresse-branche)."""
 from datetime import datetime
-from typing import Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -11,18 +11,18 @@ StatutIntervention = Literal["planifiee", "en_cours", "terminee"]
 class InterventionCreate(BaseModel):
     espace_id: int
     type: TypeIntervention
-    description: Optional[str] = Field(None, max_length=500)
-    volume_eau_l: Optional[float] = Field(None, ge=0)
-    planifiee_le: Optional[datetime] = None
+    description: str | None = Field(None, max_length=500)
+    volume_eau_l: float | None = Field(None, ge=0)
+    planifiee_le: datetime | None = None
 
 
 class InterventionUpdate(BaseModel):
-    type: Optional[TypeIntervention] = None
-    description: Optional[str] = Field(None, max_length=500)
-    volume_eau_l: Optional[float] = Field(None, ge=0)
-    statut: Optional[StatutIntervention] = None
-    planifiee_le: Optional[datetime] = None
-    realisee_le: Optional[datetime] = None
+    type: TypeIntervention | None = None
+    description: str | None = Field(None, max_length=500)
+    volume_eau_l: float | None = Field(None, ge=0)
+    statut: StatutIntervention | None = None
+    planifiee_le: datetime | None = None
+    realisee_le: datetime | None = None
 
 
 class InterventionRead(BaseModel):
@@ -31,10 +31,10 @@ class InterventionRead(BaseModel):
     id: int
     espace_id: int
     type: str
-    description: Optional[str] = None
-    volume_eau_l: Optional[float] = None
+    description: str | None = None
+    volume_eau_l: float | None = None
     statut: str
-    planifiee_le: Optional[datetime] = None
-    realisee_le: Optional[datetime] = None
+    planifiee_le: datetime | None = None
+    realisee_le: datetime | None = None
     cree_le: datetime
-    cree_par: Optional[int] = None
+    cree_par: int | None = None

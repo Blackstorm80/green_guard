@@ -1,5 +1,4 @@
 from datetime import date
-from typing import List, Optional
 
 from sqlalchemy.orm import Session
 
@@ -20,10 +19,10 @@ class BilanHydriqueRepositoryImpl(IBilanHydriqueRepository):
         self.db.refresh(bilan)
         return bilan
 
-    def get_by_espace_and_date(self, espace_id: int, date_bilan: date) -> Optional[BilanHydriqueJournalier]:
+    def get_by_espace_and_date(self, espace_id: int, date_bilan: date) -> BilanHydriqueJournalier | None:
         return self._par_espace(espace_id).filter(BilanHydriqueJournalier.date == date_bilan).first()
 
-    def get_dernier_avant(self, espace_id: int, date_bilan: date) -> Optional[BilanHydriqueJournalier]:
+    def get_dernier_avant(self, espace_id: int, date_bilan: date) -> BilanHydriqueJournalier | None:
         return (
             self._par_espace(espace_id)
             .filter(BilanHydriqueJournalier.date < date_bilan)
@@ -31,8 +30,8 @@ class BilanHydriqueRepositoryImpl(IBilanHydriqueRepository):
             .first()
         )
 
-    def get_dernier_bilan_pour_espace(self, espace_id: int) -> Optional[BilanHydriqueJournalier]:
+    def get_dernier_bilan_pour_espace(self, espace_id: int) -> BilanHydriqueJournalier | None:
         return self._par_espace(espace_id).order_by(BilanHydriqueJournalier.date.desc()).first()
 
-    def get_historique_by_espace(self, espace_id: int, limit: int = 7) -> List[BilanHydriqueJournalier]:
+    def get_historique_by_espace(self, espace_id: int, limit: int = 7) -> list[BilanHydriqueJournalier]:
         return self._par_espace(espace_id).order_by(BilanHydriqueJournalier.date.desc()).limit(limit).all()

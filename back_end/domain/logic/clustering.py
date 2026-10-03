@@ -6,8 +6,8 @@ sont recalculés sur les coordonnées réelles des espaces de chaque groupe.
 Base d'apprentissage : https://fr.python-3.com/?p=4563
 """
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass
-from typing import List, Optional, Sequence, Tuple
 
 import numpy as np
 from sklearn.cluster import KMeans
@@ -18,7 +18,7 @@ COULEUR_INCONNUE = "#64748B"
 
 @dataclass(frozen=True)
 class Groupe:
-    indices: List[int]           # positions des points dans la liste d'entrée
+    indices: list[int]           # positions des points dans la liste d'entrée
     centroid_lat: float
     centroid_lon: float
     rayon_km: float              # distance max centroïde → point du groupe
@@ -32,13 +32,13 @@ def distance_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * RAYON_TERRE_KM * math.asin(math.sqrt(a))
 
 
-def _projeter_km(points: Sequence[Tuple[float, float]]) -> np.ndarray:
+def _projeter_km(points: Sequence[tuple[float, float]]) -> np.ndarray:
     lat_ref = math.radians(sum(p[0] for p in points) / len(points))
     km_par_degre = math.pi * RAYON_TERRE_KM / 180
     return np.array([[lat * km_par_degre, lon * km_par_degre * math.cos(lat_ref)] for lat, lon in points])
 
 
-def regrouper(points: Sequence[Tuple[float, float]], n_groupes: int) -> List[Groupe]:
+def regrouper(points: Sequence[tuple[float, float]], n_groupes: int) -> list[Groupe]:
     """Regroupe des (lat, lon) en au plus n_groupes groupes non vides."""
     if not points:
         return []
@@ -55,13 +55,13 @@ def regrouper(points: Sequence[Tuple[float, float]], n_groupes: int) -> List[Gro
     return groupes
 
 
-def nommer_zones(n: int, granularite: Optional[str]) -> List[str]:
+def nommer_zones(n: int, granularite: str | None) -> list[str]:
     """Noms neutres (un vrai nommage demanderait un géocodage inverse)."""
     prefixe = "Quartier" if granularite == "quartier" else "Zone"
     return [f"{prefixe} {i + 1}" for i in range(n)]
 
 
-def calculer_couleur_gauge(sante: Optional[float]) -> str:
+def calculer_couleur_gauge(sante: float | None) -> str:
     """Couleur de jauge selon le score de santé ; gris quand il n'y a pas encore de donnée."""
     if sante is None:
         return COULEUR_INCONNUE

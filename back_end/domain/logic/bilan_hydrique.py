@@ -2,9 +2,10 @@
 
 import datetime
 
-# Note: Les chemins d'import sont basés sur la structure cible du projet.
-from domain.models import EspaceVert, BilanHydriqueJournalier
 from domain.logic.stress_hydrique import calculer_bilan_hydrique_simplifie
+
+# Note: Les chemins d'import sont basés sur la structure cible du projet.
+from domain.models import BilanHydriqueJournalier, EspaceVert
 
 
 def calculer_bilan_hydrique_pour_jour(

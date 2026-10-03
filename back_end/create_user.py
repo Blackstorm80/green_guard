@@ -1,8 +1,9 @@
 from sqlalchemy.orm import Session
 
-from infrastructure.database import SessionLocal
-from domain.models import User
 from api.deps.auth import get_password_hash
+from domain.models import User
+from infrastructure.database import SessionLocal
+
 
 def create_user(email: str, password: str, name: str = "Admin"):
     """Crée un utilisateur admin avec un mot de passe haché."""

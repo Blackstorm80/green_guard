@@ -35,7 +35,7 @@ def get_meteo_actuelle(
     try:
         return obtenir_meteo_actuelle(latitude=lat, longitude=lon, meteo_service=meteo_service)
     except MeteoIndisponibleError:
-        raise HTTPException(status_code=502, detail=ERREUR_METEO)
+        raise HTTPException(status_code=502, detail=ERREUR_METEO) from None
 
 
 @router.get("/{ville}", response_model=MeteoDTO)
@@ -49,4 +49,4 @@ def get_meteo_ville(
     try:
         return obtenir_meteo_actuelle(latitude=coords["lat"], longitude=coords["lon"], meteo_service=meteo_service)
     except MeteoIndisponibleError:
-        raise HTTPException(status_code=502, detail=ERREUR_METEO)
+        raise HTTPException(status_code=502, detail=ERREUR_METEO) from None

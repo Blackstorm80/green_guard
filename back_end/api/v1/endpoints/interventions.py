@@ -1,6 +1,5 @@
 """Interventions : détection des urgences + CRUD (repris de feature/Lucresse-branche, sécurisé)."""
-from datetime import datetime, timezone
-from typing import List, Optional
+from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
@@ -42,9 +41,9 @@ def get_interventions_urgentes(
     return lister_interventions_urgentes(espaces=espaces, capteur_service=capteur_service, limit=limit)
 
 
-@router.get("/", response_model=List[InterventionRead])
+@router.get("/", response_model=list[InterventionRead])
 def lister_interventions(
-    espace_id: Optional[int] = Query(None, description="Filtrer sur un espace"),
+    espace_id: int | None = Query(None, description="Filtrer sur un espace"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
@@ -70,7 +69,9 @@ def creer_intervention(
 
 
 @router.get("/{intervention_id}", response_model=InterventionRead)
-def obtenir_intervention(intervention_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def obtenir_intervention(
+    intervention_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     return _intervention_de_l_utilisateur(intervention_id, db, current_user)
 
 
@@ -84,7 +85,7 @@ def maj_intervention(
     intervention = _intervention_de_l_utilisateur(intervention_id, db, current_user)
     champs = data.model_dump(exclude_unset=True)
     if champs.get("statut") == "terminee" and "realisee_le" not in champs and intervention.realisee_le is None:
-        champs["realisee_le"] = datetime.now(timezone.utc)
+        champs["realisee_le"] = datetime.now(UTC)
     for champ, valeur in champs.items():
         setattr(intervention, champ, valeur)
     db.commit()
@@ -93,7 +94,9 @@ def maj_intervention(
 
 
 @router.delete("/{intervention_id}", status_code=status.HTTP_204_NO_CONTENT)
-def supprimer_intervention(intervention_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def supprimer_intervention(
+    intervention_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)
+):
     db.delete(_intervention_de_l_utilisateur(intervention_id, db, current_user))
     db.commit()
     return Response(status_code=status.HTTP_204_NO_CONTENT)

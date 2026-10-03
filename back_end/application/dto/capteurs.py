@@ -1,5 +1,4 @@
 from datetime import datetime
-from typing import List, Optional
 
 from pydantic import BaseModel, ConfigDict
 
@@ -11,29 +10,29 @@ class LectureCapteurDTO(BaseModel):
 
     espace_id: int
     nom: str
-    temperature_c: Optional[float] = None
-    humidite_percent: Optional[float] = None
-    humidite_air_percent: Optional[float] = None
-    co2_ppm: Optional[float] = None
-    reserve_eau_mm: Optional[float] = None
-    sante_percent: Optional[float] = None
+    temperature_c: float | None = None
+    humidite_percent: float | None = None
+    humidite_air_percent: float | None = None
+    co2_ppm: float | None = None
+    reserve_eau_mm: float | None = None
+    sante_percent: float | None = None
     statut: str
-    timestamp: Optional[datetime] = None
+    timestamp: datetime | None = None
 
 
 class MetriquesDashboardDTO(BaseModel):
-    sante_globale_percent: Optional[float] = None
+    sante_globale_percent: float | None = None
     espaces_suivis: int
     espaces_avec_donnees: int
     espaces_stress: int
     espaces_critiques: int
-    co2_moyen_ppm: Optional[float] = None
+    co2_moyen_ppm: float | None = None
     qualite_air: str
 
 
 class DashboardCapteursDTO(BaseModel):
     statut: str    # "Sain" | "Attention" | "Critique" | "En attente"
     message: str
-    meteo_exterieure: Optional[MeteoDTO] = None
-    capteurs: List[LectureCapteurDTO]
+    meteo_exterieure: MeteoDTO | None = None
+    capteurs: list[LectureCapteurDTO]
     metrics: MetriquesDashboardDTO

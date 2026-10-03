@@ -2,14 +2,13 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
-from infrastructure.database import get_db
-from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
-from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
-from application.use_cases.vegetal import calculer_etat_global_vegetal, calculer_impact_carbone
-from application.dto.vegetal import EtatGlobalVegetalDTO, ImpactCarboneDTO
 from api.deps.auth import require_role
+from application.dto.vegetal import EtatGlobalVegetalDTO, ImpactCarboneDTO
+from application.use_cases.vegetal import calculer_etat_global_vegetal, calculer_impact_carbone
 from domain.models import User
-from domain.models import EspaceVert
+from infrastructure.database import get_db
+from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
+from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
 
 router = APIRouter()
 

@@ -1,9 +1,10 @@
 # back_end/application/use_cases/vegetal.py
 
-from domain.ports.espace_vert_repository import IEspaceVertRepository
-from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
+from application.dto.vegetal import DetailZoneImpactDTO, EtatGlobalVegetalDTO, ImpactCarboneDTO
 from domain.logic.bilan_carbone import estimer_co2_absorbe_jour, estimer_o2_produit_jour
-from application.dto.vegetal import EtatGlobalVegetalDTO, ImpactCarboneDTO, DetailZoneImpactDTO
+from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
+from domain.ports.espace_vert_repository import IEspaceVertRepository
+
 
 def calculer_etat_global_vegetal(
     espace_repo: IEspaceVertRepository,
@@ -14,7 +15,7 @@ def calculer_etat_global_vegetal(
     """
     espaces = espace_repo.list_tous()
     total_espaces = len(espaces)
-    
+
     if total_espaces == 0:
         return EtatGlobalVegetalDTO(
             sante_globale_percent=100.0,
@@ -34,9 +35,9 @@ def calculer_etat_global_vegetal(
             somme_indices_stress += bilan.indice_stress
             if bilan.statut_hydrique == "Critique":
                 critique_count += 1
-            elif bilan.statut_hydrique == "A surveiller": 
+            elif bilan.statut_hydrique == "A surveiller":
                 warning_count += 1
-    
+
     # Calcul du pourcentage de santé globale (inverse du stress moyen)
     stress_moyen = somme_indices_stress / total_espaces
     sante_globale = max(0.0, (1.0 - stress_moyen) * 100.0)
@@ -58,24 +59,24 @@ def calculer_impact_carbone(
     Calcule l'impact carbone et oxygène agrégé (journalier estimé).
     """
     espaces = espace_repo.list_tous()
-    
+
     total_co2 = 0.0
     total_o2 = 0.0
     stats_par_zone = {}
 
     for espace in espaces:
         bilan = bilan_repo.get_dernier_bilan_pour_espace(espace.id)
-        
+
         # Valeurs par défaut si pas de bilan (pas de stress)
         stress_h = bilan.indice_stress if bilan else 0.0
         stress_s = bilan.stress_sanitaire if bilan else 0.0
-        
+
         co2 = estimer_co2_absorbe_jour(espace, stress_h, stress_s)
         o2 = estimer_o2_produit_jour(espace, stress_h, stress_s)
-        
+
         total_co2 += co2
         total_o2 += o2
-        
+
         # Agrégation par zone
         zone = espace.zone or "Non définie"
         if zone not in stats_par_zone:
@@ -86,8 +87,8 @@ def calculer_impact_carbone(
     # Construction de la liste de détails
     details = [
         DetailZoneImpactDTO(
-            zone=z, 
-            oxygen_kg=round(vals["o2"], 2), 
+            zone=z,
+            oxygen_kg=round(vals["o2"], 2),
             carbon_kg=round(vals["co2"], 2)
         )
         for z, vals in stats_par_zone.items()

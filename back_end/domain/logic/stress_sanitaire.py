@@ -1,6 +1,6 @@
 # Fichier : domain/logic/stress_sanitaire.py
 
-from typing import Sequence
+from collections.abc import Sequence
 
 
 def calculer_stress_sanitaire_jour(
@@ -13,7 +13,7 @@ def calculer_stress_sanitaire_jour(
 
     - 0 : pas de stress sanitaire lié aux conditions T/H
     - 1 : stress sanitaire maximal (conditions très défavorables)
- 
+
     - zone de confort température : 15–24 °C
     - zone de confort humidité : 40–70 %
     - au-delà de ces zones, le stress augmente linéairement jusqu'à 1

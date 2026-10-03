@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
@@ -10,7 +8,7 @@ from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydr
 N_CLUSTERS_PAR_DEFAUT = 5
 
 
-def _config_pour(db: Session, user_id: int) -> Optional[ClusteringConfig]:
+def _config_pour(db: Session, user_id: int) -> ClusteringConfig | None:
     """Configuration de l'utilisateur, sinon configuration par défaut de l'instance (user_id NULL)."""
     return (
         db.query(ClusteringConfig)
@@ -20,7 +18,7 @@ def _config_pour(db: Session, user_id: int) -> Optional[ClusteringConfig]:
     )
 
 
-def _sante_moyenne(espaces: List[EspaceVert], bilans: BilanHydriqueRepositoryImpl) -> Optional[float]:
+def _sante_moyenne(espaces: list[EspaceVert], bilans: BilanHydriqueRepositoryImpl) -> float | None:
     scores = []
     for espace in espaces:
         bilan = bilans.get_dernier_bilan_pour_espace(espace.id)
@@ -29,7 +27,7 @@ def _sante_moyenne(espaces: List[EspaceVert], bilans: BilanHydriqueRepositoryImp
     return round(sum(scores) / len(scores), 1) if scores else None
 
 
-def reconstruire_zones(db: Session, user_id: int) -> List[ZoneIntelligente]:
+def reconstruire_zones(db: Session, user_id: int) -> list[ZoneIntelligente]:
     """Remplace les zones de l'utilisateur par un nouveau regroupement de ses espaces."""
     espaces = db.query(EspaceVert).filter(EspaceVert.user_id == user_id).order_by(EspaceVert.id).all()
     if not espaces:
@@ -45,7 +43,7 @@ def reconstruire_zones(db: Session, user_id: int) -> List[ZoneIntelligente]:
 
     db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == user_id).delete()
     zones = []
-    for nom, groupe in zip(noms, groupes):
+    for nom, groupe in zip(noms, groupes, strict=False):
         membres = [espaces[i] for i in groupe.indices]
         zone = ZoneIntelligente(
             nom=nom,

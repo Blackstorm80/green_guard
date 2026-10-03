@@ -1,0 +1,17 @@
+target-version = "py313"
+line-length = 120
+extend-exclude = ["venv", "alembic/versions"]
+
+[lint]
+# E/W : style PEP 8 · F : erreurs (imports morts, noms indéfinis) · I : ordre des imports
+# B : pièges courants · UP : syntaxe moderne · S : sécurité (bandit)
+select = ["E", "W", "F", "I", "B", "UP", "S"]
+ignore = [
+    "B008",   # Depends() dans les signatures : idiome FastAPI
+    "E741",   # variables d'une lettre (l) dans les compréhensions courtes
+]
+
+[lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]   # assert et mots de passe de test
+"scripts/*" = ["S311", "E402"]         # random hors cryptographie ; sys.path avant imports
+"alembic/env.py" = ["E402"]             # load_dotenv() avant import des modèles

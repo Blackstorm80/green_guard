@@ -1,5 +1,3 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
@@ -22,14 +20,19 @@ def rebuild_zones(
     try:
         zones = reconstruire_zones(db, user_id=current_user.id)
     except ValueError as e:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     return {"message": f"{len(zones)} zone(s) intelligente(s) recalculée(s).", "zones": [z.nom for z in zones]}
 
 
-@router.get("/", response_model=List[ZoneIntelligenteRead])
+@router.get("/", response_model=list[ZoneIntelligenteRead])
 def lister_zones(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
     """Zones intelligentes de l'utilisateur, prêtes à afficher."""
-    zones = db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == current_user.id).order_by(ZoneIntelligente.id).all()
+    zones = (
+        db.query(ZoneIntelligente)
+        .filter(ZoneIntelligente.user_id == current_user.id)
+        .order_by(ZoneIntelligente.id)
+        .all()
+    )
     return [
         ZoneIntelligenteRead(
             id=z.id,

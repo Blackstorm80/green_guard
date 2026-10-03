@@ -1,5 +1,3 @@
-from typing import List, Optional
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -22,7 +20,9 @@ def get_capteur_service(db: Session = Depends(get_db)) -> CapteurHybridService:
 
 @router.get("/dashboard", response_model=DashboardCapteursDTO)
 def dashboard_capteurs(
-    espace_ids: Optional[List[int]] = Query(None, description="Filtre optionnel ; par défaut tous les espaces de l'utilisateur."),
+    espace_ids: list[int] | None = Query(
+        None, description="Filtre optionnel ; par défaut tous les espaces de l'utilisateur."
+    ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     capteurs: CapteurHybridService = Depends(get_capteur_service),

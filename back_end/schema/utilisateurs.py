@@ -1,5 +1,3 @@
-from typing import Optional
-
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 LONGUEUR_MIN_MOT_DE_PASSE = 12
@@ -14,7 +12,7 @@ class User(BaseModel):
     email: str
     role: str
     is_active: bool = True
-    avatar_url: Optional[str] = None
+    avatar_url: str | None = None
 
 
 class UserCreate(BaseModel):

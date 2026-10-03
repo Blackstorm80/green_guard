@@ -1,5 +1,3 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
@@ -18,7 +16,7 @@ def read_current_user(current_user: models.User = Depends(get_current_user)):
     return current_user
 
 
-@router.get("/me/notifications", response_model=List[notification_schema.NotificationRead])
+@router.get("/me/notifications", response_model=list[notification_schema.NotificationRead])
 def read_user_notifications(
     limit: int = Query(10, ge=1, le=100),
     current_user: models.User = Depends(get_current_user),

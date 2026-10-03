@@ -3,7 +3,6 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Optional
 
 
 class MeteoIndisponibleError(Exception):
@@ -16,9 +15,9 @@ class ConditionsMeteo:
     temperature_c: float
     condition: str
     ensoleillement_fort: bool
-    humidite: Optional[float]   # humidité relative de l'air (%)
+    humidite: float | None   # humidité relative de l'air (%)
     pluie_jour_mm: float        # cumul de précipitations du jour (mm)
-    et0_jour_mm: Optional[float] = None  # évapotranspiration de référence du jour (mm)
+    et0_jour_mm: float | None = None  # évapotranspiration de référence du jour (mm)
 
 
 class IMeteoService(ABC):

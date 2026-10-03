@@ -1,5 +1,3 @@
-from typing import List
-
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy.orm import Session
 
@@ -20,7 +18,7 @@ def _espace_de_l_utilisateur(espace_id: int, db: Session, user: models.User) -> 
     return espace
 
 
-@router.get("/", response_model=List[EspaceVertRead])
+@router.get("/", response_model=list[EspaceVertRead])
 def get_espaces_verts(db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
     """Espaces verts de l'utilisateur connecté."""
     return EspaceVertRepositoryImpl(db).list_by_user(current_user.id)
@@ -38,7 +36,9 @@ def create_espace_vert(
 
 
 @router.get("/{espace_id}", response_model=EspaceVertRead)
-def get_espace_vert(espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def get_espace_vert(
+    espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
     return _espace_de_l_utilisateur(espace_id, db, current_user)
 
 
@@ -57,7 +57,9 @@ def update_espace_vert(
 
 
 @router.delete("/{espace_id}", status_code=status.HTTP_204_NO_CONTENT)
-def delete_espace_vert(espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+def delete_espace_vert(
+    espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
+):
     espace = _espace_de_l_utilisateur(espace_id, db, current_user)
     db.delete(espace)
     db.commit()

@@ -1,8 +1,8 @@
 # back_end/application/dto/intervention.py
-from pydantic import BaseModel
-from enum import Enum
 from datetime import datetime
-from typing import List
+from enum import Enum
+
+from pydantic import BaseModel
 
 
 class PrioriteIntervention(str, Enum):
@@ -31,6 +31,6 @@ class InterventionUrgenteDTO(BaseModel):
 
 
 class InterventionsUrgentesDTO(BaseModel):
-    interventions: List[InterventionUrgenteDTO]
+    interventions: list[InterventionUrgenteDTO]
     total: int
     non_lues: int

@@ -6,9 +6,9 @@ le calcul autant de fois que voulu dans la journée, la réserve n'est décompt�
 qu'une seule fois. Les cumuls météo du jour (pluie, ET0) s'affinent à chaque passage.
 """
 import logging
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import date, datetime, timezone
-from typing import Callable, Iterable, List
+from datetime import UTC, date, datetime
 
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.models import BilanHydriqueJournalier, EspaceVert
@@ -27,8 +27,8 @@ class ResultatEspace:
 
 @dataclass
 class RapportGeneration:
-    traites: List[ResultatEspace] = field(default_factory=list)
-    ignores: List[int] = field(default_factory=list)  # ids d'espaces sans données météo exploitables
+    traites: list[ResultatEspace] = field(default_factory=list)
+    ignores: list[int] = field(default_factory=list)  # ids d'espaces sans données météo exploitables
 
 
 def calculer_bilan_du_jour(
@@ -68,7 +68,7 @@ def generer_bilans_hydriques_journaliers(
     date_du_calcul: date | None = None,
 ) -> RapportGeneration:
     date_du_calcul = date_du_calcul or date.today()
-    maintenant = datetime.now(timezone.utc)
+    maintenant = datetime.now(UTC)
     rapport = RapportGeneration()
 
     for espace in espaces:
