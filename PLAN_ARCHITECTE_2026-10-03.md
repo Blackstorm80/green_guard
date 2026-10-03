@@ -169,6 +169,13 @@ Hypothèse : un développeur à temps plein accompagné de l'architecte. Chaque 
 5. Réparation ou suppression du sous-module `inaturalist`. Suppression des branches mortes, après avoir récupéré le CRUD interventions de `feature/Lucresse-branche` si on le garde.
 6. Activation de la protection de `main` sur GitHub et du *secret scanning / push protection*. Suppression de la règle « priorité au local » du README.
 
+**Suivi au 2026-10-03** (branche `chore/phase-0-securisation`, 6 commits) :
+- ✅ Étape 2 : secrets, BDD, `node_modules`, `.vite`, `dist` et `__pycache__` retirés de l'index ; `.gitignore`, `.dockerignore` et `.env.example` en place ; `SECRET_KEY` locale régénérée.
+- ✅ Étape 3 : travail de juin relu et commité en 3 commits (sécurité back, sécurité front, PostgreSQL/Alembic, migration vérifiée avec `alembic check`).
+- ✅ Étape 5 (partielle) : gitlink `inaturalist` retiré. La branche `feature/Lucresse-branche` (CRUD interventions, historique séparé) est **à conserver** jusqu'à son report en phase 1.
+- ✅ CI : scan de secrets réel (`.github/workflows/securite.yml`). README corrigé.
+- ⏳ Étapes 1, 4 et 6, ainsi que la suppression des branches mortes : en attente du porteur de projet (rotation des clés, accord pour la purge, réglages GitHub).
+
 ### Phase 1 : faire marcher le produit (12 → 23 octobre)
 1. ADR-1 (préfixes) et alignement du front.
 2. Correction des 10 routes en 500 et des `ImportError` : décider pour chaque module mort entre **réparer** et **supprimer**.
