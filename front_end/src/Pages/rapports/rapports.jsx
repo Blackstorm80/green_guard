@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { 
   FileText, 
   Download, 
@@ -8,7 +8,6 @@ import {
   Search,
 } from "lucide-react";
 import { cn } from "../../lib/utils";
-import { api } from '../../services/api';
 
 // --- MOCK DATA : Historique des rapports ---
 const REPORTS_DATA = [
@@ -51,24 +50,9 @@ const Rapports = () => {
   const [filters, setFilters] = useState({
     startDate: '',
     endDate: '',
-    espaceId: '',
     searchTerm: '',
     type: 'ALL',
   });
-  const [espaces, setEspaces] = useState([]);
-
-  useEffect(() => {
-    const fetchEspaces = async () => {
-      try {
-        const response = await api.getEspacesVerts();
-        setEspaces(response);
-      } catch (error) {
-        console.error("Impossible de charger les espaces verts", error);
-      }
-    };
-    fetchEspaces();
-  }, []);
-
   const handleFilterChange = (e) => {
     setFilters({ ...filters, [e.target.name]: e.target.value });
   };

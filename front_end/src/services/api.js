@@ -1,5 +1,4 @@
 const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8000/api/v1";
-const TOKEN_KEY = "access_token";
 
 /** Événement émis sur toute réponse 401 : AuthContext déconnecte et redirige. */
 export const SESSION_EXPIREE = "greenguard:session-expiree";
@@ -11,12 +10,6 @@ export class ApiError extends Error {
     this.status = status;
   }
 }
-
-export const tokenStorage = {
-  get: () => localStorage.getItem(TOKEN_KEY),
-  set: (token) => localStorage.setItem(TOKEN_KEY, token),
-  clear: () => localStorage.removeItem(TOKEN_KEY),
-};
 
 /** Transforme une erreur FastAPI (texte ou liste Pydantic 422) en message lisible. */
 function messageErreur(detail, status) {
@@ -32,10 +25,12 @@ function messageErreur(detail, status) {
   return `Erreur ${status}`;
 }
 
-async function request(path, { method = "GET", body, form, auth = true, signal } = {}) {
-  const headers = {};
-  const token = tokenStorage.get();
-  if (auth && token) headers.Authorization = `Bearer ${token}`;
+/**
+ * Session : cookie httpOnly posé par le serveur (illisible par JavaScript, donc à l'abri d'un vol par XSS).
+ * X-Requested-With est exigé par l'API pour toute écriture authentifiée par cookie (protection CSRF).
+ */
+async function request(path, { method = "GET", body, form, signalerExpiration = true, signal } = {}) {
+  const headers = { "X-Requested-With": "greenguard" };
 
   let payload;
   if (form) {
@@ -48,13 +43,13 @@ async function request(path, { method = "GET", body, form, auth = true, signal }
 
   let response;
   try {
-    response = await fetch(`${BASE_URL}${path}`, { method, headers, body: payload, signal });
+    response = await fetch(`${BASE_URL}${path}`, { method, headers, body: payload, signal, credentials: "include" });
   } catch (err) {
     if (err.name === "AbortError") throw err;
     throw new ApiError("Serveur injoignable. Vérifiez votre connexion.", 0);
   }
 
-  if (response.status === 401 && auth) {
+  if (response.status === 401 && signalerExpiration) {
     window.dispatchEvent(new Event(SESSION_EXPIREE));
   }
   if (!response.ok) {
@@ -76,19 +71,14 @@ const query = (params) => {
 
 export const api = {
   // --- AUTHENTIFICATION & UTILISATEURS ---
-  login: async (email, password) => {
-    const data = await request("/auth/login", {
-      method: "POST",
-      form: { username: email, password },
-      auth: false,
-    });
-    tokenStorage.set(data.access_token);
-    return data;
-  },
+  // Le jeton renvoyé dans le corps (pour Swagger/scripts) est volontairement ignoré : seul le cookie sert.
+  login: (email, password) =>
+    request("/auth/login", { method: "POST", form: { username: email, password }, signalerExpiration: false }),
   register: ({ name, email, password }) =>
-    request("/auth/register", { method: "POST", body: { name, email, password }, auth: false }),
-  getCurrentUser: (signal) => request("/users/me", { signal }),
-  logout: () => tokenStorage.clear(),
+    request("/auth/register", { method: "POST", body: { name, email, password }, signalerExpiration: false }),
+  // Vérification de session au chargement : un 401 signifie simplement « non connecté »
+  getCurrentUser: (signal) => request("/users/me", { signal, signalerExpiration: false }),
+  logout: () => request("/auth/logout", { method: "POST", signalerExpiration: false }),
 
   // --- DASHBOARD & CAPTEURS ---
   getDashboardStats: (espaceIds = [], signal) =>
