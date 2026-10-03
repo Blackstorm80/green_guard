@@ -1,0 +1,31 @@
+name: Sécurité
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  secrets:
+    name: Scan de secrets (gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Interdire les fichiers sensibles versionnés
+        run: |
+          if git ls-files | grep -E '(^|/)\.env$|(^|/)\.env\.[^e]|\.db$|\.sqlite3?$|node_modules/'; then
+            echo "::error::Fichier sensible ou artefact versionné (voir liste ci-dessus)."
+            exit 1
+          fi
+
+      # Mode `dir` : analyse l'arbre courant. Passer en mode `git` (historique
+      # complet) une fois l'historique purgé des anciennes clés.
+      - name: Gitleaks
+        run: |
+          docker run --rm -v "$PWD:/repo" ghcr.io/gitleaks/gitleaks:v8.21.2 \
+            dir /repo --redact --verbose --no-banner
