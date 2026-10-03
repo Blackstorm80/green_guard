@@ -5,20 +5,19 @@ server {
     index index.html;
     server_tokens off;
 
-    # En-têtes de sécurité de base (CSP complète prévue en phase 2)
-    add_header X-Content-Type-Options "nosniff" always;
-    add_header X-Frame-Options "DENY" always;
-    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    # En-têtes de sécurité : inclus dans chaque location (nginx n'hérite pas des add_header du parent)
 
     # Fichiers versionnés par Vite (hash dans le nom) : cache long
     location /assets/ {
         expires 1y;
+        include /etc/nginx/conf.d/securite.inc;
         add_header Cache-Control "public, immutable";
         try_files $uri =404;
     }
 
     # SPA : toute route inconnue renvoie index.html (React Router gère le 404)
     location / {
+        include /etc/nginx/conf.d/securite.inc;
         add_header Cache-Control "no-cache";
         try_files $uri $uri/ /index.html;
     }
