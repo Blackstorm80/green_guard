@@ -1,10 +1,10 @@
-from typing import Optional
+from datetime import datetime
+
 from pydantic import BaseModel
-"""  token d'indentification pour les users (utliser en auth, ...)"""
+
+
 class Token(BaseModel):
+    """Réponse de connexion. Le navigateur utilise le cookie httpOnly ; le jeton sert à Swagger et aux scripts."""
     access_token: str
     token_type: str
-
-class TokenData(BaseModel):
-    username: Optional[str] = None
-    role: Optional[str] = None
+    expires_at: datetime

@@ -10,17 +10,16 @@ psycopg2-binary==2.9.11
 alembic==1.18.4
 
 # --- Sécurité & authentification ---
-# python-jose : remplacement par PyJWT prévu en phase 2 (ADR-6, dépendance ecdsa non maintenue)
-python-jose[cryptography]==3.5.0
+PyJWT==2.15.0
 bcrypt==5.0.0
 
 # --- Validation ---
 pydantic==2.12.5
 email-validator==2.3.0
-python-multipart==0.0.22
+python-multipart==0.0.31
 
 # --- Configuration ---
-python-dotenv==1.2.1
+python-dotenv==1.2.2
 
 # --- Tâches planifiées ---
 APScheduler==3.11.2
@@ -30,4 +29,4 @@ scikit-learn==1.8.0
 numpy==2.4.2
 
 # --- HTTP sortant (Open-Meteo) ---
-requests==2.32.5
+requests==2.33.0

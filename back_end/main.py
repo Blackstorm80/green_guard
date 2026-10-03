@@ -1,34 +1,46 @@
 import logging
-import os
 from contextlib import asynccontextmanager
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.deps.auth import EN_TETE_CSRF
+from api.middleware import installer_middlewares
 from api.v1.endpoints import (
-    auth, capteurs, catalogue, espaces_verts, health, interventions, meteo, notifications, user, vegetal, zones,
+    auth,
+    capteurs,
+    catalogue,
+    espaces_verts,
+    health,
+    interventions,
+    meteo,
+    notifications,
+    user,
+    vegetal,
+    zones,
 )
+from config import settings
 from infrastructure.jobs.mise_a_jour_capteurs import INTERVALLE_MINUTES, run_update
+from infrastructure.logging_config import configurer_logs
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s [%(name)s] %(message)s")
+configurer_logs(settings.log_level, settings.log_format)
 logger = logging.getLogger("greenguard")
 
 # Le schéma de la base est géré exclusivement par Alembic (`alembic upgrade head`).
-# Le job planifié ne doit tourner que dans UN processus : le désactiver (ENABLE_SCHEDULER=false)
-# sur les workers d'API multiples ; un service worker dédié est prévu (ADR-5).
-ENABLE_SCHEDULER = os.getenv("ENABLE_SCHEDULER", "true").lower() == "true"
+# Les tâches planifiées tournent dans le service worker (worker.py) ; ENABLE_SCHEDULER=true
+# ne sert qu'au développement local sans worker.
 
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     scheduler = None
-    if ENABLE_SCHEDULER:
-        scheduler = BackgroundScheduler()
+    if settings.enable_scheduler:
+        scheduler = BackgroundScheduler(timezone="UTC")
         scheduler.add_job(run_update, "interval", minutes=INTERVALLE_MINUTES, id="mise_a_jour_capteurs",
                           max_instances=1, coalesce=True)
         scheduler.start()
-        logger.info("Scheduler démarré (mise à jour capteurs toutes les %d min).", INTERVALLE_MINUTES)
+        logger.info("Scheduler intégré démarré (mode développement).")
     yield
     if scheduler:
         scheduler.shutdown()
@@ -36,17 +48,14 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="GreenGuard API", version="0.9.0", lifespan=lifespan)
 
-_allowed_origins = ["http://localhost:3000", "http://localhost:5173"]
-_frontend_url = os.getenv("FRONTEND_URL")
-if _frontend_url:
-    _allowed_origins.append(_frontend_url)
-
+installer_middlewares(app)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=_allowed_origins,
-    allow_credentials=True,
+    allow_origins=settings.allowed_origins,
+    allow_credentials=True,  # cookie de session
     allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_headers=["Authorization", "Content-Type", EN_TETE_CSRF],
+    expose_headers=["X-Request-ID", "Retry-After"],
 )
 
 # ADR-1 : le préfixe d'un router est défini ici et nulle part ailleurs.

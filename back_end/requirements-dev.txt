@@ -2,6 +2,8 @@
 -r requirements.txt
 
 pytest==9.0.2
+pytest-cov==6.0.0
+ruff==0.8.4
 httpx==0.28.1        # requis par fastapi.testclient
 
 # Scripts de chargement de données (scripts/load/)

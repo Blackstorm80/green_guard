@@ -1,16 +1,9 @@
-import os
 from sqlalchemy import MetaData, create_engine, event
-from sqlalchemy.orm import sessionmaker, declarative_base
-from dotenv import load_dotenv
+from sqlalchemy.orm import declarative_base, sessionmaker
 
-load_dotenv()
+from config import settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise RuntimeError(
-        "Variable d'environnement DATABASE_URL manquante. "
-        "Exemple: postgresql://greenguard:secret@localhost:5432/greenguard"
-    )
+DATABASE_URL = settings.database_url
 
 # PostgreSQL : pas besoin de connect_args check_same_thread
 connect_args = {}
@@ -24,6 +17,7 @@ if DATABASE_URL.startswith("sqlite"):
     @event.listens_for(engine, "connect")
     def _activer_cles_etrangeres(dbapi_connection, _):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
+
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 # Contraintes nommées de façon déterministe : indispensable pour que les migrations
