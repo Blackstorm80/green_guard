@@ -1,4 +1,5 @@
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -12,6 +13,18 @@ class DoseRecommandeeDTO(BaseModel):
     mm: float
     litres: float | None = None
     minutes: float | None = None
+
+
+class DecisionDTO(BaseModel):
+    """Décision d'arrosage issue de la prévision à 7 jours (arroser / reporter / surveiller / rien)."""
+    model_config = ConfigDict(from_attributes=True)
+
+    code: Literal["arroser", "reporter", "surveiller", "rien"]
+    texte: str
+    date_limite: date | None = None
+    jour_pluie: date | None = None
+    pluie_attendue_mm: float | None = None
+    dose_recommandee: DoseRecommandeeDTO | None = None
 
 
 class LectureCapteurDTO(BaseModel):
@@ -35,6 +48,9 @@ class LectureCapteurDTO(BaseModel):
     date_bilan: date | None = None
     version_modele: str | None = None
     dose_recommandee: DoseRecommandeeDTO | None = None
+    # Prévision à 7 jours ; null si la météo est indisponible ou sans bilan FAO-56 récent
+    decision: DecisionDTO | None = None
+    date_bascule: date | None = None   # premier jour prévu en Critique (J si déjà critique)
 
 
 class MetriquesDashboardDTO(BaseModel):
@@ -53,6 +69,8 @@ class DashboardCapteursDTO(BaseModel):
     meteo_exterieure: MeteoDTO | None = None
     capteurs: list[LectureCapteurDTO]
     metrics: MetriquesDashboardDTO
+    # Jour métier du calcul (fuseau du serveur) : référence pour situer les dates de bascule
+    date_calcul: date | None = None
 
 
 class DiagnosticDTO(BaseModel):

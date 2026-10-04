@@ -6,6 +6,8 @@ from datetime import date, datetime
 
 # Profondeur maximale d'une série passée (limite past_days d'Open-Meteo) : borne du rattrapage
 SERIE_JOURS_MAX = 92
+# Horizon de la prévision : aujourd'hui (J) puis J+1 à J+7
+HORIZON_PREVISION_JOURS = 7
 
 
 class MeteoIndisponibleError(Exception):
@@ -33,6 +35,16 @@ class MeteoJournaliere:
     source: str | None = None
 
 
+@dataclass(frozen=True)
+class PrevisionJournaliere:
+    """Cumuls prévus d'une journée (jour du fuseau métier) : ET0, pluie et probabilité de pluie maximale."""
+    jour: date
+    et0_mm: float | None
+    pluie_mm: float
+    probabilite_pluie_pct: float | None  # probabilité maximale de la journée (%), régionale
+    source: str | None = None
+
+
 class IMeteoService(ABC):
     """Port domaine : conditions météo utiles au pilotage."""
 
@@ -54,6 +66,13 @@ class IMeteoService(ABC):
         fin: date,
     ) -> list[MeteoJournaliere]:
         """ET0 et pluie de chaque jour de [debut, fin] (bornes incluses, 92 jours au plus).
+
+        Lève MeteoIndisponibleError si le fournisseur ne répond pas.
+        """
+
+    @abstractmethod
+    def recuperer_prevision_journaliere(self, latitude: float, longitude: float) -> list[PrevisionJournaliere]:
+        """Prévision de J (aujourd'hui, fuseau métier) à J+HORIZON_PREVISION_JOURS, par date croissante.
 
         Lève MeteoIndisponibleError si le fournisseur ne répond pas.
         """

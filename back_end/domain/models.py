@@ -295,6 +295,8 @@ class Notification(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     message = Column(String, nullable=False)
     type = Column(String, nullable=False, default="info", server_default="info")
+    # Espace concerné (alertes du worker) : une alerte par espace et par jour ; conservée si l'espace disparaît
+    espace_id = Column(Integer, ForeignKey("espaces_verts.id", ondelete="SET NULL"), nullable=True, index=True)
     est_lue = Column(Boolean, nullable=False, default=False, server_default=false())
     cree_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 

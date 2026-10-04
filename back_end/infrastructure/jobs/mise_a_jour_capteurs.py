@@ -1,4 +1,5 @@
-"""Job planifié : bilan hydrique du jour + relevé de mesures pour chaque espace.
+"""Job planifié : bilan hydrique du jour + relevé de mesures pour chaque espace, puis alertes
+(stress critique, arrosage à prévoir selon la prévision à 7 jours).
 
 Tant que les capteurs IoT ne sont pas branchés, la mesure est dérivée de la
 météo réelle (température, humidité de l'air) et du bilan (humidité du sol).
@@ -7,7 +8,7 @@ Le worker sert toutes les organisations : seule leur liste est lue hors contexte
 puis chacune est traitée dans son propre contexte (comme une requête de ses membres).
 """
 import logging
-from datetime import UTC, datetime, tzinfo
+from datetime import UTC, date, datetime, tzinfo
 
 from sqlalchemy.orm import Session
 
@@ -16,10 +17,13 @@ from application.use_cases.generer_bilans_hydriques_journaliers import (
     bornes_du_jour,
     generer_bilans_hydriques_journaliers,
 )
+from application.use_cases.prevision import etat_du_bilan, prevoir_espace
 from config import settings
+from domain.logic.arrosage import formuler_dose
 from domain.logic.droits import ROLES_INTERVENTION
+from domain.logic.prevision import ARROSER, PrevisionImpossibleError, formater_jour
 from domain.models import Mesure, Notification, Organisation, User
-from domain.ports.meteo import IMeteoService
+from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
 from infrastructure.database import SessionLocal
 from infrastructure.repositories.action_irrigation_repository_impl import ActionIrrigationRepositoryImpl
 from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
@@ -30,6 +34,7 @@ from infrastructure.services.meteo_open_meteo import OpenMeteoService
 logger = logging.getLogger(__name__)
 
 INTERVALLE_MINUTES = 60
+TYPE_ARROSAGE_A_PREVOIR = "arrosage_a_prevoir"
 
 
 def _destinataires(db: Session, organisation_id: int) -> list[int]:
@@ -49,7 +54,46 @@ def _notifier_stress_critique(db: Session, resultat, destinataires: list[int], d
         Notification.message == message, Notification.cree_le >= debut_journee,
     )}
     nouveaux = [user_id for user_id in destinataires if user_id not in deja]
-    db.add_all(Notification(user_id=user_id, type="stress_hydrique", message=message) for user_id in nouveaux)
+    db.add_all(Notification(user_id=user_id, type="stress_hydrique", message=message,
+                            espace_id=resultat.espace.id) for user_id in nouveaux)
+    return len(nouveaux)
+
+
+def _notifier_arrosage_a_prevoir(db: Session, resultat, destinataires: list[int], meteo_service: IMeteoService,
+                                 aujourd_hui: date, debut_journee: datetime) -> int:
+    """Une notification par espace, par destinataire et par jour quand la prévision conclut « arroser ».
+
+    Un espace déjà critique a reçu l'alerte de stress : pas de second message pour la même action.
+    La météo prévue est lue dans le cache du service (un appel par point) ; indisponible : rien n'est émis.
+    """
+    if not destinataires or resultat.bilan.statut_hydrique == "Critique":
+        return 0
+    etat = etat_du_bilan(resultat.bilan)
+    if etat is None:
+        return 0
+    try:
+        decision = prevoir_espace(resultat.espace, etat, meteo_service, aujourd_hui).decision
+    except (MeteoIndisponibleError, PrevisionImpossibleError) as exc:
+        logger.info("Prévision indisponible pour l'espace %s : %s", resultat.espace.id, exc)
+        return 0
+    except Exception:
+        # Alerte secondaire : son échec ne doit pas annuler les bilans, mesures et alertes de stress
+        logger.exception("Échec de la prévision de l'espace %s (worker)", resultat.espace.id)
+        return 0
+    if decision.code != ARROSER:
+        return 0
+    deja = {id_ for (id_,) in db.query(Notification.user_id).filter(
+        Notification.user_id.in_(destinataires), Notification.type == TYPE_ARROSAGE_A_PREVOIR,
+        Notification.espace_id == resultat.espace.id, Notification.cree_le >= debut_journee,
+    )}
+    quand = "aujourd'hui" if decision.date_limite <= aujourd_hui else f"le {formater_jour(decision.date_limite)}"
+    message = f"Arrosage à prévoir sur « {resultat.espace.nom} » au plus tard {quand}."
+    conseil = formuler_dose(decision.dose)
+    if conseil:
+        message += f" {conseil}"
+    nouveaux = [user_id for user_id in destinataires if user_id not in deja]
+    db.add_all(Notification(user_id=user_id, type=TYPE_ARROSAGE_A_PREVOIR, message=message,
+                            espace_id=resultat.espace.id) for user_id in nouveaux)
     return len(nouveaux)
 
 
@@ -64,7 +108,8 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
         maintenant=maintenant,
     )
 
-    debut_journee, _ = bornes_du_jour(maintenant.astimezone(fuseau).date(), fuseau)
+    aujourd_hui = maintenant.astimezone(fuseau).date()
+    debut_journee, _ = bornes_du_jour(aujourd_hui, fuseau)
     destinataires = _destinataires(db, organisation_id)
     notifications = 0
     for resultat in rapport.traites:
@@ -78,6 +123,8 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
             timestamp=maintenant,
         ))
         notifications += _notifier_stress_critique(db, resultat, destinataires, debut_journee)
+        notifications += _notifier_arrosage_a_prevoir(db, resultat, destinataires, meteo_service, aujourd_hui,
+                                                      debut_journee)
     db.commit()
     return len(rapport.traites), len(rapport.ignores), notifications
 

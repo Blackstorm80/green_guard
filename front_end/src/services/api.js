@@ -106,6 +106,8 @@ export const api = {
   deleteEspace: (id) => request(`/espaces-verts/${id}`, { method: "DELETE" }),
   // Historique des bilans hydriques et de leurs termes (FAO-56), par date croissante ; jours ≤ 365
   getBilansEspace: (id, jours = 30, signal) => request(`/espaces-verts/${id}/bilans${query({ jours })}`, { signal }),
+  // Prévision J..J+7 : réserve projetée, dates de bascule, décision (409 sans bilan récent, 502 sans météo)
+  getPrevisionEspace: (id, signal) => request(`/espaces-verts/${id}/prevision`, { signal }),
 
   // --- ZONES INTELLIGENTES ---
   getZones: (signal) => request("/zones/", { signal }),

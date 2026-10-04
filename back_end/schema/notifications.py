@@ -10,5 +10,6 @@ class NotificationRead(BaseModel):
     id: int
     message: str
     type: str
+    espace_id: int | None = None
     is_read: bool = Field(validation_alias="est_lue")
     created_at: datetime = Field(validation_alias="cree_le")

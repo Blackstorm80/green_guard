@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Activity, AlertTriangle, CheckCircle, ChevronDown, ChevronUp, Clock, Cpu, Droplets,
-  ShieldAlert, Stethoscope, Sun, Target, Thermometer, Umbrella, Wind,
+  CalendarClock, ShieldAlert, Stethoscope, Sun, Target, Thermometer, Umbrella, Wind,
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useRequete, useTitrePage } from "../../lib/hooks";
-import { peut, TON_STATUT } from "../../lib/referentiels";
+import { DECISIONS_PREVISION, peut, TON_STATUT } from "../../lib/referentiels";
 import { Badge } from "../../components/ui/Card";
 import { ModaleArrosage } from "../../components/interventions/ModaleArrosage";
 
@@ -238,6 +238,7 @@ export default function HomeTableauDeBord() {
                   <h3 className="text-sm font-black text-fg">{capteur.nom}</h3>
                   <Badge ton={TON_STATUT[capteur.statut] ?? "neutre"}>{capteur.statut}</Badge>
                 </header>
+                <DecisionPrevision decision={capteur.decision} dateBascule={capteur.date_bascule} dateCalcul={dashboard?.date_calcul} />
                 <div className="flex flex-col gap-3">
                   <MetricCard icon={<Thermometer className="text-orange-400" />} label="Température" value={formatNombre(capteur.temperature_c, 1)} unit="°C" />
                   <MetricCard icon={<Droplets className="text-teal-400" />} label="Humidité du sol" value={formatNombre(capteur.humidite_percent, 1)} unit="%" />
@@ -324,6 +325,27 @@ function ActionCard({ site, onAction, actionEnCours }) {
           );
         })}
       </div>}
+    </div>
+  );
+}
+
+const formatJour = (iso) =>
+  new Date(`${iso}T12:00:00`).toLocaleDateString("fr-FR", { weekday: "long", day: "numeric", month: "long" });
+
+/** Décision de la prévision à 7 jours : badge et phrase calculée ; rien si la météo prévue est indisponible. */
+function DecisionPrevision({ decision, dateBascule, dateCalcul }) {
+  if (!decision) return null;
+  const { libelle, ton } = DECISIONS_PREVISION[decision.code] ?? { libelle: decision.code, ton: "neutre" };
+  // Déjà critique aujourd'hui : le badge de statut le dit, la phrase dit quoi faire.
+  // Comparaison au jour métier du serveur (dates ISO), pas à l'horloge ni au fuseau du navigateur
+  const basculeAVenir = Boolean(dateBascule && dateCalcul && dateBascule > dateCalcul);
+  return (
+    <div className="mb-4 flex flex-col gap-2 rounded-xl border border-line bg-canvas/50 p-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge ton={ton}><CalendarClock size={12} aria-hidden /> Prévision : {libelle}</Badge>
+        {basculeAVenir && <span className="text-xs text-fg-muted">Critique prévu le {formatJour(dateBascule)}</span>}
+      </div>
+      <p className="text-sm text-fg-soft">{decision.texte}</p>
     </div>
   );
 }

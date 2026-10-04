@@ -5,6 +5,7 @@ from datetime import date, datetime
 from typing import Protocol
 
 from domain.logic.arrosage import DoseRecommandee
+from domain.logic.prevision import EtatHydrique
 
 STATUT_SANS_DONNEE = "Sans donnée"
 
@@ -43,6 +44,8 @@ class LectureCapteur:
     version_modele: str | None = None
     # Dose pour revenir à la capacité au champ (bilan FAO-56 seulement)
     dose_recommandee: DoseRecommandee | None = None
+    # Point de départ de la prévision à 7 jours (bilan FAO-56 seulement)
+    etat_hydrique: EtatHydrique | None = None
 
 
 class ICapteurService(ABC):

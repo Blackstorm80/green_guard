@@ -4,6 +4,8 @@ from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 
 from domain.logic.arrosage import dose_recommandee
+from domain.logic.fao56 import COEFFICIENT_PAYSAGER_DEFAUT
+from domain.logic.prevision import EtatHydrique
 from domain.models import BilanHydriqueJournalier, Mesure
 from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService, LectureCapteur
 
@@ -48,7 +50,7 @@ class CapteurHybridService(ICapteurService):
         )
         requete = select(
             b.espace_id, b.date, b.reserve_utile_fin_journee, b.indice_stress, b.statut_hydrique,
-            b.taw_mm, b.raw_mm, b.et0_mm, b.etc_mm, b.epuisement_fin_mm, b.version_modele,
+            b.taw_mm, b.raw_mm, b.et0_mm, b.etc_mm, b.epuisement_fin_mm, b.version_modele, b.kl, b.pluie_mm,
         ).join(
             dernier, (b.espace_id == dernier.c.espace_id) & (b.date == dernier.c.d)
         )
@@ -79,6 +81,10 @@ class CapteurHybridService(ICapteurService):
             "date_bilan": bilan.date,
             "version_modele": bilan.version_modele,
             "dose_recommandee": cls._dose(bilan, espace) if bilan.taw_mm is not None else None,
+            "etat_hydrique": EtatHydrique(
+                date=bilan.date, epuisement_mm=bilan.epuisement_fin_mm, taw_mm=bilan.taw_mm,
+                kl=bilan.kl or COEFFICIENT_PAYSAGER_DEFAUT, et0_mm=bilan.et0_mm, pluie_mm=bilan.pluie_mm,
+            ) if bilan.taw_mm is not None and bilan.epuisement_fin_mm is not None else None,
         }
 
     def lectures_actuelles(self, espaces: Sequence[EspaceIdentifie]) -> list[LectureCapteur]:

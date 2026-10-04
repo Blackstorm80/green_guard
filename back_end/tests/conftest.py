@@ -23,6 +23,7 @@ from domain.ports.meteo import (  # noqa: E402
     IMeteoService,
     MeteoIndisponibleError,
     MeteoJournaliere,
+    PrevisionJournaliere,
 )
 from infrastructure.database import Base, SessionLocal, engine  # noqa: E402
 from main import app  # noqa: E402
@@ -41,6 +42,11 @@ class FausseMeteo(IMeteoService):
         self.jours_absents: set[date] = set()
         self.serie_disponible = True
         self.appels_serie: list[tuple[date, date]] = []
+        # Prévision J..J+7 : par défaut et0 courant, sans pluie ; jours[décalage] = (et0, pluie, probabilité)
+        self.prevision: dict[int, tuple[float | None, float, float | None]] = {}
+        self.prevision_disponible = True
+        self.aujourd_hui: date | None = None   # jour de départ de la prévision (sinon : aujourd'hui, Europe/Paris)
+        self.appels_prevision: list[tuple[float, float]] = []
 
     def recuperer_conditions_actuelles(self, latitude, longitude, maintenant: datetime) -> ConditionsMeteo:
         self.appels += 1
@@ -60,6 +66,19 @@ class FausseMeteo(IMeteoService):
             MeteoJournaliere(jour=j, et0_mm=self.serie.get(j, (self.et0, self.pluie))[0],
                              pluie_mm=self.serie.get(j, (self.et0, self.pluie))[1], source="test-serie")
             for j in jours if j not in self.jours_absents
+        ]
+
+
+    def recuperer_prevision_journaliere(self, latitude, longitude) -> list[PrevisionJournaliere]:
+        self.appels_prevision.append((latitude, longitude))
+        if not self.prevision_disponible:
+            raise MeteoIndisponibleError("indisponible")
+        from config import settings
+        debut = self.aujourd_hui or datetime.now(settings.fuseau).date()
+        return [
+            PrevisionJournaliere(debut + timedelta(days=i), *self.prevision.get(i, (self.et0, 0.0, 0.0)),
+                                 source="test-prevision")
+            for i in range(8)
         ]
 
 

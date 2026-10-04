@@ -1,6 +1,9 @@
+from datetime import UTC, datetime, tzinfo
+
 from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO, MetriquesDashboardDTO
 from application.dto.meteo import MeteoDTO
 from application.use_cases.meteo import obtenir_meteo_actuelle
+from application.use_cases.prevision import decision_dto, previsions_des_lectures
 from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService
 from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
 
@@ -40,9 +43,27 @@ def obtenir_dashboard_capteurs(
     espaces: list[EspaceIdentifie],
     capteur_service: ICapteurService,
     meteo_service: IMeteoService,
+    fuseau: tzinfo,
+    maintenant: datetime | None = None,
 ) -> DashboardCapteursDTO:
-    """Tableau de bord des espaces fournis (déjà filtrés sur l'utilisateur par l'appelant)."""
-    lectures = [LectureCapteurDTO.model_validate(l) for l in capteur_service.lectures_actuelles(espaces)]
+    """Tableau de bord des espaces fournis (déjà filtrés sur l'utilisateur par l'appelant).
+
+    Chaque lecture porte la décision de la prévision à 7 jours et la date de bascule en Critique,
+    absentes si la météo prévue est indisponible.
+    """
+    brutes = capteur_service.lectures_actuelles(espaces)
+    aujourd_hui = (maintenant or datetime.now(UTC)).astimezone(fuseau).date()
+    previsions = previsions_des_lectures(espaces, brutes, meteo_service, aujourd_hui)
+    lectures = []
+    for brute in brutes:
+        lecture = LectureCapteurDTO.model_validate(brute)
+        prevision = previsions.get(brute.espace_id)
+        if prevision is not None:
+            lecture = lecture.model_copy(update={
+                "decision": decision_dto(prevision.decision),
+                "date_bascule": prevision.date_bascule_critique,
+            })
+        lectures.append(lecture)
     avec_donnees = [l for l in lectures if l.statut != STATUT_SANS_DONNEE]
 
     co2_moyen = _moyenne([l.co2_ppm for l in lectures if l.co2_ppm is not None])
@@ -70,4 +91,5 @@ def obtenir_dashboard_capteurs(
         meteo_exterieure=meteo,
         capteurs=lectures,
         metrics=metrics,
+        date_calcul=aujourd_hui,
     )

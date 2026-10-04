@@ -28,6 +28,14 @@ export const TON_STATUT = {
   "Sans donnée": "neutre",
 };
 
+// Décision de la prévision à 7 jours (tableau de bord)
+export const DECISIONS_PREVISION = {
+  arroser: { libelle: "Arroser", ton: "danger" },
+  reporter: { libelle: "Reporter", ton: "info" },
+  surveiller: { libelle: "À surveiller", ton: "alerte" },
+  rien: { libelle: "Rien à prévoir", ton: "succes" },
+};
+
 export const LIBELLES_INTERVENTION = {
   arrosage: "Arrosage", ombrage: "Ombrage", taille: "Taille", fertilisation: "Fertilisation",
   traitement: "Traitement", nettoyage: "Nettoyage", diagnostic: "Diagnostic",

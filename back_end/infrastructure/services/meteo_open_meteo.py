@@ -1,17 +1,21 @@
 import logging
+import math
 import time
 from datetime import date, datetime, timedelta
 from threading import Lock
+from zoneinfo import ZoneInfo
 
 import requests
 
 from config import settings
 from domain.ports.meteo import (
+    HORIZON_PREVISION_JOURS,
     SERIE_JOURS_MAX,
     ConditionsMeteo,
     IMeteoService,
     MeteoIndisponibleError,
     MeteoJournaliere,
+    PrevisionJournaliere,
 )
 
 logger = logging.getLogger(__name__)
@@ -24,21 +28,69 @@ CACHE_TTL_S = 15 * 60
 PRECISION_CACHE = 1
 SOURCE = "open-meteo"
 
-# Clé : point arrondi (conditions du jour), ou point arrondi + plage de dates (série passée)
+# Prévision : premier jour renvoyé = aujourd'hui (fuseau demandé), d'où 8 jours pour couvrir J..J+7
+JOURS_PREVISION = HORIZON_PREVISION_JOURS + 1
+# Échec mémorisé brièvement (prévision) : un fournisseur en panne ne coûte pas un délai d'attente
+# à chaque lecture du tableau de bord
+ECHEC_TTL_S = 60
+# Au-delà, chaque écriture purge les entrées expirées (coordonnées libres de /meteo/actuelle)
+CACHE_MAX_ENTREES = 1000
+# Bornes de plausibilité des cumuls journaliers prévus : au-delà, la réponse est jugée inexploitable
+ET0_MAX_MM = 30.0
+PLUIE_MAX_MM = 1000.0
+
+# Clé : point arrondi (conditions du jour), point arrondi + plage de dates (série passée),
+# ou point arrondi + "prevision" + jour métier (une prévision mise en cache la veille ne couvre
+# plus J..J+7 après minuit). Valeur : (échéance monotone, donnée ou échec mémorisé)
 _cache: dict[tuple, tuple[float, object]] = {}
 _cache_lock = Lock()
 _verrous_par_point: dict[tuple, Lock] = {}
 
 
+class _Echec:
+    def __init__(self, message: str):
+        self.message = message
+
+
 def _lire_cache(cle: tuple):
     with _cache_lock:
         entree = _cache.get(cle)
-    if entree and time.monotonic() - entree[0] < CACHE_TTL_S:
-        return entree[1]
-    return None
+    if entree is None or time.monotonic() >= entree[0]:
+        return None
+    if isinstance(entree[1], _Echec):
+        raise MeteoIndisponibleError(entree[1].message)
+    return entree[1]
 
 
-def _avec_cache(cle: tuple, charger):
+def _purger_expirees(maintenant: float) -> None:
+    """Sous _cache_lock. Un verrou retiré pendant qu'un appel l'attend coûte au pire un appel en double."""
+    for cle in [c for c, (echeance, _) in _cache.items() if echeance <= maintenant]:
+        del _cache[cle]
+    for cle in [c for c, verrou in _verrous_par_point.items() if c not in _cache and not verrou.locked()]:
+        del _verrous_par_point[cle]
+
+
+def _ecrire_cache(cle: tuple, valeur: object, duree_s: float) -> None:
+    with _cache_lock:
+        maintenant = time.monotonic()
+        if len(_cache) >= CACHE_MAX_ENTREES:
+            _purger_expirees(maintenant)
+        _cache[cle] = (maintenant + duree_s, valeur)
+
+
+def _nombre(valeur, minimum: float, maximum: float) -> float | None:
+    """Valeur numérique finie et plausible du fournisseur (None conservé) ; sinon ValueError."""
+    if valeur is None:
+        return None
+    if isinstance(valeur, bool) or not isinstance(valeur, int | float):
+        raise ValueError(f"valeur non numérique : {valeur!r}")
+    valeur = float(valeur)
+    if not math.isfinite(valeur) or not minimum <= valeur <= maximum:
+        raise ValueError(f"valeur hors bornes : {valeur!r}")
+    return valeur
+
+
+def _avec_cache(cle: tuple, charger, memoriser_echec: bool = False):
     """Un seul appel réseau par clé : les requêtes concurrentes attendent puis lisent le cache."""
     valeur = _lire_cache(cle)
     if valeur is not None:
@@ -49,9 +101,13 @@ def _avec_cache(cle: tuple, charger):
         valeur = _lire_cache(cle)
         if valeur is not None:
             return valeur
-        valeur = charger()
-        with _cache_lock:
-            _cache[cle] = (time.monotonic(), valeur)
+        try:
+            valeur = charger()
+        except MeteoIndisponibleError as exc:
+            if memoriser_echec:
+                _ecrire_cache(cle, _Echec(str(exc)), ECHEC_TTL_S)
+            raise
+        _ecrire_cache(cle, valeur, CACHE_TTL_S)
         return valeur
 
 
@@ -69,6 +125,11 @@ class OpenMeteoService(IMeteoService):
             raise ValueError(f"Plage de dates invalide : {debut} → {fin} ({SERIE_JOURS_MAX} jours au plus)")
         cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE), debut, fin)
         return _avec_cache(cle, lambda: self._appeler_serie(latitude, longitude, debut, fin))
+
+    def recuperer_prevision_journaliere(self, latitude, longitude) -> list[PrevisionJournaliere]:
+        aujourd_hui = datetime.now(ZoneInfo(self.fuseau_horaire)).date()
+        cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE), "prevision", aujourd_hui)
+        return _avec_cache(cle, lambda: self._appeler_prevision(latitude, longitude), memoriser_echec=True)
 
     def _get(self, params: dict) -> dict:
         try:
@@ -102,6 +163,31 @@ class OpenMeteoService(IMeteoService):
             MeteoJournaliere(jour=j, et0_mm=e, pluie_mm=p or 0.0, source=SOURCE)
             for j, e, p in zip(jours, et0, pluie, strict=False) if j in attendus
         ]
+
+    def _appeler_prevision(self, latitude: float, longitude: float) -> list[PrevisionJournaliere]:
+        data = self._get({
+            "latitude": latitude,
+            "longitude": longitude,
+            "daily": "et0_fao_evapotranspiration,precipitation_sum,precipitation_probability_max",
+            "forecast_days": JOURS_PREVISION,
+            "timezone": self.fuseau_horaire,
+        })
+        try:
+            daily = data["daily"]
+            jours = [date.fromisoformat(j) for j in daily["time"]]
+            et0 = daily.get("et0_fao_evapotranspiration") or [None] * len(jours)
+            pluie = daily.get("precipitation_sum") or [None] * len(jours)
+            probabilite = daily.get("precipitation_probability_max") or [None] * len(jours)
+            return [
+                PrevisionJournaliere(
+                    jour=j, et0_mm=_nombre(e, 0.0, ET0_MAX_MM), pluie_mm=_nombre(p, 0.0, PLUIE_MAX_MM) or 0.0,
+                    probabilite_pluie_pct=_nombre(pp, 0.0, 100.0), source=SOURCE,
+                )
+                for j, e, p, pp in zip(jours, et0, pluie, probabilite, strict=False)
+            ]
+        except (KeyError, TypeError, ValueError, AttributeError) as exc:
+            logger.warning("Prévision Open-Meteo illisible (%s, %s) : %s", latitude, longitude, exc)
+            raise MeteoIndisponibleError("Prévision météo inexploitable") from exc
 
     def _appeler_api(self, latitude: float, longitude: float) -> ConditionsMeteo:
         data = self._get({
