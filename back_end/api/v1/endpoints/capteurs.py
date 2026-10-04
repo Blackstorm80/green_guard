@@ -21,16 +21,16 @@ def get_capteur_service(db: Session = Depends(get_db)) -> CapteurHybridService:
 @router.get("/dashboard", response_model=DashboardCapteursDTO)
 def dashboard_capteurs(
     espace_ids: list[int] | None = Query(
-        None, description="Filtre optionnel ; par défaut tous les espaces de l'utilisateur."
+        None, description="Filtre optionnel ; par défaut tous les espaces de l'organisation."
     ),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
     capteurs: CapteurHybridService = Depends(get_capteur_service),
     meteo: OpenMeteoService = Depends(get_meteo_service),
 ):
-    espaces = EspaceVertRepositoryImpl(db).list_resume_by_user(current_user.id)
+    espaces = EspaceVertRepositoryImpl(db).list_resume_par_organisation(current_user.organisation_id)
     if espace_ids:
-        # Filtre appliqué sur les espaces de l'utilisateur : impossible de lire ceux d'un autre compte
+        # Filtre appliqué sur les espaces de l'organisation : impossible de lire ceux d'une autre
         demandes = set(espace_ids)
         espaces = [e for e in espaces if e.id in demandes]
     return obtenir_dashboard_capteurs(espaces=espaces, capteur_service=capteurs, meteo_service=meteo)

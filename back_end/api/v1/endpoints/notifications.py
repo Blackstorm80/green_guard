@@ -30,7 +30,7 @@ def mark_notification_as_read(
     current_user: models.User = Depends(get_current_user)
 ):
     """
-    Marque une notification spécifique comme lue.
+    Marque une notification spécifique comme lue. État personnel : ouvert à tous les rôles, lecteur compris.
     """
     db_notification = db.query(models.Notification).filter(
         models.Notification.id == notification_id,

@@ -13,13 +13,19 @@ def test_inscription_refuse_mot_de_passe_faible(client):
     assert r.status_code == 422
 
 
-def test_inscription_ignore_le_role_fourni(client):
-    r = client.post(f"{API}/auth/register",
-                    json={"name": "Eve", "email": "eve@example.com", "password": MOT_DE_PASSE, "role": "admin"})
+def test_inscription_ignore_role_et_organisation_fournis(client):
+    alice = creer_compte(client)
+    organisation_alice = client.get(f"{API}/users/me", headers=alice).json()["organisation"]["id"]
+    r = client.post(f"{API}/auth/register", json={
+        "name": "Eve", "email": "eve@example.com", "password": MOT_DE_PASSE,
+        "role": "lecteur", "est_superadmin": True, "organisation_id": organisation_alice,
+    })
     assert r.status_code == 201
     token = client.post(f"{API}/auth/login", data={"username": "eve@example.com", "password": MOT_DE_PASSE}).json()
     me = client.get(f"{API}/users/me", headers={"Authorization": f"Bearer {token['access_token']}"}).json()
-    assert me["role"] == "user"
+    # Toujours administrateur d'une organisation NEUVE, jamais superadmin
+    assert me["role"] == "admin" and me["est_superadmin"] is False
+    assert me["organisation"]["id"] != organisation_alice
 
 
 def test_email_deja_utilise_message_generique(client):
@@ -54,7 +60,9 @@ def test_routes_protegees_sans_jeton(client):
 def test_crud_espace_vert(client):
     headers = creer_compte(client)
     espace = creer_espace(client, headers, ph_actuel=6.5, exposition="Soleil")
-    assert espace["user_id"] and espace["ph_actuel"] == 6.5
+    me = client.get(f"{API}/users/me", headers=headers).json()
+    assert espace["organisation_id"] == me["organisation"]["id"] and espace["cree_par"] == me["id"]
+    assert espace["ph_actuel"] == 6.5
 
     assert len(client.get(f"{API}/espaces-verts/", headers=headers).json()) == 1
     assert client.get(f"{API}/espaces-verts/{espace['id']}", headers=headers).status_code == 200

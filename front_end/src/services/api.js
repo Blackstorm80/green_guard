@@ -74,11 +74,22 @@ export const api = {
   // Le jeton renvoyé dans le corps (pour Swagger/scripts) est volontairement ignoré : seul le cookie sert.
   login: (email, password) =>
     request("/auth/login", { method: "POST", form: { username: email, password }, signalerExpiration: false }),
-  register: ({ name, email, password }) =>
-    request("/auth/register", { method: "POST", body: { name, email, password }, signalerExpiration: false }),
+  // Provisoire : l'inscription crée une nouvelle organisation dont le compte est administrateur
+  register: ({ name, email, password, organisation }) =>
+    request("/auth/register", {
+      method: "POST",
+      body: { name, email, password, organisation: organisation || undefined },
+      signalerExpiration: false,
+    }),
   // Vérification de session au chargement : un 401 signifie simplement « non connecté »
   getCurrentUser: (signal) => request("/users/me", { signal, signalerExpiration: false }),
   logout: () => request("/auth/logout", { method: "POST", signalerExpiration: false }),
+
+  // --- ORGANISATION & MEMBRES ---
+  getOrganisation: (signal) => request("/organisations/moi", { signal }),
+  updateOrganisation: (data) => request("/organisations/moi", { method: "PUT", body: data }),
+  getMembres: (signal) => request("/organisations/moi/membres", { signal }),
+  updateMembre: (id, data) => request(`/organisations/moi/membres/${id}`, { method: "PUT", body: data }),
 
   // --- DASHBOARD & CAPTEURS ---
   getDashboardStats: (espaceIds = [], signal) =>

@@ -16,13 +16,16 @@ from api.v1.endpoints import (
     interventions,
     meteo,
     notifications,
+    organisations,
     user,
     vegetal,
     zones,
 )
 from config import settings
+from infrastructure.database import engine
 from infrastructure.jobs.mise_a_jour_capteurs import INTERVALLE_MINUTES, run_update
 from infrastructure.logging_config import configurer_logs
+from infrastructure.rls import avertir_si_rls_inoperante
 
 configurer_logs(settings.log_level, settings.log_format)
 logger = logging.getLogger("greenguard")
@@ -34,6 +37,7 @@ logger = logging.getLogger("greenguard")
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    avertir_si_rls_inoperante(engine)
     scheduler = None
     if settings.enable_scheduler:
         scheduler = BackgroundScheduler(timezone="UTC")
@@ -71,6 +75,7 @@ app.add_middleware(
 API = "/api/v1"
 app.include_router(auth.router, prefix=f"{API}/auth", tags=["Auth"])
 app.include_router(user.router, prefix=f"{API}/users", tags=["Utilisateurs"])
+app.include_router(organisations.router, prefix=f"{API}/organisations", tags=["Organisations"])
 app.include_router(espaces_verts.router, prefix=f"{API}/espaces-verts", tags=["Espaces verts"])
 app.include_router(zones.router, prefix=f"{API}/zones", tags=["Zones intelligentes"])
 app.include_router(capteurs.router, prefix=f"{API}/capteurs", tags=["Capteurs"])

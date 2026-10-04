@@ -1,8 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
 import { CheckCircle2, Download, Printer } from "lucide-react";
 import { api } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import { useRequete, useTitrePage } from "../../lib/hooks";
-import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION } from "../../lib/referentiels";
+import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION, peut } from "../../lib/referentiels";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Alert, Badge, Card } from "../../components/ui/Card";
@@ -35,6 +36,8 @@ function exporterCsv(lignes, nomEspace) {
 
 export default function Rapports() {
   useTitrePage("Rapports");
+  const { user } = useAuth();
+  const peutIntervenir = peut(user, "interventions");
   const { donnees, setDonnees, chargement, erreur } = useRequete(chargerDonnees, { interventions: [], espaces: [] });
   const [filtres, setFiltres] = useState(FILTRES_INITIAUX);
   const [erreurAction, setErreurAction] = useState("");
@@ -176,7 +179,7 @@ export default function Rapports() {
                   <Badge ton={TON_STATUT[i.statut]}>{LIBELLES_STATUT_INTERVENTION[i.statut] ?? i.statut}</Badge>
                 </td>
                 <td className="px-4 py-3 text-right">
-                  {i.statut !== "terminee" && (
+                  {i.statut !== "terminee" && peutIntervenir && (
                     <Button variante="fantome" taille="sm" icone={CheckCircle2} onClick={() => terminer(i)}
                             className="no-print" aria-label={`Marquer terminée : ${LIBELLES_INTERVENTION[i.type] ?? i.type}, ${nomEspace(i.espace_id)}`}>
                       Terminer

@@ -17,6 +17,7 @@ from sqlalchemy.orm import Session
 from config import settings
 from domain.models import User
 from infrastructure.database import get_db
+from infrastructure.rls import contournement_rls, definir_organisation
 
 ALGORITHM = "HS256"
 EN_TETE_CSRF = "X-Requested-With"
@@ -94,25 +95,30 @@ def get_current_user(
     if payload.get("type") != "access":
         raise credentials_exception
 
-    user = db.query(User).filter(User.email == payload["sub"]).first()
+    # L'organisation n'est pas encore connue : seule lecture hors contexte RLS de la requête
+    with contournement_rls(db):
+        user = db.query(User).filter(User.email == payload["sub"]).first()
     # Un compte désactivé perd immédiatement l'accès, même avec un jeton encore valide
     if user is None or not user.is_active:
         raise credentials_exception
+    # Toutes les transactions suivantes de la requête sont limitées à son organisation
+    definir_organisation(db, user.organisation_id)
     return user
 
 
-# Alias conservé pour les routes existantes : get_current_user vérifie déjà is_active
-get_current_active_user = get_current_user
-
-
 #  SECTION 4 : RÔLES (lus en base, jamais depuis le jeton)
-def require_role(role: str):
-    return require_any_role([role])
+def exiger_role(*roles: str):
+    """Dépendance réservant une route aux rôles indiqués (voir domain/logic/droits.py)."""
+    autorises = frozenset(roles)
 
-
-def require_any_role(roles: list[str]):
-    def role_checker(current_user: User = Depends(get_current_user)) -> User:
-        if current_user.role not in roles:
+    def verifier_role(current_user: User = Depends(get_current_user)) -> User:
+        if current_user.role not in autorises:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissions insuffisantes")
         return current_user
-    return role_checker
+    return verifier_role
+
+
+def exiger_superadmin(current_user: User = Depends(get_current_user)) -> User:
+    if not current_user.est_superadmin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissions insuffisantes")
+    return current_user

@@ -1,6 +1,7 @@
 from datetime import date
 
 from sqlalchemy import (
+    JSON,
     Boolean,
     CheckConstraint,
     Column,
@@ -20,9 +21,9 @@ from sqlalchemy import (
 )
 from sqlalchemy.orm import relationship
 
+from domain.logic.droits import LECTEUR, ROLES, permissions_du_role
 from infrastructure.database import Base
 
-ROLES = ("admin", "manager", "user")
 STATUTS_HYDRIQUES = ("Optimal", "A surveiller", "Critique")
 TYPES_INTERVENTION = ("arrosage", "ombrage", "taille", "fertilisation", "traitement", "nettoyage", "diagnostic")
 STATUTS_INTERVENTION = ("planifiee", "en_cours", "terminee")
@@ -41,7 +42,20 @@ zone_espaces = Table(
 )
 
 
-#  1. UTILISATEURS
+#  1. ORGANISATIONS & UTILISATEURS
+class Organisation(Base):
+    """Collectivité cliente : son patrimoine et ses membres sont cloisonnés (filtrage applicatif + RLS)."""
+    __tablename__ = "organisations"
+
+    id = Column(Integer, primary_key=True, index=True)
+    nom = Column(String(120), nullable=False)
+    slug = Column(String(80), nullable=False, unique=True, index=True)
+    parametres = Column(JSON, nullable=True)  # paramètres métier propres à la collectivité
+    cree_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    membres = relationship("User", back_populates="organisation", passive_deletes=True)
+
+
 class User(Base):
     __tablename__ = "users"
     __table_args__ = (CheckConstraint(_in("role", ROLES), name="role"),)
@@ -50,12 +64,19 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
-    role = Column(String, nullable=False, default="user", server_default="user")
+    organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
+    role = Column(String, nullable=False, default=LECTEUR, server_default=LECTEUR)
+    # Administrateur de la plateforme (crée les organisations), indépendant du rôle dans l'organisation
+    est_superadmin = Column(Boolean, nullable=False, default=False, server_default=false())
     is_active = Column(Boolean, nullable=False, default=True, server_default=true())
     avatar_url = Column(String, nullable=True)
 
+    organisation = relationship("Organisation", back_populates="membres")
     notifications = relationship("Notification", back_populates="user", passive_deletes=True)
-    espaces = relationship("EspaceVert", back_populates="proprietaire", passive_deletes=True)
+
+    @property
+    def permissions(self) -> list[str]:
+        return permissions_du_role(self.role)
 
 
 # 2. BOTANIQUE & CATALOGUE
@@ -149,9 +170,10 @@ class EspaceVert(Base):
     coefficient_cultural = Column(Float, nullable=False, default=1.0, server_default="1")
     cree_le = Column(DateTime(timezone=True), server_default=func.now())
 
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
+    # Historique seulement : l'espace appartient à l'organisation, pas à son créateur
+    cree_par = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
-    proprietaire = relationship("User", back_populates="espaces")
     mesures = relationship("Mesure", back_populates="espace", cascade="all, delete-orphan", passive_deletes=True)
     bilans_hydriques = relationship("BilanHydriqueJournalier", back_populates="espace", passive_deletes=True)
     capteurs = relationship("Capteur", back_populates="espace", passive_deletes=True)
@@ -168,7 +190,7 @@ class ZoneIntelligente(Base):
     __tablename__ = "zones_intelligentes"
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, nullable=False)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
     description = Column(Text, nullable=True)
     granularite = Column(String, nullable=True)
     centroid_lat = Column(Float, nullable=True)
@@ -181,11 +203,11 @@ class ZoneIntelligente(Base):
 
 
 class ClusteringConfig(Base):
-    """Paramètres de clustering ; user_id NULL = configuration par défaut de l'instance."""
+    """Paramètres de clustering ; organisation_id NULL = configuration par défaut de l'instance."""
     __tablename__ = "clustering_configs"
     id = Column(Integer, primary_key=True, index=True)
     nom_config = Column(String, unique=True)
-    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=True, index=True)
+    organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=True, index=True)
     n_clusters = Column(Integer, nullable=False, default=5, server_default="5")
     distance_max = Column(Float, default=0.5)
     algorithme = Column(String, default="KMEANS")

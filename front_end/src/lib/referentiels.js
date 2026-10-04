@@ -6,7 +6,19 @@ export const EXPOSITIONS = ["Soleil", "Mi-ombre", "Ombre"];
 export const DRAINAGES = ["Faible", "Moyen", "Bon"];
 export const IRRIGATIONS = ["Goutte-à-goutte", "Aspersion", "Manuel", "Aucune"];
 
-export const LIBELLES_ROLES = { admin: "Administrateur", manager: "Gestionnaire", user: "Utilisateur" };
+export const LIBELLES_ROLES = {
+  admin: "Administrateur",
+  gestionnaire: "Gestionnaire",
+  technicien: "Technicien",
+  lecteur: "Lecteur",
+};
+export const ROLES = Object.keys(LIBELLES_ROLES);
+
+/**
+ * Droits renvoyés par /users/me (le serveur reste seul juge) : « interventions » (technicien et plus),
+ * « gestion » (espaces, zones, paramètres : gestionnaire et admin), « membres » (admin).
+ */
+export const peut = (user, permission) => Boolean(user?.permissions?.includes(permission));
 
 /** Statut hydrique → ton de badge. */
 export const TON_STATUT = {

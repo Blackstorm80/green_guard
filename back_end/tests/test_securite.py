@@ -127,6 +127,7 @@ def test_dependances_bdd_synchrones():
     d'événements en attendant une connexion du pool ; sous charge, l'API entière se fige."""
     import inspect
 
-    from api.deps.auth import get_current_user, require_any_role
+    from api.deps.auth import exiger_role, exiger_superadmin, get_current_user
     assert not inspect.iscoroutinefunction(get_current_user)
-    assert not inspect.iscoroutinefunction(require_any_role(["admin"]))
+    assert not inspect.iscoroutinefunction(exiger_role("admin"))
+    assert not inspect.iscoroutinefunction(exiger_superadmin)

@@ -23,7 +23,7 @@ class EspaceVertAgronomie(BaseModel):
 
 
 class EspaceVertCreate(EspaceVertAgronomie):
-    """Création : le propriétaire est toujours l'utilisateur authentifié (jamais fourni par le client)."""
+    """Création : l'organisation et le créateur viennent de la session (jamais fournis par le client)."""
     nom: str = Field(..., min_length=1, max_length=120)
     latitude: float = Field(..., ge=-90, le=90)
     longitude: float = Field(..., ge=-180, le=180)
@@ -43,7 +43,8 @@ class EspaceVertRead(EspaceVertAgronomie):
     nom: str
     latitude: float
     longitude: float
-    user_id: int
+    organisation_id: int
+    cree_par: int | None = None
     zone_id: int | None = None
     sante_percent: float | None = None
     cree_le: datetime | None = None

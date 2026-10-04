@@ -1,4 +1,4 @@
-"""Couverture complémentaire : indicateurs végétaux (admin), client Open-Meteo, notifications."""
+"""Couverture complémentaire : indicateurs végétaux (gestion), client Open-Meteo, notifications."""
 from datetime import UTC, datetime
 
 import pytest
@@ -14,17 +14,18 @@ from tests.conftest import creer_compte, creer_espace
 API = "/api/v1"
 
 
-def promouvoir_admin(db, email="alice@example.com"):
-    db.query(User).filter(User.email == email).update({User.role: "admin"})
+def changer_role(db, role, email="alice@example.com"):
+    db.query(User).filter(User.email == email).update({User.role: role})
     db.commit()
 
 
-def test_indicateurs_vegetaux_reserves_aux_admins(client, db, meteo):
+def test_indicateurs_vegetaux_reserves_a_la_gestion(client, db, meteo):
     headers = creer_compte(client)
     creer_espace(client, headers, surface_m2=1000)
+    changer_role(db, "technicien")
     assert client.get(f"{API}/vegetal/etat-global", headers=headers).status_code == 403
 
-    promouvoir_admin(db)
+    changer_role(db, "gestionnaire")
     vide = client.get(f"{API}/vegetal/etat-global", headers=headers).json()
     assert vide["total_espaces"] == 1 and vide["espaces_en_stress"] == 0
 

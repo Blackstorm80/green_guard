@@ -1,9 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from api.deps.auth import get_current_user, require_any_role
+from api.deps.auth import exiger_role, get_current_user
 from application.use_cases.zones import reconstruire_zones
 from domain.logic.clustering import calculer_couleur_gauge
+from domain.logic.droits import ROLES_GESTION
 from domain.models import User, ZoneIntelligente
 from infrastructure.database import get_db
 from schema.zones import ReconstructionZonesRead, ZoneIntelligenteRead
@@ -13,12 +14,12 @@ router = APIRouter()
 
 @router.post("/clustering/rebuild", response_model=ReconstructionZonesRead, status_code=status.HTTP_201_CREATED)
 def rebuild_zones(
-    current_user: User = Depends(require_any_role(["admin", "manager", "user"])),
+    current_user: User = Depends(exiger_role(*ROLES_GESTION)),
     db: Session = Depends(get_db),
 ):
-    """Recalcule les zones intelligentes de l'utilisateur à partir de ses espaces."""
+    """Recalcule les zones intelligentes de l'organisation à partir de ses espaces."""
     try:
-        zones = reconstruire_zones(db, user_id=current_user.id)
+        zones = reconstruire_zones(db, organisation_id=current_user.organisation_id)
     except ValueError as e:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)) from e
     return {"message": f"{len(zones)} zone(s) intelligente(s) recalculée(s).", "zones": [z.nom for z in zones]}
@@ -26,10 +27,10 @@ def rebuild_zones(
 
 @router.get("/", response_model=list[ZoneIntelligenteRead])
 def lister_zones(current_user: User = Depends(get_current_user), db: Session = Depends(get_db)):
-    """Zones intelligentes de l'utilisateur, prêtes à afficher."""
+    """Zones intelligentes de l'organisation, prêtes à afficher."""
     zones = (
         db.query(ZoneIntelligente)
-        .filter(ZoneIntelligente.user_id == current_user.id)
+        .filter(ZoneIntelligente.organisation_id == current_user.organisation_id)
         .order_by(ZoneIntelligente.id)
         .all()
     )

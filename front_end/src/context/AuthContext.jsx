@@ -56,9 +56,12 @@ export const AuthProvider = ({ children }) => {
     await chargerUtilisateur();
   }, [chargerUtilisateur]);
 
+  // Après un changement de rôle ou de nom d'organisation : relit le profil sans écran de chargement
+  const rafraichirUtilisateur = useCallback(() => chargerUtilisateur(), [chargerUtilisateur]);
+
   const value = useMemo(
-    () => ({ user, login, logout, loading, isAuthenticated: Boolean(user) }),
-    [user, login, logout, loading]
+    () => ({ user, login, logout, loading, rafraichirUtilisateur, isAuthenticated: Boolean(user) }),
+    [user, login, logout, loading, rafraichirUtilisateur]
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

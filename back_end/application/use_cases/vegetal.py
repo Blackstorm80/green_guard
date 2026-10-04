@@ -7,13 +7,14 @@ from domain.ports.espace_vert_repository import IEspaceVertRepository
 
 
 def calculer_etat_global_vegetal(
+    organisation_id: int,
     espace_repo: IEspaceVertRepository,
     bilan_repo: IBilanHydriqueRepository
 ) -> EtatGlobalVegetalDTO:
     """
-    Calcule les statistiques globales de santé du parc végétal.
+    Calcule les statistiques globales de santé du parc végétal de l'organisation.
     """
-    espaces = espace_repo.list_tous()
+    espaces = espace_repo.list_par_organisation(organisation_id)
     total_espaces = len(espaces)
 
     if total_espaces == 0:
@@ -52,13 +53,15 @@ def calculer_etat_global_vegetal(
 
 
 def calculer_impact_carbone(
+    organisation_id: int,
     espace_repo: IEspaceVertRepository,
     bilan_repo: IBilanHydriqueRepository
 ) -> ImpactCarboneDTO:
     """
-    Calcule l'impact carbone et oxygène agrégé : projection annuelle, estimation grossière (majorant).
+    Calcule l'impact carbone et oxygène agrégé de l'organisation : projection annuelle, estimation
+    grossière (majorant).
     """
-    espaces = espace_repo.list_tous()
+    espaces = espace_repo.list_par_organisation(organisation_id)
 
     total_co2 = 0.0
     total_o2 = 0.0

@@ -57,8 +57,8 @@ def run_diagnostic(
     db: Session = Depends(get_db),
     capteurs: CapteurHybridService = Depends(get_capteur_service),
 ):
-    """Diagnostic d'un espace de l'utilisateur à partir de ses dernières mesures réelles."""
-    espace = EspaceVertRepositoryImpl(db).get_for_user(payload.espace_id, current_user.id)
+    """Diagnostic d'un espace de l'organisation à partir de ses dernières mesures réelles (lecture seule)."""
+    espace = EspaceVertRepositoryImpl(db).get_pour_organisation(payload.espace_id, current_user.organisation_id)
     if espace is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Espace vert introuvable")
     lecture = LectureCapteurDTO.model_validate(capteurs.lecture_actuelle(espace))

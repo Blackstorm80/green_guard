@@ -4,8 +4,9 @@ import {
   ShieldAlert, Stethoscope, Sun, Target, Thermometer, Umbrella, Wind,
 } from "lucide-react";
 import { api } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import { useTitrePage } from "../../lib/hooks";
-import { TON_STATUT } from "../../lib/referentiels";
+import { peut, TON_STATUT } from "../../lib/referentiels";
 import { Badge } from "../../components/ui/Card";
 
 const INTERVALLE_RAFRAICHISSEMENT_MS = 30000;
@@ -21,6 +22,8 @@ const formatNombre = (v, decimales = 0) =>
 
 export default function HomeTableauDeBord() {
   useTitrePage("Tableau de bord");
+  const { user } = useAuth();
+  const peutIntervenir = peut(user, "interventions");
   const [dashboard, setDashboard] = useState(null);
   const [lastUpdate, setLastUpdate] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -161,7 +164,8 @@ export default function HomeTableauDeBord() {
           </h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {sitesEnAlerte.map((site) => (
-              <ActionCard key={site.espace_id} site={site} onAction={declencherIntervention} actionEnCours={actionEnCours} />
+              <ActionCard key={site.espace_id} site={site} actionEnCours={actionEnCours}
+                          onAction={peutIntervenir ? declencherIntervention : null} />
             ))}
           </div>
         </section>
@@ -242,7 +246,8 @@ function ActionCard({ site, onAction, actionEnCours }) {
         <span className="text-sm font-bold text-fg truncate w-2/3">{site.nom}</span>
         <span className="text-xs font-bold text-danger">{formatNombre(site.sante_percent)} % santé</span>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      {/* Rôle lecteur : l'alerte est visible, les actions terrain ne sont pas proposées */}
+      {onAction && <div className="grid grid-cols-3 gap-2">
         {ACTIONS.map((action) => {
           const Icone = action.icon;
           const enCours = actionEnCours === `${site.espace_id}-${action.type}`;
@@ -258,7 +263,7 @@ function ActionCard({ site, onAction, actionEnCours }) {
             </button>
           );
         })}
-      </div>
+      </div>}
     </div>
   );
 }

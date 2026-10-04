@@ -56,6 +56,13 @@ export function Sidebar() {
           <Logo compact />
         </div>
 
+        {user?.organisation && (
+          <div className="border-b border-line px-6 py-3">
+            <p className="text-xs text-fg-muted">Organisation</p>
+            <p className="truncate text-sm font-semibold text-fg" title={user.organisation.nom}>{user.organisation.nom}</p>
+          </div>
+        )}
+
         <nav aria-label="Navigation principale" className="flex-1 space-y-1 overflow-y-auto p-4">
           {NAVIGATION.map((item) => (
             <NavLink

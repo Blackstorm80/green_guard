@@ -2,6 +2,7 @@ from sqlalchemy import MetaData, create_engine, event
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 from config import settings
+from infrastructure.rls import poser_contexte_transaction
 
 DATABASE_URL = settings.database_url
 
@@ -24,6 +25,8 @@ if DATABASE_URL.startswith("sqlite"):
         dbapi_connection.execute("PRAGMA foreign_keys=ON")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+# Contexte d'organisation (RLS PostgreSQL) reposé au début de chaque transaction
+event.listen(SessionLocal, "after_begin", poser_contexte_transaction)
 
 # Contraintes nommées de façon déterministe : indispensable pour que les migrations
 # Alembic puissent les modifier ou les supprimer de la même manière sur PostgreSQL et SQLite.

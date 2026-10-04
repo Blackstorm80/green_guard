@@ -4,7 +4,27 @@ Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; ve
 
 ## [Non publié]
 
+### Ajouté
+- Multi-organisations : une instance sert plusieurs collectivités cloisonnées ; les agents d'une même
+  organisation partagent son patrimoine. Rôles `admin`, `gestionnaire`, `technicien`, `lecteur` (élu, lecture
+  seule) appliqués à toutes les routes d'écriture ; administrateur de la plateforme (`est_superadmin`).
+- Routes `/organisations/moi` (nom, paramètres métier), `/organisations/moi/membres` (rôle, désactivation ;
+  dernier admin protégé) et `POST /organisations` (superadmin). `create_user.py --organisation --role --superadmin`.
+- Front : nom de l'organisation dans la barre latérale, gestion des membres dans Paramètres, actions
+  masquées selon le rôle ; champ facultatif « collectivité » à l'inscription.
+
+### Modifié
+- Migration `0002_organisations` : « Organisation par défaut » pour les données existantes ; rôles
+  `manager` et `user` → `gestionnaire` ; l'ancien propriétaire d'un espace devient son créateur (`cree_par`).
+- L'inscription crée une nouvelle organisation dont le compte est administrateur (provisoire, avant l'invitation).
+- `GET /espaces-verts` : `user_id` remplacé par `organisation_id` et `cree_par`.
+- `/vegetal/*` : ouvert au gestionnaire, limité au patrimoine de son organisation (et non plus à toute la base).
+- Alerte de stress critique envoyée aux membres actifs qui interviennent (admin, gestionnaire, technicien).
+
 ### Sécurité
+- Isolation par la base (PostgreSQL) : Row Level Security forcée sur les tables métier, contexte
+  d'organisation reposé à chaque transaction ; avertissement au démarrage si le rôle de connexion
+  l'ignore (superutilisateur).
 - API et front publiés sur `127.0.0.1` par défaut (`API_BIND`, `FRONT_BIND`) : en production, seul le
   reverse proxy TLS y accède.
 - Proxys de confiance configurables (`TRUSTED_PROXIES` → `--forwarded-allow-ips`) ; connexion limitée par

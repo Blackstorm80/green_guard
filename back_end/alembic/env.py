@@ -2,7 +2,7 @@ import os
 from logging.config import fileConfig
 
 from dotenv import load_dotenv
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 from alembic import context
 
@@ -43,6 +43,11 @@ def run_migrations_online() -> None:
         poolclass=pool.NullPool,
     )
     with connectable.connect() as connection:
+        if connection.dialect.name == "postgresql":
+            # Les migrations de données voient toutes les organisations (RLS, migration 0002) ;
+            # paramètre de session, limité à cette connexion (NullPool : jamais réutilisée)
+            connection.execute(text("SELECT set_config('app.contourner_rls', 'on', false)"))
+            connection.commit()
         # render_as_batch : ALTER portables sur SQLite (tests) comme sur PostgreSQL
         context.configure(connection=connection, target_metadata=target_metadata, render_as_batch=True)
         with context.begin_transaction():

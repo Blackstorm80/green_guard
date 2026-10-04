@@ -71,13 +71,30 @@ def client(meteo):
     return TestClient(app)
 
 
-def creer_compte(client: TestClient, email: str = "alice@example.com") -> dict:
-    """Inscrit puis connecte un utilisateur ; renvoie les en-têtes d'authentification."""
-    r = client.post("/api/v1/auth/register", json={"name": "Alice", "email": email, "password": MOT_DE_PASSE})
-    assert r.status_code == 201, r.text
+def connecter(client: TestClient, email: str) -> dict:
     r = client.post("/api/v1/auth/login", data={"username": email, "password": MOT_DE_PASSE})
     assert r.status_code == 200, r.text
     return {"Authorization": f"Bearer {r.json()['access_token']}"}
+
+
+def creer_compte(client: TestClient, email: str = "alice@example.com", **champs) -> dict:
+    """Inscrit (nouvelle organisation, rôle admin) puis connecte un utilisateur ; renvoie les en-têtes."""
+    r = client.post("/api/v1/auth/register",
+                    json={"name": "Alice", "email": email, "password": MOT_DE_PASSE, **champs})
+    assert r.status_code == 201, r.text
+    return connecter(client, email)
+
+
+def ajouter_membre(client: TestClient, db, headers_admin: dict, email: str, role: str) -> dict:
+    """Ajoute un membre à l'organisation de l'admin (en base : l'invitation n'existe pas encore)."""
+    from api.deps.auth import get_password_hash
+    from domain.models import User
+
+    organisation_id = client.get("/api/v1/users/me", headers=headers_admin).json()["organisation"]["id"]
+    db.add(User(name=email.split("@")[0], email=email, hashed_password=get_password_hash(MOT_DE_PASSE),
+                organisation_id=organisation_id, role=role))
+    db.commit()
+    return connecter(client, email)
 
 
 def creer_espace(client: TestClient, headers: dict, **champs) -> dict:

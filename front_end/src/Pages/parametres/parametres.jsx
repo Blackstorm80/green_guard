@@ -7,6 +7,7 @@ import { LIBELLES_ROLES } from "../../lib/referentiels";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { cn } from "../../lib/utils";
+import Organisation from "./Organisation";
 
 const OPTIONS_THEME = [
   { valeur: "systeme", libelle: "Système", detail: "Suit le réglage de votre appareil", icone: Monitor },
@@ -28,7 +29,7 @@ export default function Parametres() {
     <div className="max-w-3xl space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight text-fg">Paramètres</h1>
-        <p className="mt-1 text-fg-muted">Votre compte et vos préférences d'affichage.</p>
+        <p className="mt-1 text-fg-muted">Votre compte, votre organisation et vos préférences d'affichage.</p>
       </div>
 
       <Card aria-labelledby="titre-profil">
@@ -48,6 +49,8 @@ export default function Parametres() {
           </div>
         </dl>
       </Card>
+
+      <Organisation />
 
       <Card aria-labelledby="titre-apparence">
         <fieldset>

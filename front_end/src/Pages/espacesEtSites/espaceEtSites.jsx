@@ -3,12 +3,17 @@ import {
   Search, Plus, MapPin, Leaf, LayoutGrid, List, Layers 
 } from "lucide-react";
 import { api } from "../../services/api";
+import { useAuth } from "../../context/AuthContext";
 import { useTitrePage } from "../../lib/hooks";
+import { peut } from "../../lib/referentiels";
 import AddSpaceModal from "./AddSpaceModal";
 import EditSpaceModal from "./EditSpaceModal"; // 1. Importer le nouveau composant
 
 export default function EspacesSites() {
   useTitrePage("Espaces et zones");
+  const { user } = useAuth();
+  // Lecteur et technicien consultent le patrimoine sans le modifier
+  const peutGerer = peut(user, "gestion");
   const [espaces, setEspaces] = useState([]);
   const [clusters, setClusters] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -83,7 +88,7 @@ export default function EspacesSites() {
           <p className="text-fg-muted mt-1">Vos espaces verts regroupés par zone géographique</p>
           {recalcul.message && <p role="status" className="text-sm text-fg-soft mt-2">{recalcul.message}</p>}
         </div>
-        <div className="flex gap-3">
+        {peutGerer && <div className="flex gap-3">
         <button
           type="button"
           onClick={recalculerZones}
@@ -101,7 +106,7 @@ export default function EspacesSites() {
           <Plus size={20} />
           <span>Ajouter un espace</span>
         </button>
-        </div>
+        </div>}
       </div>
 
       {/* SECTION DES JAUGES DE CLUSTERS (inchangée) ... */}
@@ -178,20 +183,16 @@ export default function EspacesSites() {
 
       {loading && <p role="status" className="text-fg-muted text-sm">Chargement des espaces…</p>}
       {!loading && espaces.length === 0 && (
-        <p className="text-fg-muted text-sm">Aucun espace vert pour le moment : ajoutez votre premier site.</p>
+        <p className="text-fg-muted text-sm">
+          {peutGerer ? "Aucun espace vert pour le moment : ajoutez votre premier site." : "Aucun espace vert pour le moment."}
+        </p>
       )}
 
       {/* LISTE DES SITES */}
       <div className={viewMode === "grid" ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" : "space-y-4"}>
-        {sitesFiltres.map(site => (
-          // 3. Ajouter onClick pour ouvrir la modale d'édition
-          <button
-            type="button"
-            key={site.id}
-            onClick={() => handleEditClick(site)}
-            aria-label={`Modifier ${site.nom}`}
-            className="text-left w-full bg-surface border border-line rounded-2xl p-5 hover:border-success/50 transition-all group cursor-pointer"
-          >
+        {sitesFiltres.map((site) => {
+          const contenu = (
+            <>
             <h3 className="text-xl font-bold text-fg mb-1">{site.nom}</h3>
             <div className="flex items-center gap-2 text-fg-muted text-sm mb-4">
               <MapPin size={14} />
@@ -203,12 +204,29 @@ export default function EspacesSites() {
                  {typeof site.sante_percent === "number" ? `${Math.round(site.sante_percent)} % santé` : "Santé : en attente"}
                </span>
             </div>
-          </button>
-        ))}
+            </>
+          );
+          // Carte cliquable (modale d'édition) uniquement pour les rôles de gestion
+          return peutGerer ? (
+            <button
+              type="button"
+              key={site.id}
+              onClick={() => handleEditClick(site)}
+              aria-label={`Modifier ${site.nom}`}
+              className="text-left w-full bg-surface border border-line rounded-2xl p-5 hover:border-success/50 transition-all group cursor-pointer"
+            >
+              {contenu}
+            </button>
+          ) : (
+            <article key={site.id} className="w-full bg-surface border border-line rounded-2xl p-5">
+              {contenu}
+            </article>
+          );
+        })}
       </div>
 
       {/* BOUTON MOBILE FLOTTANT (FAB) */}
-      <button
+      {peutGerer && <button
         type="button"
         onClick={() => setIsAddModalOpen(true)}
         aria-label="Ajouter un espace"
@@ -217,10 +235,10 @@ export default function EspacesSites() {
         {/* Halo d'invitation quand la liste est vide (désactivé si « réduire les animations ») */}
         {aBesoinDePulse && <span aria-hidden className="absolute inset-0 rounded-full bg-primary/40 animate-ping" />}
         <Plus size={28} aria-hidden className="relative" />
-      </button>
+      </button>}
 
       {/* MODALES */}
-      {isAddModalOpen && (
+      {peutGerer && isAddModalOpen && (
         <AddSpaceModal 
           onClose={() => setIsAddModalOpen(false)} 
           onSuccess={chargerDonnees} 
@@ -228,7 +246,7 @@ export default function EspacesSites() {
       )}
       
       {/* 4. Rendu conditionnel de la modale d'édition */}
-      {isEditModalOpen && selectedEspace && (
+      {peutGerer && isEditModalOpen && selectedEspace && (
         <EditSpaceModal
           espace={selectedEspace}
           onClose={() => setIsEditModalOpen(false)}

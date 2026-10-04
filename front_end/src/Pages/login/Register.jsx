@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { AtSign, CheckCircle2, Lock, User } from "lucide-react";
+import { AtSign, Building2, CheckCircle2, Lock, User } from "lucide-react";
 import { api } from "../../services/api";
 import { useTitrePage } from "../../lib/hooks";
 import { Button } from "../../components/ui/Button";
@@ -13,7 +13,7 @@ const LONGUEUR_MIN = 12;
 const Register = () => {
   useTitrePage("Créer un compte");
   const navigate = useNavigate();
-  const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "" });
+  const [formData, setFormData] = useState({ name: "", email: "", password: "", confirmPassword: "", organisation: "" });
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
@@ -29,7 +29,10 @@ const Register = () => {
     setLoading(true);
     setError("");
     try {
-      await api.register({ name: formData.name, email: formData.email, password: formData.password });
+      await api.register({
+        name: formData.name, email: formData.email, password: formData.password,
+        organisation: formData.organisation.trim(),
+      });
       setSuccess(true);
       setTimeout(() => navigate("/login"), 2500);
     } catch (err) {
@@ -55,6 +58,9 @@ const Register = () => {
     <AuthLayout titre="Créer un compte" sousTitre="Quelques informations suffisent pour commencer.">
       <form onSubmit={handleSubmit} className="space-y-5">
         <Field label="Nom complet" icone={User} autoComplete="name" value={formData.name} onChange={maj("name")} required />
+        <Field label="Nom de votre collectivité" icone={Building2} autoComplete="organization" maxLength={120}
+               aide="Facultatif. Votre organisation est créée avec vous comme administrateur."
+               value={formData.organisation} onChange={maj("organisation")} />
         <Field label="Adresse e-mail" type="email" icone={AtSign} autoComplete="email" value={formData.email}
                onChange={maj("email")} required />
         <Field label="Mot de passe" type="password" icone={Lock} autoComplete="new-password" minLength={LONGUEUR_MIN}
