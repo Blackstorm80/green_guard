@@ -9,6 +9,7 @@ import { DRAINAGES, EXPOSITIONS, IRRIGATIONS, TYPES_SOL } from "../../lib/refere
 
 const CHAMPS_NUMERIQUES = new Set([
   "surface_m2", "ph_actuel", "humidite_cible", "frequence_arrosage_auto", "profondeur_racinaire",
+  "reserve_utile_max", "coefficient_cultural",
 ]);
 
 const valeursInitiales = (espace) => ({
@@ -22,9 +23,13 @@ const valeursInitiales = (espace) => ({
   humidite_cible: espace?.humidite_cible ?? "",
   frequence_arrosage_auto: espace?.frequence_arrosage_auto ?? "",
   profondeur_racinaire: espace?.profondeur_racinaire ?? "",
+  reserve_utile_max: espace?.reserve_utile_max ?? "",
+  coefficient_cultural: espace?.coefficient_cultural ?? "",
   type_irrigation: espace?.type_irrigation ?? "",
   date_derniere_fertilisation: espace?.date_derniere_fertilisation ?? "",
 });
+
+const formatMm = (v) => (typeof v === "number" ? v.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "--");
 
 export default function EditSpaceModal({ espace, onClose, onSuccess }) {
   // Le parent monte la modale avec l'espace sélectionné : l'état initial suffit
@@ -45,6 +50,8 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
         .filter(([, v]) => v !== "" && v !== null && v !== undefined)
         .map(([k, v]) => [k, CHAMPS_NUMERIQUES.has(k) ? Number(v) : v])
     );
+    // Réserve vidée : retour à la réserve calculée (FAO-56) plutôt que « inchangée »
+    if (valeurs.reserve_utile_max === "" && espace.reserve_utile_max != null) payload.reserve_utile_max = null;
     try {
       await api.updateEspace(espace.id, payload);
       onSuccess();
@@ -86,6 +93,12 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
           <Champ {...lie} nom="humidite_cible" label="Humidité cible (%)" type="number" min="0" max="100" />
           <Champ {...lie} nom="frequence_arrosage_auto" label="Arrosage auto (heures)" type="number" min="0" />
           <Champ {...lie} nom="profondeur_racinaire" label="Profondeur racinaire (cm)" type="number" min="0" />
+          <Champ {...lie} nom="reserve_utile_max" label="Réserve utile (mm)" type="number" min="1" step="any"
+                 aide={espace.reserve_utile_max == null
+                   ? `Calculée (FAO-56) : ${formatMm(espace.reserve_utile_effective_mm)} mm. Saisir une valeur pour la remplacer.`
+                   : "Valeur saisie. Vider le champ pour revenir à la réserve calculée."} />
+          <Champ {...lie} nom="coefficient_cultural" label="Coefficient paysager" type="number" min="0.1" max="3" step="0.05"
+                 aide="0,8 pour un gazon." />
           <Choix {...lie} nom="type_irrigation" label="Irrigation" options={IRRIGATIONS} />
           <Champ {...lie} nom="date_derniere_fertilisation" label="Dernière fertilisation" type="date" />
         </fieldset>

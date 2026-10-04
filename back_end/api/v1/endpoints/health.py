@@ -5,31 +5,19 @@ from sqlalchemy.orm import Session
 
 from api.deps.auth import get_current_user
 from api.v1.endpoints.capteurs import get_capteur_service
-from application.dto.capteurs import LectureCapteurDTO
+from application.dto.capteurs import DiagnosticDTO
+from application.use_cases.bilans_hydriques import diagnostiquer_espace
 from domain.models import User
-from domain.ports.capteurs import STATUT_SANS_DONNEE
 from infrastructure.database import get_db
+from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
 from infrastructure.services.capteur_hybrid_service import CapteurHybridService
 
 router = APIRouter()
 
-MESSAGES = {
-    "Optimal": "L'espace vert est dans des conditions optimales.",
-    "A surveiller": "Réserve en eau en baisse : un arrosage est à prévoir.",
-    "Critique": "Stress hydrique critique : arrosage recommandé sans délai.",
-    STATUT_SANS_DONNEE: "Aucune mesure disponible pour cet espace pour le moment.",
-}
-
 
 class DiagnosticRequest(BaseModel):
     espace_id: int
-
-
-class DiagnosticResponse(BaseModel):
-    statut: str
-    message: str
-    mesures: LectureCapteurDTO
 
 
 @router.get("/live", tags=["Supervision"])
@@ -50,7 +38,7 @@ def readiness(db: Session = Depends(get_db)):
     return {"status": "ok"}
 
 
-@router.post("/diagnostic", response_model=DiagnosticResponse)
+@router.post("/diagnostic", response_model=DiagnosticDTO)
 def run_diagnostic(
     payload: DiagnosticRequest,
     current_user: User = Depends(get_current_user),
@@ -61,5 +49,4 @@ def run_diagnostic(
     espace = EspaceVertRepositoryImpl(db).get_pour_organisation(payload.espace_id, current_user.organisation_id)
     if espace is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Espace vert introuvable")
-    lecture = LectureCapteurDTO.model_validate(capteurs.lecture_actuelle(espace))
-    return DiagnosticResponse(statut=lecture.statut, message=MESSAGES.get(lecture.statut, ""), mesures=lecture)
+    return diagnostiquer_espace(espace, capteurs, BilanHydriqueRepositoryImpl(db))

@@ -84,8 +84,8 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
     destinataires = _destinataires(db, organisation_id)
     notifications = 0
     for resultat in rapport.traites:
-        ru_max = resultat.espace.reserve_utile_max or 1.0
-        humidite_sol = resultat.bilan.reserve_utile_fin_journee / ru_max * 100
+        # Humidité simulée : part de la réserve utile totale (TAW) encore disponible
+        humidite_sol = (1.0 - resultat.bilan.indice_stress) * 100
         db.add(Mesure(
             espace_id=resultat.espace.id,
             temperature=resultat.conditions.temperature_c,

@@ -10,7 +10,7 @@ Architecture en couches (Onion) : les dépendances vont toujours vers le domaine
 
 | Couche | Dossier | Rôle |
 |---|---|---|
-| Domaine | `domain/logic/`, `domain/ports/`, `domain/models.py` | Calculs purs (bilan hydrique, stress, clustering, arrosage, carbone, droits par rôle, slugs d'organisation) et interfaces (ports) |
+| Domaine | `domain/logic/`, `domain/ports/`, `domain/models.py` | Calculs purs (moteur hydrique FAO-56, bilan hydrique, stress, clustering, arrosage, carbone, droits par rôle, slugs d'organisation) et interfaces (ports) |
 | Application | `application/use_cases/`, `application/dto/` | Orchestration des cas d'usage, objets de sortie |
 | Infrastructure | `infrastructure/` | Base de données, repositories, services externes (Open-Meteo), job planifié, logs |
 | API | `api/`, `schema/`, `main.py` | Routes FastAPI, authentification, middlewares, schémas de validation |
@@ -29,8 +29,9 @@ back_end/
 │   ├── deps/rate_limit.py       # Limitation de débit (login, inscription)
 │   ├── middleware.py            # En-têtes de sécurité, X-Request-ID, journal d'accès, erreur 500 générique
 │   └── v1/endpoints/            # Une ressource par fichier
-├── application/use_cases/       # capteurs, interventions, zones, météo, végétal, bilans journaliers, organisations
-├── domain/logic/                # stress_hydrique, bilan_hydrique, stress_sanitaire, arrosage, bilan_carbone, clustering,
+├── application/use_cases/       # capteurs, interventions, zones, météo, végétal, bilans journaliers (génération,
+│                                # rattrapage), bilans hydriques (historique, diagnostic expliqué), organisations
+├── domain/logic/                # fao56 (moteur hydrique), bilan_hydrique, stress_sanitaire, arrosage, bilan_carbone, clustering,
 │                                # droits (rôles → permissions), organisations (slug, nom par défaut)
 ├── infrastructure/
 │   ├── database.py              # Moteur SQLAlchemy, convention de nommage des contraintes
@@ -53,7 +54,7 @@ d'une même organisation partagent son patrimoine. Lecture : tout membre. Écrit
 | `/auth` | public (limité en débit) | public | `POST /login` (formulaire OAuth2), `POST /register` (JSON, crée une organisation), `POST /logout` |
 | `/users` | connecté | — | `GET /me` (dont `organisation {id, nom}`, `role`, `permissions`, `est_superadmin`), `GET /me/notifications` |
 | `/organisations` | connecté | voir colonne Contenu | `GET /moi` ; `PUT /moi` (paramètres : gestionnaire ; nom : admin) ; `GET /moi/membres` ; `PUT /moi/membres/{id}` (admin : rôle, désactivation) ; `POST /` (superadmin : organisation + premier admin) |
-| `/espaces-verts` | connecté | gestionnaire | CRUD complet |
+| `/espaces-verts` | connecté | gestionnaire | CRUD complet (`reserve_utile_effective_mm` en lecture) ; `GET /{id}/bilans?jours=30` (historique des bilans et de leurs termes, 1 à 365 jours, par date croissante) |
 | `/zones` | connecté | gestionnaire | `GET /`, `POST /clustering/rebuild` |
 | `/capteurs` | connecté | — | `GET /dashboard` (synthèse, lectures, météo extérieure) |
 | `/interventions` | connecté | technicien (création, suivi) ; gestionnaire (suppression) | `GET /urgent`, CRUD |
@@ -61,7 +62,7 @@ d'une même organisation partagent son patrimoine. Lecture : tout membre. Écrit
 | `/catalogue` | connecté | — | `GET /plantes`, `GET /auxiliaires` (pagination `offset`/`limit`) |
 | `/meteo` | connecté | — | `GET /actuelle?lat&lon`, `GET /{ville}` |
 | `/vegetal` | gestionnaire | — | `GET /etat-global`, `GET /impact-carbone` (patrimoine de l'organisation) |
-| `/health` | public / connecté | — | `GET /live`, `GET /ready` (base), `POST /diagnostic` (lecture seule) |
+| `/health` | public / connecté | — | `GET /live`, `GET /ready` (base), `POST /diagnostic` (lecture seule : statut, message, `explication` calculée, mesures et termes du dernier bilan) |
 
 « gestionnaire » se lit « gestionnaire ou admin », « technicien » « technicien, gestionnaire ou admin ».
 
@@ -120,21 +121,55 @@ ajoute les agents avec `create_user.py --organisation <slug> --role <rôle>`.
 
 ## 4. Métier
 
-### Bilan hydrique journalier
-`application/use_cases/generer_bilans_hydriques_journaliers.py`, appelé chaque heure par le worker.
+### Bilan hydrique journalier (moteur FAO-56 paysager)
+`domain/logic/fao56.py` (calcul pur) et `application/use_cases/generer_bilans_hydriques_journaliers.py`,
+appelé chaque heure par le worker. Référence : FAO Irrigation and Drainage Paper 56 (1998), chapitre 8.
 
 Le « jour » est celui de `FUSEAU_HORAIRE` (Europe/Paris par défaut), pour le bilan comme pour les
 cumuls météo demandés à Open-Meteo : un passage à 0 h 30 (heure de Paris) produit le bilan du jour
 qui commence sans écraser celui de la veille. Arrosages et notifications sont comptés sur ce même jour.
 
-1. Météo du jour (Open-Meteo) : ET0 et cumul de pluie, mis en cache par point (~10 km, 15 min).
-2. Point de départ : dernier bilan **antérieur** au jour (réserve pleine s'il n'y en a pas).
-3. `réserve = réserve_veille + pluie + arrosage − ET0 × Kc × facteur_sol`, bornée à [0, RU max].
-4. `indice de stress = 1 − réserve / RU max` → *Optimal* (< 0,3), *A surveiller* (< 0,6), *Critique*.
-5. Le bilan du jour est **remplacé** s'il existe déjà (idempotent : relancer ne décompte pas deux fois).
-6. Une mesure est enregistrée ; un espace *Critique* déclenche une notification (une par jour).
+**Réserve de l'espace.** `TAW = Δθ × Zr × 1000` (mm). Δθ par texture (FAO-56 tableau 19, milieu de
+fourchette) : Sableux 0,08 ; Limoneux 0,155 ; Limon-Argileux 0,155 ; Argileux 0,16 ; inconnue 0,14.
+Zr = `profondeur_racinaire` (cm / 100) si renseignée, sinon selon le type d'espace : gazon, pelouse,
+Square 0,3 m ; Jardin, massif 0,4 ; Parc 0,5 ; arbres, Rue 0,8 ; Toiture 0,15 ; autre 0,4.
+`RAW = p × TAW`, p = 0,5. **Règle de surcharge** : `reserve_utile_max` est facultatif ; NULL (cas par
+défaut) = TAW calculée ; une valeur saisie la remplace. `reserve_utile_effective_mm` (lecture) donne
+la réserve réellement utilisée. `coefficient_cultural` est le coefficient paysager KL (défaut 0,8, gazon).
 
-Les seuils (0,3 / 0,6) et les facteurs de sol restent **à faire valider par un agronome** (décision D-4).
+**Bilan d'une journée** sur l'épuisement racinaire Dr (mm, 0 = réserve pleine) :
+1. Météo du jour (Open-Meteo) : ET0 et cumul de pluie, mis en cache par point (~10 km, 15 min).
+2. Point de départ : `epuisement_fin_mm` du dernier bilan **antérieur** au jour (réserve pleine s'il
+   n'y en a pas ; pour un bilan `historique-v1`, indice de stress × TAW actuelle).
+3. Pluie efficace Pe = pluie si pluie ≥ 2 mm, sinon 0 (petite pluie interceptée et ré-évaporée ;
+   ruissellement négligé). Ks = 1 si Dr ≤ RAW, sinon (TAW − Dr) / (TAW − RAW), évalué sur Dr de début
+   de journée. ETc = ET0 × KL × Ks.
+4. `Dr_fin = Dr_début − Pe − arrosage + ETc + DP`, borné à [0, TAW] ; DP = drainage profond (eau au-delà
+   de la capacité au champ), calculé et conservé. ETc est bornée par l'eau restante : le bilan est fermé.
+5. Statut : *Optimal* si Dr ≤ RAW ; *A surveiller* jusqu'à RAW + (TAW − RAW) / 2 ; *Critique* au-delà.
+   `indice_stress = Dr / TAW` ; `reserve_utile_fin_journee = TAW − Dr`.
+6. Tous les termes sont **conservés** dans `bilans_hydriques` (`et0_mm`, `kl`, `ks`, `etc_mm`, `pluie_mm`,
+   `pluie_efficace_mm`, `arrosage_mm`, `drainage_mm`, `epuisement_debut_mm`, `epuisement_fin_mm`,
+   `taw_mm`, `raw_mm`, `version_modele` = `fao56-paysager-1`, `source_meteo`). Les bilans antérieurs
+   (migration `0003_moteur_fao56`) portent `version_modele = historique-v1` et des termes NULL.
+7. Le bilan du jour est **remplacé** s'il existe déjà (idempotent : relancer ne décompte pas deux fois).
+8. Une mesure est enregistrée ; un espace *Critique* déclenche une notification (une par jour).
+
+**Rattrapage.** Si le dernier bilan date de plus d'un jour (worker arrêté…), chaque jour manquant est
+recalculé dans l'ordre avec la série journalière passée d'Open-Meteo (`start_date`/`end_date`, ET0 et
+pluie dans le fuseau métier) et les arrosages de chaque jour, puis le jour courant. 92 jours au plus
+(limite d'Open-Meteo) : au-delà, la chaîne repart du dernier bilan connu. Si la série est indisponible
+ou incomplète, rien n'est écrit pour l'espace (ni le jour courant, pour ne pas enchaîner sur un trou) ;
+le rattrapage est retenté au passage suivant.
+
+**Diagnostic expliqué.** `POST /health/diagnostic` ajoute une phrase calculée sur les 30 derniers bilans,
+par exemple « Réserve à 34 % : il a manqué 18 mm depuis la dernière pluie (9 mm, il y a 2 jours) ;
+évapotranspiration de 4,2 mm/j. » (ETc moyenne sur 7 jours ; absente pour un bilan `historique-v1`).
+
+Comparé à l'ancien modèle (réserve fixe de 100 mm, facteur de sol empirique, seuils 0,3 / 0,6 sur la
+réserve), un gazon sur limon (Zr 0,3 m, TAW 46,5 mm) à ET0 4 mm/j sans pluie passe « A surveiller » au
+jour 8 au lieu de 10 et « Critique » au jour 12 au lieu de 19 (même coefficient 0,8). Les tables de sols
+et de profondeurs restent **à faire valider par un agronome partenaire**.
 
 ### Impact carbone (estimation grossière)
 `domain/logic/bilan_carbone.py` : séquestration des arbres urbains selon Nowak & Crane (2002),

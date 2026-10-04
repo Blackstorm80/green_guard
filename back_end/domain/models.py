@@ -22,6 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.orm import relationship
 
 from domain.logic.droits import LECTEUR, ROLES, permissions_du_role
+from domain.logic.fao56 import reserve_utile_de_l_espace
 from infrastructure.database import Base
 
 STATUTS_HYDRIQUES = ("Optimal", "A surveiller", "Critique")
@@ -166,8 +167,10 @@ class EspaceVert(Base):
     type_irrigation = Column(String, nullable=True)
     date_derniere_fertilisation = Column(Date, nullable=True)
     sante_percent = Column(Float, nullable=True)
-    reserve_utile_max = Column(Float, nullable=False, default=100.0, server_default="100")
-    coefficient_cultural = Column(Float, nullable=False, default=1.0, server_default="1")
+    # Surcharge facultative de la réserve utile (mm) ; NULL : réserve calculée (TAW FAO-56, sol × racines)
+    reserve_utile_max = Column(Float, nullable=True)
+    # Coefficient paysager KL (0,8 : gazon de saison fraîche)
+    coefficient_cultural = Column(Float, nullable=False, default=0.8, server_default="0.8")
     cree_le = Column(DateTime(timezone=True), server_default=func.now())
 
     organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -184,6 +187,11 @@ class EspaceVert(Base):
     def zone_id(self) -> int | None:
         """Zone intelligente de rattachement (le clustering affecte une seule zone par espace)."""
         return self.zones[0].id if self.zones else None
+
+    @property
+    def reserve_utile_effective_mm(self) -> float:
+        """Réserve utile totale utilisée par le bilan : la surcharge si elle est saisie, sinon la TAW calculée."""
+        return reserve_utile_de_l_espace(self)
 
 
 class ZoneIntelligente(Base):
@@ -255,10 +263,26 @@ class BilanHydriqueJournalier(Base):
     espace_id = Column(Integer, ForeignKey("espaces_verts.id", ondelete="CASCADE"), nullable=False, index=True)
     # Callable : évalué à chaque insertion (et non une seule fois à l'import du module)
     date = Column(Date, nullable=False, default=date.today)
-    reserve_utile_fin_journee = Column(Float, nullable=False)
-    indice_stress = Column(Float, nullable=False, default=0.0)
+    reserve_utile_fin_journee = Column(Float, nullable=False)  # TAW − épuisement de fin de journée
+    indice_stress = Column(Float, nullable=False, default=0.0)  # épuisement / TAW
     statut_hydrique = Column(String, nullable=False, default="Optimal")
     stress_sanitaire = Column(Float, nullable=True)
+
+    # Termes conservés du bilan FAO-56 (mm, sauf coefficients) : NULL pour les bilans antérieurs au modèle
+    et0_mm = Column(Float, nullable=True)
+    kl = Column(Float, nullable=True)
+    ks = Column(Float, nullable=True)
+    etc_mm = Column(Float, nullable=True)
+    pluie_mm = Column(Float, nullable=True)
+    pluie_efficace_mm = Column(Float, nullable=True)
+    arrosage_mm = Column(Float, nullable=True)
+    drainage_mm = Column(Float, nullable=True)
+    epuisement_debut_mm = Column(Float, nullable=True)
+    epuisement_fin_mm = Column(Float, nullable=True)
+    taw_mm = Column(Float, nullable=True)
+    raw_mm = Column(Float, nullable=True)
+    version_modele = Column(String(40), nullable=False)  # ex. fao56-paysager-1 ; historique-v1 avant
+    source_meteo = Column(String(40), nullable=True)
 
     espace = relationship("EspaceVert", back_populates="bilans_hydriques")
 

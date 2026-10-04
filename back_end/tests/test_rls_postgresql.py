@@ -188,7 +188,7 @@ def test_parcours_api_sous_rls(base_rls, client, meteo):
         entetes[nom] = connecter(client, f"{nom}@rls.example.com")
     alice, bob = entetes["alice"], entetes["bob"]
 
-    espace_alice = creer_espace(client, alice, nom="Parc d'Alice", reserve_utile_max=10)
+    espace_alice = creer_espace(client, alice, nom="Parc d'Alice", reserve_utile_max=10, coefficient_cultural=1.0)
     creer_espace(client, bob, nom="Parc de Bob")
     assert [e["nom"] for e in client.get(f"{API}/espaces-verts/", headers=alice).json()] == ["Parc d'Alice"]
     assert client.get(f"{API}/espaces-verts/{espace_alice['id']}", headers=bob).status_code == 404

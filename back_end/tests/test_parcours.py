@@ -124,7 +124,7 @@ def test_job_alimente_le_dashboard(client, db, meteo):
 
 def test_job_idempotent_dans_la_journee(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers)
+    creer_espace(client, headers, reserve_utile_max=100, coefficient_cultural=1.0)
     for _ in range(5):
         executer_mise_a_jour(db, meteo_service=meteo)
 
@@ -144,7 +144,7 @@ def test_job_meteo_indisponible_ne_plante_pas(client, db, meteo):
 
 def test_stress_critique_genere_une_intervention_urgente(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers, reserve_utile_max=10)
+    creer_espace(client, headers, reserve_utile_max=10, coefficient_cultural=1.0)
     meteo.et0 = 9.0                                   # réserve 10 → 1 mm : stress 0,9
     executer_mise_a_jour(db, meteo_service=meteo)
 
@@ -227,7 +227,7 @@ def test_diagnostic_espace(client, db, meteo):
 
 def test_stress_critique_notifie_le_proprietaire_une_fois_par_jour(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers, nom="Square sec", reserve_utile_max=10)
+    creer_espace(client, headers, nom="Square sec", reserve_utile_max=10, coefficient_cultural=1.0)
     meteo.et0 = 9.0
     for _ in range(3):
         executer_mise_a_jour(db, meteo_service=meteo)

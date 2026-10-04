@@ -7,6 +7,10 @@ from domain.models import BilanHydriqueJournalier, Mesure
 from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService, LectureCapteur
 
 
+def _arrondi(valeur: float | None) -> float | None:
+    return round(valeur, 1) if valeur is not None else None
+
+
 class CapteurHybridService(ICapteurService):
     """Lit la dernière mesure et le dernier bilan hydrique en base.
 
@@ -41,10 +45,29 @@ class CapteurHybridService(ICapteurService):
             .group_by(b.espace_id)
             .subquery()
         )
-        requete = select(b.espace_id, b.reserve_utile_fin_journee, b.indice_stress, b.statut_hydrique).join(
+        requete = select(
+            b.espace_id, b.date, b.reserve_utile_fin_journee, b.indice_stress, b.statut_hydrique,
+            b.taw_mm, b.raw_mm, b.et0_mm, b.etc_mm, b.version_modele,
+        ).join(
             dernier, (b.espace_id == dernier.c.espace_id) & (b.date == dernier.c.d)
         )
         return {ligne.espace_id: ligne for ligne in self.db.execute(requete)}
+
+    @staticmethod
+    def _termes(bilan: Row | None) -> dict:
+        """Termes FAO-56 du dernier bilan (restent à None pour un bilan historique-v1)."""
+        if bilan is None:
+            return {}
+        return {
+            "reserve_max_mm": _arrondi(bilan.taw_mm),
+            "reserve_facilement_utilisable_mm": _arrondi(bilan.raw_mm),
+            "reserve_percent": _arrondi(bilan.reserve_utile_fin_journee / bilan.taw_mm * 100)
+            if bilan.taw_mm else None,
+            "et0_mm": _arrondi(bilan.et0_mm),
+            "etc_mm": _arrondi(bilan.etc_mm),
+            "date_bilan": bilan.date,
+            "version_modele": bilan.version_modele,
+        }
 
     def lectures_actuelles(self, espaces: Sequence[EspaceIdentifie]) -> list[LectureCapteur]:
         """Lectures de plusieurs espaces en 2 requêtes, quel que soit leur nombre."""
@@ -66,6 +89,7 @@ class CapteurHybridService(ICapteurService):
                 sante_percent=round((1.0 - bilan.indice_stress) * 100, 1) if bilan else None,
                 statut=bilan.statut_hydrique if bilan else STATUT_SANS_DONNEE,
                 timestamp=mesure.timestamp if mesure else None,
+                **self._termes(bilan),
             ))
         return lectures
 

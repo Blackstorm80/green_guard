@@ -1,6 +1,6 @@
 import os
 import tempfile
-from datetime import datetime
+from datetime import date, datetime, timedelta
 
 import pytest
 
@@ -18,7 +18,12 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from api.v1.endpoints.auth import limiteur_connexion, limiteur_inscription  # noqa: E402
 from api.v1.endpoints.meteo import get_meteo_service  # noqa: E402
-from domain.ports.meteo import ConditionsMeteo, IMeteoService, MeteoIndisponibleError  # noqa: E402
+from domain.ports.meteo import (  # noqa: E402
+    ConditionsMeteo,
+    IMeteoService,
+    MeteoIndisponibleError,
+    MeteoJournaliere,
+)
 from infrastructure.database import Base, SessionLocal, engine  # noqa: E402
 from main import app  # noqa: E402
 
@@ -31,6 +36,11 @@ class FausseMeteo(IMeteoService):
     def __init__(self, et0: float = 5.0, pluie: float = 0.0, temperature: float = 22.0, disponible: bool = True):
         self.et0, self.pluie, self.temperature, self.disponible = et0, pluie, temperature, disponible
         self.appels = 0
+        # Série passée (rattrapage) : valeurs par jour, sinon et0/pluie courants ; jours absents simulables
+        self.serie: dict[date, tuple[float | None, float]] = {}
+        self.jours_absents: set[date] = set()
+        self.serie_disponible = True
+        self.appels_serie: list[tuple[date, date]] = []
 
     def recuperer_conditions_actuelles(self, latitude, longitude, maintenant: datetime) -> ConditionsMeteo:
         self.appels += 1
@@ -38,8 +48,19 @@ class FausseMeteo(IMeteoService):
             raise MeteoIndisponibleError("indisponible")
         return ConditionsMeteo(
             city="Test", temperature_c=self.temperature, condition="Dégagé", ensoleillement_fort=True,
-            humidite=55.0, pluie_jour_mm=self.pluie, et0_jour_mm=self.et0,
+            humidite=55.0, pluie_jour_mm=self.pluie, et0_jour_mm=self.et0, source="test",
         )
+
+    def recuperer_serie_journaliere(self, latitude, longitude, debut: date, fin: date) -> list[MeteoJournaliere]:
+        self.appels_serie.append((debut, fin))
+        if not self.serie_disponible:
+            raise MeteoIndisponibleError("indisponible")
+        jours = (debut + timedelta(days=i) for i in range((fin - debut).days + 1))
+        return [
+            MeteoJournaliere(jour=j, et0_mm=self.serie.get(j, (self.et0, self.pluie))[0],
+                             pluie_mm=self.serie.get(j, (self.et0, self.pluie))[1], source="test-serie")
+            for j in jours if j not in self.jours_absents
+        ]
 
 
 @pytest.fixture(autouse=True)

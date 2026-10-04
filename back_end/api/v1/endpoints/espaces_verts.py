@@ -1,11 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from datetime import datetime
+
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy.orm import Session
 
 from api.deps.auth import exiger_role, get_current_user
+from application.use_cases.bilans_hydriques import historique_des_bilans
+from config import settings
 from domain import models
 from domain.logic.droits import ROLES_GESTION
 from infrastructure.database import get_db
+from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
+from schema.bilans_hydriques import BilanHydriqueRead
 from schema.espaces_verts import EspaceVertCreate, EspaceVertRead, EspaceVertUpdate
 
 router = APIRouter()
@@ -43,6 +49,19 @@ def get_espace_vert(
     espace_id: int, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)
 ):
     return _espace_de_l_organisation(espace_id, db, current_user)
+
+
+@router.get("/{espace_id}/bilans", response_model=list[BilanHydriqueRead])
+def get_bilans_espace_vert(
+    espace_id: int,
+    jours: int = Query(30, ge=1, le=365, description="Profondeur de l'historique en jours (aujourd'hui compris)."),
+    db: Session = Depends(get_db),
+    current_user: models.User = Depends(get_current_user),
+):
+    """Historique des bilans hydriques et de leurs termes, par date croissante."""
+    espace = _espace_de_l_organisation(espace_id, db, current_user)
+    aujourd_hui = datetime.now(settings.fuseau).date()
+    return historique_des_bilans(espace.id, jours, aujourd_hui, BilanHydriqueRepositoryImpl(db))
 
 
 @router.put("/{espace_id}", response_model=EspaceVertRead)

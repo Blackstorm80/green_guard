@@ -35,3 +35,11 @@ class BilanHydriqueRepositoryImpl(IBilanHydriqueRepository):
 
     def get_historique_by_espace(self, espace_id: int, limit: int = 7) -> list[BilanHydriqueJournalier]:
         return self._par_espace(espace_id).order_by(BilanHydriqueJournalier.date.desc()).limit(limit).all()
+
+    def lister_depuis(self, espace_id: int, date_debut: date) -> list[BilanHydriqueJournalier]:
+        return (
+            self._par_espace(espace_id)
+            .filter(BilanHydriqueJournalier.date >= date_debut)
+            .order_by(BilanHydriqueJournalier.date)
+            .all()
+        )

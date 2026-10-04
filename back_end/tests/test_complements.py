@@ -21,7 +21,7 @@ def changer_role(db, role, email="alice@example.com"):
 
 def test_indicateurs_vegetaux_reserves_a_la_gestion(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers, surface_m2=1000)
+    creer_espace(client, headers, surface_m2=1000, reserve_utile_max=100, coefficient_cultural=1.0)
     changer_role(db, "technicien")
     assert client.get(f"{API}/vegetal/etat-global", headers=headers).status_code == 403
 

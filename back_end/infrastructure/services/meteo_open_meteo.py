@@ -1,12 +1,18 @@
 import logging
 import time
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from threading import Lock
 
 import requests
 
 from config import settings
-from domain.ports.meteo import ConditionsMeteo, IMeteoService, MeteoIndisponibleError
+from domain.ports.meteo import (
+    SERIE_JOURS_MAX,
+    ConditionsMeteo,
+    IMeteoService,
+    MeteoIndisponibleError,
+    MeteoJournaliere,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -16,18 +22,37 @@ TIMEOUT_S = 10
 # quand de nombreux espaces sont proches les uns des autres.
 CACHE_TTL_S = 15 * 60
 PRECISION_CACHE = 1
+SOURCE = "open-meteo"
 
-_cache: dict[tuple[float, float], tuple[float, ConditionsMeteo]] = {}
+# Clé : point arrondi (conditions du jour), ou point arrondi + plage de dates (série passée)
+_cache: dict[tuple, tuple[float, object]] = {}
 _cache_lock = Lock()
-_verrous_par_point: dict[tuple[float, float], Lock] = {}
+_verrous_par_point: dict[tuple, Lock] = {}
 
 
-def _lire_cache(cle: tuple[float, float]) -> ConditionsMeteo | None:
+def _lire_cache(cle: tuple):
     with _cache_lock:
         entree = _cache.get(cle)
     if entree and time.monotonic() - entree[0] < CACHE_TTL_S:
         return entree[1]
     return None
+
+
+def _avec_cache(cle: tuple, charger):
+    """Un seul appel réseau par clé : les requêtes concurrentes attendent puis lisent le cache."""
+    valeur = _lire_cache(cle)
+    if valeur is not None:
+        return valeur
+    with _cache_lock:
+        verrou = _verrous_par_point.setdefault(cle, Lock())
+    with verrou:
+        valeur = _lire_cache(cle)
+        if valeur is not None:
+            return valeur
+        valeur = charger()
+        with _cache_lock:
+            _cache[cle] = (time.monotonic(), valeur)
+        return valeur
 
 
 class OpenMeteoService(IMeteoService):
@@ -37,37 +62,60 @@ class OpenMeteoService(IMeteoService):
 
     def recuperer_conditions_actuelles(self, latitude, longitude, maintenant: datetime) -> ConditionsMeteo:
         cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE))
-        conditions = _lire_cache(cle)
-        if conditions:
-            return conditions
-        with _cache_lock:
-            verrou = _verrous_par_point.setdefault(cle, Lock())
-        # Un seul appel réseau par point : les requêtes concurrentes attendent puis lisent le cache
-        with verrou:
-            conditions = _lire_cache(cle)
-            if conditions:
-                return conditions
-            conditions = self._appeler_api(latitude, longitude)
-            with _cache_lock:
-                _cache[cle] = (time.monotonic(), conditions)
-            return conditions
+        return _avec_cache(cle, lambda: self._appeler_api(latitude, longitude))
+
+    def recuperer_serie_journaliere(self, latitude, longitude, debut: date, fin: date) -> list[MeteoJournaliere]:
+        if fin < debut or (fin - debut).days >= SERIE_JOURS_MAX:
+            raise ValueError(f"Plage de dates invalide : {debut} → {fin} ({SERIE_JOURS_MAX} jours au plus)")
+        cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE), debut, fin)
+        return _avec_cache(cle, lambda: self._appeler_serie(latitude, longitude, debut, fin))
+
+    def _get(self, params: dict) -> dict:
+        try:
+            response = requests.get(OPEN_METEO_URL, params=params, timeout=TIMEOUT_S)
+            response.raise_for_status()
+            return response.json()
+        except (requests.RequestException, ValueError) as exc:
+            logger.warning("Open-Meteo indisponible (%s, %s) : %s", params["latitude"], params["longitude"], exc)
+            raise MeteoIndisponibleError("Service météo indisponible") from exc
+
+    def _appeler_serie(self, latitude: float, longitude: float, debut: date, fin: date) -> list[MeteoJournaliere]:
+        # start_date/end_date sur l'API de prévision : jours passés (92 au plus) dans le fuseau métier
+        data = self._get({
+            "latitude": latitude,
+            "longitude": longitude,
+            "daily": "et0_fao_evapotranspiration,precipitation_sum",
+            "start_date": debut.isoformat(),
+            "end_date": fin.isoformat(),
+            "timezone": self.fuseau_horaire,
+        })
+        try:
+            daily = data["daily"]
+            jours = [date.fromisoformat(j) for j in daily["time"]]
+            et0 = daily.get("et0_fao_evapotranspiration") or [None] * len(jours)
+            pluie = daily.get("precipitation_sum") or [None] * len(jours)
+        except (KeyError, TypeError, ValueError) as exc:
+            logger.warning("Série Open-Meteo illisible (%s, %s) : %s", latitude, longitude, exc)
+            raise MeteoIndisponibleError("Réponse météo inexploitable") from exc
+        attendus = {debut + timedelta(days=i) for i in range((fin - debut).days + 1)}
+        return [
+            MeteoJournaliere(jour=j, et0_mm=e, pluie_mm=p or 0.0, source=SOURCE)
+            for j, e, p in zip(jours, et0, pluie, strict=False) if j in attendus
+        ]
 
     def _appeler_api(self, latitude: float, longitude: float) -> ConditionsMeteo:
-        params = {
+        data = self._get({
             "latitude": latitude,
             "longitude": longitude,
             "current": "temperature_2m,relative_humidity_2m,cloud_cover",
             "daily": "et0_fao_evapotranspiration,precipitation_sum",
             "forecast_days": 1,
             "timezone": self.fuseau_horaire,
-        }
+        })
         try:
-            response = requests.get(OPEN_METEO_URL, params=params, timeout=TIMEOUT_S)
-            response.raise_for_status()
-            data = response.json()
             current = data["current"]
             daily = data.get("daily", {})
-        except (requests.RequestException, ValueError, KeyError) as exc:
+        except (KeyError, TypeError, AttributeError) as exc:
             logger.warning("Open-Meteo indisponible (%s, %s) : %s", latitude, longitude, exc)
             raise MeteoIndisponibleError("Service météo indisponible") from exc
 
@@ -84,4 +132,5 @@ class OpenMeteoService(IMeteoService):
             humidite=current.get("relative_humidity_2m"),
             pluie_jour_mm=pluie,
             et0_jour_mm=et0,
+            source=SOURCE,
         )

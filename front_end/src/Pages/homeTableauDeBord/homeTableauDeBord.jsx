@@ -5,7 +5,7 @@ import {
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
-import { useTitrePage } from "../../lib/hooks";
+import { useRequete, useTitrePage } from "../../lib/hooks";
 import { peut, TON_STATUT } from "../../lib/referentiels";
 import { Badge } from "../../components/ui/Card";
 
@@ -205,7 +205,10 @@ export default function HomeTableauDeBord() {
                   </button>
                   {ouvert && (
                     <div className="flex flex-col gap-3 w-full mt-6">
-                      <MetricCard icon={<Droplets className="text-indigo-400" />} label="Réserve en eau" value={formatNombre(capteur.reserve_eau_mm, 1)} unit="mm" />
+                      <MetricCard icon={<Droplets className="text-indigo-400" />} label="Réserve en eau" value={formatNombre(capteur.reserve_eau_mm, 1)}
+                                  unit={typeof capteur.reserve_max_mm === "number" ? `mm sur ${formatNombre(capteur.reserve_max_mm, 1)} mm` : "mm"} />
+                      <MetricCard icon={<Sun className="text-amber-400" />} label="Consommation du jour" value={formatNombre(capteur.etc_mm, 1)} unit="mm" />
+                      <ExplicationReserve espaceId={capteur.espace_id} />
                       <MetricCard icon={<Activity className="text-purple-400" />} label="CO₂" value={formatNombre(capteur.co2_ppm)} unit="ppm" />
                     </div>
                   )}
@@ -266,6 +269,15 @@ function ActionCard({ site, onAction, actionEnCours }) {
       </div>}
     </div>
   );
+}
+
+/** Phrase « pourquoi » calculée par le diagnostic (lecture seule), chargée à l'ouverture du détail. */
+function ExplicationReserve({ espaceId }) {
+  const charger = useCallback(() => api.diagnostiquerEspace(espaceId), [espaceId]);
+  const { donnees, chargement } = useRequete(charger);
+  if (chargement) return <p role="status" className="text-xs text-fg-muted">Calcul de l'explication…</p>;
+  if (!donnees?.explication) return null;
+  return <p className="text-sm text-fg-soft bg-canvas/50 p-4 rounded-xl border border-line">{donnees.explication}</p>;
 }
 
 function MetricCard({ icon, label, value, unit }) {

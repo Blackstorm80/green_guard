@@ -12,46 +12,17 @@ from domain.logic.arrosage import calculer_besoin_arrosage_mm, calculer_volume_a
 from domain.logic.bilan_carbone import CO2_KG_M2_AN, estimer_co2_absorbe_jour, estimer_o2_produit_jour
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.logic.clustering import calculer_couleur_gauge, distance_km, nommer_zones, regrouper
-from domain.logic.stress_hydrique import calculer_bilan_hydrique_simplifie, classe_sol
 from domain.logic.stress_sanitaire import calculer_stress_sanitaire_jour
 from domain.ports.capteurs import STATUT_SANS_DONNEE, ICapteurService, LectureCapteur
 
 
 def espace(**champs):
     defaut = dict(id=1, nom="Parc", reserve_utile_max=100.0, coefficient_cultural=1.0, type_sol=None,
-                  type_espace="Parc", surface_m2=1000.0, latitude=45.76, longitude=4.83)
+                  type_espace="Parc", profondeur_racinaire=None, surface_m2=1000.0, latitude=45.76, longitude=4.83)
     return SimpleNamespace(**{**defaut, **champs})
 
 
-# --- Stress hydrique ---------------------------------------------------------
-
-@pytest.mark.parametrize("reserve, statut", [(100, "Optimal"), (71, "Optimal"), (60, "A surveiller"),
-                                             (41, "A surveiller"), (40, "Critique"), (0, "Critique")])
-def test_seuils_de_statut(reserve, statut):
-    _, _, resultat = calculer_bilan_hydrique_simplifie(reserve, 0, 0, 100, 1.0)
-    assert resultat == statut
-
-
-def test_reserve_bornee_entre_zero_et_maximum():
-    assert calculer_bilan_hydrique_simplifie(90, 50, 0, 100, 1.0)[0] == 100   # pas de débordement
-    assert calculer_bilan_hydrique_simplifie(5, 0, 50, 100, 1.0)[0] == 0      # pas de réserve négative
-
-
-def test_reserve_utile_nulle_ne_divise_pas_par_zero():
-    _, indice, statut = calculer_bilan_hydrique_simplifie(0, 0, 0, 0, 1.0)
-    assert indice == 1.0 and statut == "Critique"
-
-
-@pytest.mark.parametrize("type_sol, classe", [("Argileux", "riche"), ("sableux", "pauvre"), ("Limoneux", "moyen"),
-                                              ("Limon-Argileux", "moyen"), (None, "moyen"), ("inconnu", "moyen")])
-def test_classe_de_sol(type_sol, classe):
-    assert classe_sol(type_sol) == classe
-
-
-def test_sol_drainant_consomme_plus_vite():
-    argile = calculer_bilan_hydrique_simplifie(100, 0, 10, 100, 1.0, type_sol="Argileux")[0]
-    sable = calculer_bilan_hydrique_simplifie(100, 0, 10, 100, 1.0, type_sol="Sableux")[0]
-    assert argile == 92 and sable == 88
+# Le modèle hydrique (FAO-56) est testé dans tests/test_fao56.py.
 
 
 # --- Bilan journalier --------------------------------------------------------
@@ -64,11 +35,13 @@ def test_premier_bilan_part_d_une_reserve_pleine():
 
 
 def test_bilan_part_de_la_veille_et_compte_pluie_et_arrosage():
-    veille = SimpleNamespace(reserve_utile_fin_journee=30.0)
+    veille = SimpleNamespace(epuisement_fin_mm=70.0, indice_stress=0.7)
     bilan = calculer_bilan_hydrique_pour_jour(espace(), veille, pluie_jour_mm=10, et0_jour_mm=5,
                                               arrosage_jour_mm=15, date_du_jour=date(2026, 7, 2),
                                               stress_sanitaire_jour=None)
-    assert bilan.reserve_utile_fin_journee == 50
+    # Dr = 70 > RAW (50) : Ks = (100 − 70) / 50 = 0,6, ETc = 3 ; Dr = 70 − 10 − 15 + 3 = 48
+    assert bilan.ks == pytest.approx(0.6)
+    assert bilan.reserve_utile_fin_journee == pytest.approx(52)
 
 
 # --- Stress sanitaire --------------------------------------------------------

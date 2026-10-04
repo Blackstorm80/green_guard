@@ -8,7 +8,8 @@ import { nombreOuVide, TYPES_ESPACE, TYPES_SOL } from "../../lib/referentiels";
 
 const INITIAL = {
   nom: "", type_espace: "Parc", ville: "", latitude: "", longitude: "",
-  surface_m2: "", type_sol: "Argileux", ph_actuel: "7", reserve_utile_max: "100", coefficient_cultural: "0.8",
+  surface_m2: "", type_sol: "Argileux", ph_actuel: "7", profondeur_racinaire: "", reserve_utile_max: "",
+  coefficient_cultural: "0.8",
 };
 
 export default function AddSpaceModal({ onClose, onSuccess }) {
@@ -33,6 +34,7 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
         longitude: Number(valeurs.longitude),
         surface_m2: nombreOuVide(valeurs.surface_m2),
         ph_actuel: nombreOuVide(valeurs.ph_actuel),
+        profondeur_racinaire: nombreOuVide(valeurs.profondeur_racinaire),
         reserve_utile_max: nombreOuVide(valeurs.reserve_utile_max),
         coefficient_cultural: nombreOuVide(valeurs.coefficient_cultural),
       });
@@ -62,10 +64,12 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
           <Champ {...lie} nom="surface_m2" label="Surface (m²)" type="number" min="0" step="any" />
           <Choix {...lie} nom="type_sol" label="Type de sol" options={TYPES_SOL} />
           <Champ {...lie} nom="ph_actuel" label="pH du sol" type="number" min="0" max="14" step="0.1" />
-          <Champ {...lie} nom="reserve_utile_max" label="Réserve utile max (mm)" type="number" min="1" step="any"
-                 aide="Eau disponible pour les plantes, sol plein." />
-          <Champ {...lie} nom="coefficient_cultural" label="Coefficient cultural" type="number" min="0.1" max="3" step="0.05"
-                 aide="Besoin en eau relatif de la végétation (Kc)." />
+          <Champ {...lie} nom="profondeur_racinaire" label="Profondeur racinaire (cm)" type="number" min="1" step="any"
+                 aide="Vide : selon le type d'espace (30 cm pour un square, 80 cm pour des arbres d'alignement)." />
+          <Champ {...lie} nom="reserve_utile_max" label="Réserve utile (mm)" type="number" min="1" step="any"
+                 aide="Vide : calculée selon le sol et la profondeur racinaire (méthode FAO-56)." />
+          <Champ {...lie} nom="coefficient_cultural" label="Coefficient paysager" type="number" min="0.1" max="3" step="0.05"
+                 aide="Besoin en eau relatif de la végétation (0,8 pour un gazon)." />
         </fieldset>
 
         {erreur && <Alert ton="danger">{erreur}</Alert>}

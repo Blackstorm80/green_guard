@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict
 
@@ -18,6 +18,13 @@ class LectureCapteurDTO(BaseModel):
     sante_percent: float | None = None
     statut: str
     timestamp: datetime | None = None
+    reserve_max_mm: float | None = None
+    reserve_facilement_utilisable_mm: float | None = None
+    reserve_percent: float | None = None
+    et0_mm: float | None = None
+    etc_mm: float | None = None
+    date_bilan: date | None = None
+    version_modele: str | None = None
 
 
 class MetriquesDashboardDTO(BaseModel):
@@ -36,3 +43,11 @@ class DashboardCapteursDTO(BaseModel):
     meteo_exterieure: MeteoDTO | None = None
     capteurs: list[LectureCapteurDTO]
     metrics: MetriquesDashboardDTO
+
+
+class DiagnosticDTO(BaseModel):
+    statut: str
+    message: str
+    # Phrase calculée (réserve, manque depuis la dernière pluie, évapotranspiration) ; None sans bilan FAO-56
+    explication: str | None = None
+    mesures: LectureCapteurDTO

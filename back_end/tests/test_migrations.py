@@ -111,3 +111,44 @@ def test_migration_base_vide_sans_organisation_fantome(monkeypatch):
     with engine.connect() as conn:
         assert conn.execute(text("SELECT COUNT(*) FROM organisations")).scalar() == 0
     engine.dispose()
+
+
+def test_migration_fao56_conserve_les_bilans_et_libere_la_reserve_par_defaut(monkeypatch):
+    url = f"sqlite:///{os.path.join(tempfile.mkdtemp(), 'fao56.db')}"
+    config = config_alembic(monkeypatch, url)
+    command.upgrade(config, "0002_organisations")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO organisations (id, nom, slug) VALUES (1, 'Ville', 'ville')"))
+        conn.execute(text(
+            "INSERT INTO espaces_verts (id, nom, latitude, longitude, organisation_id, reserve_utile_max, "
+            "coefficient_cultural) VALUES (10, 'Défaut', 45.7, 4.8, 1, 100, 1), (11, 'Saisie', 45.8, 4.9, 1, 60, 0.7)"
+        ))
+        conn.execute(text(
+            "INSERT INTO bilans_hydriques (espace_id, date, reserve_utile_fin_journee, indice_stress, "
+            "statut_hydrique) VALUES (10, '2026-07-01', 70, 0.3, 'A surveiller')"
+        ))
+
+    command.upgrade(config, "head")
+    with engine.begin() as conn:
+        bilan = conn.execute(text("SELECT reserve_utile_fin_journee, indice_stress, version_modele, taw_mm, "
+                                  "epuisement_fin_mm, source_meteo FROM bilans_hydriques")).one()
+        assert tuple(bilan) == (70, 0.3, "historique-v1", None, None, None)
+        espaces = conn.execute(text("SELECT id, reserve_utile_max, coefficient_cultural FROM espaces_verts "
+                                    "ORDER BY id")).all()
+        assert [tuple(e) for e in espaces] == [(10, None, 1), (11, 60, 0.7)]   # 100 = ancien défaut → calculée
+        conn.execute(text("INSERT INTO espaces_verts (id, nom, latitude, longitude, organisation_id) "
+                          "VALUES (12, 'Nouveau', 45.0, 4.0, 1)"))
+        assert conn.execute(text("SELECT coefficient_cultural FROM espaces_verts WHERE id = 12")).scalar() == 0.8
+        # Un nouveau bilan doit déclarer la version de son modèle
+        with pytest.raises(IntegrityError):
+            conn.execute(text("INSERT INTO bilans_hydriques (espace_id, date, reserve_utile_fin_journee, "
+                              "indice_stress, statut_hydrique, version_modele) "
+                              "VALUES (11, '2026-07-01', 1, 0, 'Optimal', NULL)"))
+
+    command.downgrade(config, "0002_organisations")
+    with engine.begin() as conn:
+        assert dict(conn.execute(text("SELECT id, reserve_utile_max FROM espaces_verts")).all()) == {
+            10: 100, 11: 60, 12: 100}
+        assert conn.execute(text("SELECT reserve_utile_fin_journee FROM bilans_hydriques")).scalar() == 70
+    engine.dispose()

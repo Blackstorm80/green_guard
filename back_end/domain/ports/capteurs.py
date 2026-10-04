@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import date, datetime
 from typing import Protocol
 
 STATUT_SANS_DONNEE = "Sans donnée"
@@ -28,6 +28,14 @@ class LectureCapteur:
     sante_percent: float | None
     statut: str
     timestamp: datetime | None
+    # Termes du dernier bilan FAO-56 (None pour un bilan antérieur au modèle)
+    reserve_max_mm: float | None = None
+    reserve_facilement_utilisable_mm: float | None = None
+    reserve_percent: float | None = None
+    et0_mm: float | None = None
+    etc_mm: float | None = None
+    date_bilan: date | None = None
+    version_modele: str | None = None
 
 
 class ICapteurService(ABC):

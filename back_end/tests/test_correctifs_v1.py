@@ -195,7 +195,7 @@ def test_bilan_date_du_jour_local_et_non_utc(meteo):
 
 def test_job_entre_minuit_et_2h_n_ecrase_pas_la_veille(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers)
+    creer_espace(client, headers, reserve_utile_max=100, coefficient_cultural=1.0)
     executer_mise_a_jour(db, meteo_service=meteo, maintenant=datetime(2026, 7, 14, 21, 0, tzinfo=UTC))
     executer_mise_a_jour(db, meteo_service=meteo, maintenant=datetime(2026, 7, 14, 22, 30, tzinfo=UTC))
 
@@ -206,7 +206,7 @@ def test_job_entre_minuit_et_2h_n_ecrase_pas_la_veille(client, db, meteo):
 
 def test_arrosage_compte_sur_le_jour_local(client, db, meteo):
     headers = creer_compte(client)
-    espace_id = creer_espace(client, headers, reserve_utile_max=100)["id"]
+    espace_id = creer_espace(client, headers, reserve_utile_max=100, coefficient_cultural=1.0)["id"]
     # 14 juillet 23 h UTC = 15 juillet 1 h à Paris ; 14 juillet 21 h UTC = 14 juillet 23 h à Paris
     db.add_all([
         ActionIrrigation(espace_id=espace_id, quantite_mm=3.0, timestamp=datetime(2026, 7, 14, 23, 0, tzinfo=UTC)),
@@ -223,7 +223,7 @@ def test_arrosage_compte_sur_le_jour_local(client, db, meteo):
 
 def test_notification_critique_une_fois_par_jour_local(client, db, meteo):
     headers = creer_compte(client)
-    creer_espace(client, headers, reserve_utile_max=10)
+    creer_espace(client, headers, reserve_utile_max=10, coefficient_cultural=1.0)
     meteo.et0 = 9.0
     executer_mise_a_jour(db, meteo_service=meteo, maintenant=datetime(2026, 7, 15, 6, 0, tzinfo=UTC))
     executer_mise_a_jour(db, meteo_service=meteo, maintenant=datetime(2026, 7, 15, 20, 0, tzinfo=UTC))

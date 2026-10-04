@@ -20,7 +20,7 @@ def deux_organisations(client, db, meteo):
     """Ville A (admin Alice) et ville B (admin Bob), chacune avec un espace, une intervention et des mesures."""
     alice = creer_compte(client, "alice@example.com", organisation="Ville A")
     bob = creer_compte(client, "bob@example.com", organisation="Ville B")
-    espace_a = creer_espace(client, alice, nom="Parc A", reserve_utile_max=10)
+    espace_a = creer_espace(client, alice, nom="Parc A", reserve_utile_max=10, coefficient_cultural=1.0)
     espace_b = creer_espace(client, bob, nom="Parc B", latitude=48.85, longitude=2.35)
     intervention_b = client.post(f"{API}/interventions/", json={"espace_id": espace_b["id"], "type": "arrosage"},
                                  headers=bob).json()
@@ -194,7 +194,7 @@ def test_alerte_critique_envoyee_aux_membres_qui_interviennent(client, db, meteo
     alice = creer_compte(client, "alice@example.com")
     tech = ajouter_membre(client, db, alice, "tech@example.com", "technicien")
     elu = ajouter_membre(client, db, alice, "elu@example.com", "lecteur")
-    creer_espace(client, alice, nom="Square sec", reserve_utile_max=10)
+    creer_espace(client, alice, nom="Square sec", reserve_utile_max=10, coefficient_cultural=1.0)
     meteo.et0 = 9.0
     for _ in range(2):
         executer_mise_a_jour(db, meteo_service=meteo)

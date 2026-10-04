@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from domain.logic.fao56 import reserve_utile_de_l_espace
 from domain.models import (
     BilanHydriqueJournalier,
     EspaceVert,
@@ -22,7 +23,7 @@ def calculer_besoin_arrosage_mm(
     cible (par exemple 100 % de la RU).
 
     Args:
-        espace: L'espace vert concerné (pour connaître la Réserve Utile max).
+        espace: L'espace vert concerné (pour connaître la réserve utile totale, TAW).
         bilan: Le dernier bilan hydrique (pour connaître la réserve actuelle).
         seuil_declenchement_ratio: Pourcentage de la RU en dessous duquel
             on déclenche l'arrosage (ex: 0.5 pour 50 %).
@@ -37,7 +38,8 @@ def calculer_besoin_arrosage_mm(
     cible_remplissage_ratio = max(0.0, cible_remplissage_ratio)
 
     reserve_actuelle = bilan.reserve_utile_fin_journee
-    ru_max = espace.reserve_utile_max
+    # TAW conservée avec le bilan ; à défaut (bilan historique), celle de l'espace
+    ru_max = getattr(bilan, "taw_mm", None) or reserve_utile_de_l_espace(espace)
 
     # Seuil en mm (ex: 50 % de 100 mm = 50 mm)
     seuil_mm = ru_max * seuil_declenchement_ratio

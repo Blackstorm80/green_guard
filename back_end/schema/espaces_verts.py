@@ -15,9 +15,10 @@ class EspaceVertAgronomie(BaseModel):
     drainage: str | None = Field(None, max_length=50)
     humidite_cible: float | None = Field(None, ge=0, le=100)
     frequence_arrosage_auto: int | None = Field(None, ge=0)
-    profondeur_racinaire: float | None = Field(None, ge=0)
+    profondeur_racinaire: float | None = Field(None, ge=0)  # cm
     type_irrigation: str | None = Field(None, max_length=50)
     date_derniere_fertilisation: date | None = None
+    # Surcharge de la réserve utile (mm) ; absente ou null : calculée (FAO-56, texture × profondeur racinaire)
     reserve_utile_max: float | None = Field(None, gt=0)
     coefficient_cultural: float | None = Field(None, gt=0, le=3)
 
@@ -48,3 +49,5 @@ class EspaceVertRead(EspaceVertAgronomie):
     zone_id: int | None = None
     sante_percent: float | None = None
     cree_le: datetime | None = None
+    # Réserve utilisée par le bilan : reserve_utile_max si saisie, sinon la TAW calculée
+    reserve_utile_effective_mm: float

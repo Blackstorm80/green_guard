@@ -20,3 +20,7 @@ class IBilanHydriqueRepository(ABC):
 
     @abstractmethod
     def get_historique_by_espace(self, espace_id: int, limit: int = 7) -> list[BilanHydriqueJournalier]: ...
+
+    @abstractmethod
+    def lister_depuis(self, espace_id: int, date_debut: date) -> list[BilanHydriqueJournalier]:
+        """Bilans de l'espace datés de date_debut ou après, par date croissante."""

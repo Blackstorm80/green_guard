@@ -103,6 +103,8 @@ export const api = {
   createEspace: (data) => request("/espaces-verts/", { method: "POST", body: data }),
   updateEspace: (id, data) => request(`/espaces-verts/${id}`, { method: "PUT", body: data }),
   deleteEspace: (id) => request(`/espaces-verts/${id}`, { method: "DELETE" }),
+  // Historique des bilans hydriques et de leurs termes (FAO-56), par date croissante ; jours ≤ 365
+  getBilansEspace: (id, jours = 30, signal) => request(`/espaces-verts/${id}/bilans${query({ jours })}`, { signal }),
 
   // --- ZONES INTELLIGENTES ---
   getZones: (signal) => request("/zones/", { signal }),
