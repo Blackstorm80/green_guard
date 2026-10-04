@@ -30,3 +30,6 @@ numpy==2.4.2
 
 # --- HTTP sortant (Open-Meteo) ---
 requests==2.33.0
+
+# --- Fuseaux horaires (base IANA pour zoneinfo : absente sous Windows et dans l'image slim) ---
+tzdata==2026.5

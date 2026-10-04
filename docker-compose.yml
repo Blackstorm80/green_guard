@@ -1,5 +1,8 @@
-# Pile complète : docker compose up --build  →  front http://localhost:3000, API http://localhost:8000/docs
+# Pile complète : docker compose up --build  →  front http://localhost:3000, API http://localhost:8000
+# (documentation interactive /docs : ENABLE_DOCS=true dans .env, à réserver au développement)
 # Variables lues depuis .env à la racine (voir .env.example). SECRET_KEY est obligatoire.
+# API et front ne sont publiés que sur l'interface locale : en production, le reverse proxy TLS
+# installé sur l'hôte est le seul point d'entrée (API_BIND / FRONT_BIND pour s'en écarter).
 services:
 
   db:
@@ -24,14 +27,18 @@ services:
       context: ./back_end
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "${API_BIND:-127.0.0.1}:8000:8000"
     environment: &env_backend
       DATABASE_URL: postgresql://greenguard:${POSTGRES_PASSWORD:-greenguard_dev}@db:5432/greenguard
       SECRET_KEY: ${SECRET_KEY:?Définir SECRET_KEY dans .env (voir .env.example)}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}   # http://localhost est un contexte sécurisé pour les navigateurs
       HSTS: ${HSTS:-false}                    # true uniquement derrière HTTPS
-      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10} # tentatives de connexion/inscription par minute et par IP
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10}         # connexion : par identifiant ; inscription : par IP (par minute)
+      AUTH_RATE_LIMIT_IP: ${AUTH_RATE_LIMIT_IP:-100}  # connexion : par IP (large, une collectivité partage une IP)
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1}  # proxys dont X-Forwarded-For est cru (uvicorn)
+      ENABLE_DOCS: ${ENABLE_DOCS:-false}              # /docs, /redoc, /openapi.json
+      FUSEAU_HORAIRE: ${FUSEAU_HORAIRE:-Europe/Paris} # jour du bilan hydrique et de la météo journalière
       LOG_FORMAT: json
       ENABLE_SCHEDULER: "false"               # le job tourne dans le service worker (ADR-5)
     depends_on:
@@ -60,7 +67,7 @@ services:
     environment:
       API_ORIGIN: ${API_ORIGIN:-http://localhost:8000}   # autorisée par la CSP (connect-src)
     ports:
-      - "3000:80"
+      - "${FRONT_BIND:-127.0.0.1}:3000:80"
     depends_on:
       - backend
 

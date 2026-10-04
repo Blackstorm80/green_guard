@@ -19,4 +19,7 @@ class ImpactCarboneDTO(BaseModel):
     total_oxygen_kg: float
     total_carbon_absorbed_kg: float
     periode: str
+    # Ordre de grandeur, pas une mesure : à afficher comme tel
+    estimation_grossiere: bool = True
+    methode: str
     detail_par_zone: list[DetailZoneImpactDTO]

@@ -2,6 +2,23 @@
 
 Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; versions selon [SemVer](https://semver.org/lang/fr/).
 
+## [Non publié]
+
+### Sécurité
+- API et front publiés sur `127.0.0.1` par défaut (`API_BIND`, `FRONT_BIND`) : en production, seul le
+  reverse proxy TLS y accède.
+- Proxys de confiance configurables (`TRUSTED_PROXIES` → `--forwarded-allow-ips`) ; connexion limitée par
+  identifiant (`AUTH_RATE_LIMIT`) et par IP (`AUTH_RATE_LIMIT_IP`, 100) : 10 mauvais mots de passe ne
+  bloquent plus toute une collectivité derrière la même IP.
+- Documentation interactive fermée par défaut (`ENABLE_DOCS=false` : `/docs`, `/redoc`, `/openapi.json` en 404).
+
+### Corrigé
+- Jour du bilan hydrique calculé dans le fuseau métier (`FUSEAU_HORAIRE`, Europe/Paris) et non en UTC,
+  comme les cumuls météo Open-Meteo : entre 0 h et 2 h, le bilan de la veille n'est plus écrasé.
+- Impact carbone : facteur sourcé (Nowak & Crane, 2002 : ≈ 1,12 kg CO₂/m²/an, majorant) au lieu
+  d'environ 18 kg/m²/an ; l'API indique `estimation_grossiere` et `methode`. Le détail par zone est
+  désormais projeté sur l'année, comme les totaux.
+
 ## [1.0.0-rc1] — 2026-10-04 (version candidate)
 
 Première version candidate après la reprise du projet. Plan et décisions :

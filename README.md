@@ -71,7 +71,7 @@ Générer une clé JWT : `python -c "import secrets; print(secrets.token_hex(32)
 cp .env.example .env       # puis renseigner SECRET_KEY et POSTGRES_PASSWORD
 docker compose up --build -d
 ```
-Front : http://localhost:3000 — API : http://localhost:8000/docs. Les migrations s'appliquent au démarrage du backend ; le service `worker` exécute le bilan hydrique toutes les heures (premier passage au démarrage).
+Front : http://localhost:3000 — API : http://localhost:8000 (Swagger sur `/docs` si `ENABLE_DOCS=true` dans `.env`). Les migrations s'appliquent au démarrage du backend ; le service `worker` exécute le bilan hydrique toutes les heures (premier passage au démarrage).
 
 > Base créée avant octobre 2026 : le schéma de référence a été remplacé (`0001_schema_v1`).
 > Recréer la base de développement : `docker compose down -v` puis `docker compose up --build -d`.
@@ -94,7 +94,7 @@ alembic upgrade head
 uvicorn main:app --reload
 # ou, comme en production : ENABLE_SCHEDULER=false et `python worker.py` dans un second terminal
 ```
-*Accès Swagger : [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs)*
+*Accès Swagger : [http://127.0.0.1:8000/docs](http://127.0.0.1:8000/docs) — nécessite `ENABLE_DOCS=true` dans `back_end/.env` (présent dans `.env.example`)*
 
 ### 3. Frontend
 ```bash

@@ -1,7 +1,7 @@
 # back_end/application/use_cases/vegetal.py
 
 from application.dto.vegetal import DetailZoneImpactDTO, EtatGlobalVegetalDTO, ImpactCarboneDTO
-from domain.logic.bilan_carbone import estimer_co2_absorbe_jour, estimer_o2_produit_jour
+from domain.logic.bilan_carbone import METHODE_CARBONE, estimer_co2_absorbe_jour, estimer_o2_produit_jour
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
 from domain.ports.espace_vert_repository import IEspaceVertRepository
 
@@ -56,7 +56,7 @@ def calculer_impact_carbone(
     bilan_repo: IBilanHydriqueRepository
 ) -> ImpactCarboneDTO:
     """
-    Calcule l'impact carbone et oxygène agrégé (journalier estimé).
+    Calcule l'impact carbone et oxygène agrégé : projection annuelle, estimation grossière (majorant).
     """
     espaces = espace_repo.list_tous()
 
@@ -84,23 +84,24 @@ def calculer_impact_carbone(
         stats_par_zone[zone]["co2"] += co2
         stats_par_zone[zone]["o2"] += o2
 
-    # Construction de la liste de détails
+    # Projection annuelle de l'estimation du jour (le stress du jour est supposé constant),
+    # appliquée aussi au détail par zone : totaux et détail restent sur la même période
+    facteur_projection = 365.0
+
     details = [
         DetailZoneImpactDTO(
             zone=z,
-            oxygen_kg=round(vals["o2"], 2),
-            carbon_kg=round(vals["co2"], 2)
+            oxygen_kg=round(vals["o2"] * facteur_projection, 1),
+            carbon_kg=round(vals["co2"] * facteur_projection, 1)
         )
         for z, vals in stats_par_zone.items()
     ]
 
-    # Pour l'exemple, on projette sur une année (x365) pour avoir des chiffres significatifs
-    # comme dans l'exemple JSON (1234 kg), sinon ce serait très faible par jour.
-    facteur_projection = 365.0
-
     return ImpactCarboneDTO(
         total_oxygen_kg=round(total_o2 * facteur_projection, 1),
         total_carbon_absorbed_kg=round(total_co2 * facteur_projection, 1),
-        periode="Projection annuelle (estimation journalière × 365)",
+        periode="Projection annuelle (estimation du jour × 365), majorant",
+        estimation_grossiere=True,
+        methode=METHODE_CARBONE,
         detail_par_zone=details
     )

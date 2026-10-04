@@ -34,7 +34,7 @@ def installer_middlewares(app: FastAPI) -> None:
         response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["Permissions-Policy"] = "geolocation=(), camera=(), microphone=()"
         response.headers["Cross-Origin-Opener-Policy"] = "same-origin"
-        if not request.url.path.startswith(CHEMINS_DOCUMENTATION):
+        if not (settings.enable_docs and request.url.path.startswith(CHEMINS_DOCUMENTATION)):
             response.headers["Content-Security-Policy"] = CSP_API
         if settings.hsts:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"

@@ -12,10 +12,11 @@ os.environ["SECRET_KEY"] = "cle-de-test-uniquement-0123456789abcdef"
 os.environ["ENABLE_SCHEDULER"] = "false"
 # TestClient parle HTTP : un cookie Secure ne serait jamais renvoyé
 os.environ["COOKIE_SECURE"] = "false"
+os.environ["ENABLE_DOCS"] = "true"
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from api.v1.endpoints.auth import limiteur_auth  # noqa: E402
+from api.v1.endpoints.auth import limiteur_connexion, limiteur_inscription  # noqa: E402
 from api.v1.endpoints.meteo import get_meteo_service  # noqa: E402
 from domain.ports.meteo import ConditionsMeteo, IMeteoService, MeteoIndisponibleError  # noqa: E402
 from infrastructure.database import Base, SessionLocal, engine  # noqa: E402
@@ -45,7 +46,8 @@ class FausseMeteo(IMeteoService):
 def base_vierge():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    limiteur_auth.reinitialiser()
+    limiteur_connexion.reinitialiser()
+    limiteur_inscription.reinitialiser()
     yield
     app.dependency_overrides.clear()
 

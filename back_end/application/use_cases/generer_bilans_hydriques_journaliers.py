@@ -4,11 +4,14 @@ Le bilan du jour J se calcule toujours à partir du dernier bilan *antérieur* �
 puis remplace (et non ajoute) le bilan de J s'il existe déjà : on peut relancer
 le calcul autant de fois que voulu dans la journée, la réserve n'est décomptée
 qu'une seule fois. Les cumuls météo du jour (pluie, ET0) s'affinent à chaque passage.
+
+Le « jour » est celui du fuseau métier (celui de la météo journalière), jamais le jour UTC :
+sinon, entre minuit et 2 h à Paris, le calcul écraserait le bilan de la veille.
 """
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, tzinfo
 
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.models import BilanHydriqueJournalier, EspaceVert
@@ -65,10 +68,11 @@ def generer_bilans_hydriques_journaliers(
     bilan_repo: IBilanHydriqueRepository,
     meteo_service: IMeteoService,
     arrosage_du_jour_mm: Callable[[int, date], float],
-    date_du_calcul: date | None = None,
+    fuseau: tzinfo,
+    maintenant: datetime | None = None,
 ) -> RapportGeneration:
-    date_du_calcul = date_du_calcul or date.today()
-    maintenant = datetime.now(UTC)
+    maintenant = maintenant or datetime.now(UTC)
+    date_du_calcul = maintenant.astimezone(fuseau).date()
     rapport = RapportGeneration()
 
     for espace in espaces:

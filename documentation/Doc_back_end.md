@@ -1,7 +1,8 @@
 # Documentation technique du back-end GreenGuard
 
 > À jour au 2026-10-04 (phase 3). Le **contrat d'API de référence** est le schéma OpenAPI
-> généré par FastAPI : `http://localhost:8000/docs` (Swagger) ou `/openapi.json`.
+> généré par FastAPI : `http://localhost:8000/docs` (Swagger) ou `/openapi.json`, servis
+> uniquement si `ENABLE_DOCS=true` (développement ; 404 sinon).
 
 ## 1. Architecture
 
@@ -68,7 +69,13 @@ Un espace d'un autre compte répond **404** (et non 403), pour ne pas révéler 
 - **Mots de passe** : bcrypt, 12 caractères minimum. **`SECRET_KEY`** : 32 caractères minimum.
 - **Rôles** (`admin`, `manager`, `user`) relus en base à chaque requête ; un compte désactivé
   perd l'accès immédiatement.
-- **En-têtes** : CSP stricte (sauf `/docs`), `X-Frame-Options: DENY`, `nosniff`,
+- **Limitation de débit** (en mémoire, fenêtre `AUTH_RATE_WINDOW_S`) : la connexion est limitée
+  par identifiant (e-mail en minuscules, `AUTH_RATE_LIMIT`) **et** par IP (`AUTH_RATE_LIMIT_IP`, large :
+  toute une collectivité peut sortir par la même IP) ; l'inscription par IP (`AUTH_RATE_LIMIT`).
+  Le 429 est identique que le compte existe ou non. Derrière un reverse proxy, l'IP du client n'est
+  connue que si ce proxy figure dans `TRUSTED_PROXIES` (`--forwarded-allow-ips` d'uvicorn).
+- **Documentation interactive** (`/docs`, `/redoc`, `/openapi.json`) : fermée par défaut (`ENABLE_DOCS`).
+- **En-têtes** : CSP stricte (sauf `/docs` quand elle est ouverte), `X-Frame-Options: DENY`, `nosniff`,
   `Referrer-Policy`, HSTS si `HSTS=true`. Les erreurs 500 ne renvoient qu'un message
   générique et un `request_id` à retrouver dans les logs.
 
@@ -76,6 +83,10 @@ Un espace d'un autre compte répond **404** (et non 403), pour ne pas révéler 
 
 ### Bilan hydrique journalier
 `application/use_cases/generer_bilans_hydriques_journaliers.py`, appelé chaque heure par le worker.
+
+Le « jour » est celui de `FUSEAU_HORAIRE` (Europe/Paris par défaut), pour le bilan comme pour les
+cumuls météo demandés à Open-Meteo : un passage à 0 h 30 (heure de Paris) produit le bilan du jour
+qui commence sans écraser celui de la veille. Arrosages et notifications sont comptés sur ce même jour.
 
 1. Météo du jour (Open-Meteo) : ET0 et cumul de pluie, mis en cache par point (~10 km, 15 min).
 2. Point de départ : dernier bilan **antérieur** au jour (réserve pleine s'il n'y en a pas).
@@ -85,6 +96,13 @@ Un espace d'un autre compte répond **404** (et non 403), pour ne pas révéler 
 6. Une mesure est enregistrée ; un espace *Critique* déclenche une notification (une par jour).
 
 Les seuils (0,3 / 0,6) et les facteurs de sol restent **à faire valider par un agronome** (décision D-4).
+
+### Impact carbone (estimation grossière)
+`domain/logic/bilan_carbone.py` : séquestration des arbres urbains selon Nowak & Crane (2002),
+0,306 kg C par m² de couvert arboré et par an, soit ≈ 1,12 kg CO₂/m²/an (× 44/12), appliquée comme
+**majorant** (surface supposée entièrement arborée), réduite par le stress du jour puis projetée sur
+l'année (× 365). `GET /vegetal/impact-carbone` renvoie `estimation_grossiere: true` et `methode`
+(texte court à afficher avec le chiffre) ; totaux et détail par zone portent sur la même période.
 
 ### Zones intelligentes
 `domain/logic/clustering.py` : K-Means sur les coordonnées projetées en km. Nombre de zones
@@ -100,7 +118,11 @@ sinon 5). Les centroïdes et rayons sont en coordonnées réelles.
 | `FRONTEND_URL` | — | Origine CORS supplémentaire |
 | `COOKIE_SECURE` | `true` | Cookie de session réservé à HTTPS (localhost accepté) |
 | `ACCESS_TOKEN_MINUTES` | `60` | Durée de session |
-| `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_S` | `10` / `60` | Tentatives autorisées par IP et par fenêtre |
+| `AUTH_RATE_LIMIT` / `AUTH_RATE_WINDOW_S` | `10` / `60` | Connexion : tentatives par identifiant ; inscription : par IP (par fenêtre, en s) |
+| `AUTH_RATE_LIMIT_IP` | `100` | Connexion : tentatives par IP et par fenêtre |
+| `TRUSTED_PROXIES` | `127.0.0.1` | Proxys (adresses ou CIDR) dont `X-Forwarded-For` est cru (CMD du Dockerfile) |
+| `ENABLE_DOCS` | `false` | Ouvre `/docs`, `/redoc`, `/openapi.json` (développement) |
+| `FUSEAU_HORAIRE` | `Europe/Paris` | Jour métier du bilan et des cumuls météo (nom IANA) |
 | `ENABLE_SCHEDULER` | `false` | Job intégré à l'API (développement sans worker) |
 | `LOG_FORMAT` / `LOG_LEVEL` | `text` / `INFO` | `json` en production |
 | `HSTS` | `false` | À activer derrière HTTPS |

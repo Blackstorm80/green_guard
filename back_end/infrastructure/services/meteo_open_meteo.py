@@ -5,6 +5,7 @@ from threading import Lock
 
 import requests
 
+from config import settings
 from domain.ports.meteo import ConditionsMeteo, IMeteoService, MeteoIndisponibleError
 
 logger = logging.getLogger(__name__)
@@ -30,6 +31,10 @@ def _lire_cache(cle: tuple[float, float]) -> ConditionsMeteo | None:
 
 
 class OpenMeteoService(IMeteoService):
+    def __init__(self, fuseau_horaire: str | None = None):
+        # Cumuls journaliers (pluie, ET0) calculés sur le jour du fuseau métier, comme le bilan
+        self.fuseau_horaire = fuseau_horaire or settings.fuseau_horaire
+
     def recuperer_conditions_actuelles(self, latitude, longitude, maintenant: datetime) -> ConditionsMeteo:
         cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE))
         conditions = _lire_cache(cle)
@@ -47,15 +52,14 @@ class OpenMeteoService(IMeteoService):
                 _cache[cle] = (time.monotonic(), conditions)
             return conditions
 
-    @staticmethod
-    def _appeler_api(latitude: float, longitude: float) -> ConditionsMeteo:
+    def _appeler_api(self, latitude: float, longitude: float) -> ConditionsMeteo:
         params = {
             "latitude": latitude,
             "longitude": longitude,
             "current": "temperature_2m,relative_humidity_2m,cloud_cover",
             "daily": "et0_fao_evapotranspiration,precipitation_sum",
             "forecast_days": 1,
-            "timezone": "auto",
+            "timezone": self.fuseau_horaire,
         }
         try:
             response = requests.get(OPEN_METEO_URL, params=params, timeout=TIMEOUT_S)

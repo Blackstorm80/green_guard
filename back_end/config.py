@@ -1,6 +1,7 @@
 """Configuration centralisée (ADR-8) : seul module qui lit les variables d'environnement."""
 import os
 from dataclasses import dataclass, field
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dotenv import load_dotenv
 
@@ -34,9 +35,21 @@ class Settings:
     # Secure par défaut ; ne le désactiver que pour une pile locale servie en HTTP hors localhost
     cookie_secure: bool = field(default_factory=lambda: _bool("COOKIE_SECURE", True))
 
-    # Limitation de débit des routes d'authentification (par IP)
+    # Limitation de débit de l'authentification. Connexion : quota strict par identifiant (bourrage
+    # d'identifiants) et quota large par IP (une collectivité entière peut partager une IP de sortie).
+    # Inscription : quota strict par IP.
     auth_rate_limit: int = field(default_factory=lambda: int(os.getenv("AUTH_RATE_LIMIT", "10")))
+    auth_rate_limit_ip: int = field(default_factory=lambda: int(os.getenv("AUTH_RATE_LIMIT_IP", "100")))
     auth_rate_window_s: int = field(default_factory=lambda: int(os.getenv("AUTH_RATE_WINDOW_S", "60")))
+    # Proxys dont les en-têtes X-Forwarded-* sont crus : transmis à uvicorn (--forwarded-allow-ips,
+    # CMD du Dockerfile) ; sans cela, toutes les requêtes semblent venir de l'adresse du proxy.
+    trusted_proxies: str = field(default_factory=lambda: os.getenv("TRUSTED_PROXIES", "127.0.0.1"))
+
+    # Documentation interactive (/docs, /redoc, /openapi.json) : fermée par défaut (production)
+    enable_docs: bool = field(default_factory=lambda: _bool("ENABLE_DOCS", False))
+
+    # Fuseau du « jour » métier : celui de la météo journalière et du bilan hydrique
+    fuseau_horaire: str = field(default_factory=lambda: os.getenv("FUSEAU_HORAIRE", "Europe/Paris"))
 
     # Job planifié : à n'activer que dans UN processus (service worker en production)
     enable_scheduler: bool = field(default_factory=lambda: _bool("ENABLE_SCHEDULER", False))
@@ -57,6 +70,16 @@ class Settings:
                 f"SECRET_KEY trop courte ({len(self.secret_key)} caractères, minimum {LONGUEUR_MIN_SECRET}). "
                 'Générer : python -c "import secrets; print(secrets.token_hex(32))"'
             )
+        try:
+            ZoneInfo(self.fuseau_horaire)
+        except (ZoneInfoNotFoundError, ValueError) as exc:
+            raise RuntimeError(
+                f"FUSEAU_HORAIRE invalide ({self.fuseau_horaire!r}). Exemple : Europe/Paris"
+            ) from exc
+
+    @property
+    def fuseau(self) -> ZoneInfo:
+        return ZoneInfo(self.fuseau_horaire)
 
     @property
     def allowed_origins(self) -> list[str]:

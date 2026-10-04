@@ -47,7 +47,15 @@ async def lifespan(_: FastAPI):
 
 
 VERSION = "1.0.0-rc1"
-app = FastAPI(title="GreenGuard API", version=VERSION, lifespan=lifespan)
+# Documentation interactive fermée en production : sans schéma OpenAPI, /docs et /redoc répondent 404
+app = FastAPI(
+    title="GreenGuard API",
+    version=VERSION,
+    lifespan=lifespan,
+    docs_url="/docs" if settings.enable_docs else None,
+    redoc_url="/redoc" if settings.enable_docs else None,
+    openapi_url="/openapi.json" if settings.enable_docs else None,
+)
 
 installer_middlewares(app)
 app.add_middleware(

@@ -4,12 +4,13 @@ Tant que les capteurs IoT ne sont pas branchés, la mesure est dérivée de la
 météo réelle (température, humidité de l'air) et du bilan (humidité du sol).
 """
 import logging
-from datetime import UTC, date, datetime, time
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from application.use_cases.generer_bilans_hydriques_journaliers import generer_bilans_hydriques_journaliers
+from config import settings
 from domain.models import ActionIrrigation, Mesure, Notification
 from domain.ports.meteo import IMeteoService
 from infrastructure.database import SessionLocal
@@ -22,11 +23,20 @@ logger = logging.getLogger(__name__)
 INTERVALLE_MINUTES = 60
 
 
-def _arrosage_du_jour(db: Session):
+def _bornes_du_jour(jour: date, fuseau: tzinfo) -> tuple[datetime, datetime]:
+    """Minuit local du jour et du lendemain, en UTC (heures stockées en UTC)."""
+    debut = datetime.combine(jour, time.min, tzinfo=fuseau)
+    fin = datetime.combine(jour + timedelta(days=1), time.min, tzinfo=fuseau)
+    return debut.astimezone(UTC), fin.astimezone(UTC)
+
+
+def _arrosage_du_jour(db: Session, fuseau: tzinfo):
     def cumul(espace_id: int, jour: date) -> float:
+        debut, fin = _bornes_du_jour(jour, fuseau)
         total = (
             db.query(func.sum(ActionIrrigation.quantite_mm))
-            .filter(ActionIrrigation.espace_id == espace_id, func.date(ActionIrrigation.timestamp) == jour)
+            .filter(ActionIrrigation.espace_id == espace_id,
+                    ActionIrrigation.timestamp >= debut, ActionIrrigation.timestamp < fin)
             .scalar()
         )
         return float(total or 0.0)
@@ -51,16 +61,20 @@ def _notifier_stress_critique(db: Session, resultat, debut_journee: datetime) ->
     return True
 
 
-def executer_mise_a_jour(db: Session, meteo_service: IMeteoService | None = None) -> None:
+def executer_mise_a_jour(db: Session, meteo_service: IMeteoService | None = None,
+                         maintenant: datetime | None = None) -> None:
+    fuseau = settings.fuseau
+    maintenant = maintenant or datetime.now(UTC)
     rapport = generer_bilans_hydriques_journaliers(
         espaces=EspaceVertRepositoryImpl(db).list_tous(),
         bilan_repo=BilanHydriqueRepositoryImpl(db),
         meteo_service=meteo_service or OpenMeteoService(),
-        arrosage_du_jour_mm=_arrosage_du_jour(db),
+        arrosage_du_jour_mm=_arrosage_du_jour(db, fuseau),
+        fuseau=fuseau,
+        maintenant=maintenant,
     )
 
-    maintenant = datetime.now(UTC)
-    debut_journee = datetime.combine(maintenant.date(), time.min, tzinfo=UTC)
+    debut_journee, _ = _bornes_du_jour(maintenant.astimezone(fuseau).date(), fuseau)
     notifications = 0
     for resultat in rapport.traites:
         ru_max = resultat.espace.reserve_utile_max or 1.0

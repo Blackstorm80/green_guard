@@ -9,7 +9,7 @@ from api.deps.auth import (
     poser_cookie_session,
     verify_password,
 )
-from api.deps.rate_limit import RateLimiter
+from api.deps.rate_limit import LimiteurConnexion, RateLimiter
 from config import settings
 from domain.models import User
 from infrastructure.database import get_db
@@ -17,10 +17,15 @@ from schema.token import Token
 from schema.utilisateurs import UserCreate
 
 router = APIRouter()
-limiteur_auth = RateLimiter(settings.auth_rate_limit, settings.auth_rate_window_s)
+limiteur_connexion = LimiteurConnexion(
+    max_par_ip=settings.auth_rate_limit_ip,
+    max_par_identifiant=settings.auth_rate_limit,
+    fenetre_s=settings.auth_rate_window_s,
+)
+limiteur_inscription = RateLimiter(settings.auth_rate_limit, settings.auth_rate_window_s)
 
 
-@router.post("/login", response_model=Token, dependencies=[Depends(limiteur_auth)])
+@router.post("/login", response_model=Token, dependencies=[Depends(limiteur_connexion)])
 def login(response: Response, form_data: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get_db)):
     """Ouvre une session : cookie httpOnly pour le navigateur ; jeton aussi renvoyé pour Swagger et les scripts."""
     user = db.query(User).filter(User.email == form_data.username).first()
@@ -44,7 +49,7 @@ def logout(response: Response):
     return response
 
 
-@router.post("/register", status_code=status.HTTP_201_CREATED, dependencies=[Depends(limiteur_auth)])
+@router.post("/register", status_code=status.HTTP_201_CREATED, dependencies=[Depends(limiteur_inscription)])
 def register(user_in: UserCreate, db: Session = Depends(get_db)):
     """Crée un compte. Le rôle est toujours « user » : jamais fourni par le client."""
     if db.query(User).filter(User.email == user_in.email).first():

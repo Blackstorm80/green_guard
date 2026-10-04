@@ -9,7 +9,7 @@ from application.dto.intervention import PrioriteIntervention
 from application.use_cases.capteurs import _qualite_air, _synthese
 from application.use_cases.interventions import lister_interventions_urgentes
 from domain.logic.arrosage import calculer_besoin_arrosage_mm, calculer_volume_arrosage, convertir_besoin_en_litres
-from domain.logic.bilan_carbone import estimer_co2_absorbe_jour, estimer_o2_produit_jour
+from domain.logic.bilan_carbone import CO2_KG_M2_AN, estimer_co2_absorbe_jour, estimer_o2_produit_jour
 from domain.logic.bilan_hydrique import calculer_bilan_hydrique_pour_jour
 from domain.logic.clustering import calculer_couleur_gauge, distance_km, nommer_zones, regrouper
 from domain.logic.stress_hydrique import calculer_bilan_hydrique_simplifie, classe_sol
@@ -94,10 +94,19 @@ def test_arrosage():
 # --- Carbone -----------------------------------------------------------------
 
 def test_carbone():
-    assert estimer_co2_absorbe_jour(espace(surface_m2=100), 0.0, None) == pytest.approx(5.0)
-    assert estimer_co2_absorbe_jour(espace(surface_m2=100), 0.5, 0.5) == pytest.approx(1.25)
+    jour_100_m2 = 100 * 0.306 * 44 / 12 / 365                 # Nowak & Crane (2002), converti en CO2
+    assert estimer_co2_absorbe_jour(espace(surface_m2=100), 0.0, None) == pytest.approx(jour_100_m2)
+    assert estimer_co2_absorbe_jour(espace(surface_m2=100), 0.5, 0.5) == pytest.approx(jour_100_m2 / 4)
     assert estimer_co2_absorbe_jour(espace(surface_m2=None), 0.0, None) == 0.0
-    assert estimer_o2_produit_jour(espace(surface_m2=100), 0.0, None) == pytest.approx(5.0 * 32 / 44)
+    assert estimer_co2_absorbe_jour(espace(surface_m2=100), 1.0, None) == 0.0
+    assert estimer_o2_produit_jour(espace(surface_m2=100), 0.0, None) == pytest.approx(jour_100_m2 * 32 / 44)
+
+
+def test_carbone_ordre_de_grandeur_annuel():
+    """Non-régression : l'ancien facteur donnait ≈ 18 kg CO2/m²/an, 15 à 20 fois trop."""
+    annuel_m2 = estimer_co2_absorbe_jour(espace(surface_m2=1), 0.0, None) * 365
+    assert annuel_m2 == pytest.approx(CO2_KG_M2_AN)
+    assert 1.1 < annuel_m2 < 1.13
 
 
 # --- Clustering --------------------------------------------------------------

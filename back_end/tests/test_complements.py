@@ -34,6 +34,11 @@ def test_indicateurs_vegetaux_reserves_aux_admins(client, db, meteo):
     impact = client.get(f"{API}/vegetal/impact-carbone", headers=headers).json()
     assert impact["total_carbon_absorbed_kg"] > 0
     assert "× 365" in impact["periode"]
+    assert impact["estimation_grossiere"] is True
+    assert "Nowak" in impact["methode"]
+    # 1000 m², stress 0,05 : ≈ 1,12 kg CO2/m²/an × 0,95 (et non plus ≈ 18 kg/m²/an)
+    assert impact["total_carbon_absorbed_kg"] == pytest.approx(1000 * 0.306 * 44 / 12 * 0.95, abs=0.1)
+    assert impact["detail_par_zone"][0]["carbon_kg"] == pytest.approx(impact["total_carbon_absorbed_kg"], abs=0.1)
 
 
 def test_notification_marquee_lue_et_isolee(client, db):
@@ -83,6 +88,7 @@ def test_client_open_meteo_et_cache(monkeypatch):
     service = OpenMeteoService()
     maintenant = datetime.now(UTC)
     c = service.recuperer_conditions_actuelles(45.76, 4.83, maintenant)
+    assert appels[0]["timezone"] == "Europe/Paris"            # jour météo = jour du bilan (FUSEAU_HORAIRE)
     assert (c.temperature_c, c.et0_jour_mm, c.pluie_jour_mm, c.ensoleillement_fort) == (21.5, 4.2, 1.5, True)
 
     service.recuperer_conditions_actuelles(45.7601, 4.8301, maintenant)   # même point arrondi → cache
