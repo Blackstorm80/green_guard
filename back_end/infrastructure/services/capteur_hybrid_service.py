@@ -3,6 +3,7 @@ from collections.abc import Sequence
 from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 
+from domain.logic.arrosage import dose_recommandee
 from domain.models import BilanHydriqueJournalier, Mesure
 from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService, LectureCapteur
 
@@ -47,14 +48,24 @@ class CapteurHybridService(ICapteurService):
         )
         requete = select(
             b.espace_id, b.date, b.reserve_utile_fin_journee, b.indice_stress, b.statut_hydrique,
-            b.taw_mm, b.raw_mm, b.et0_mm, b.etc_mm, b.version_modele,
+            b.taw_mm, b.raw_mm, b.et0_mm, b.etc_mm, b.epuisement_fin_mm, b.version_modele,
         ).join(
             dernier, (b.espace_id == dernier.c.espace_id) & (b.date == dernier.c.d)
         )
         return {ligne.espace_id: ligne for ligne in self.db.execute(requete)}
 
     @staticmethod
-    def _termes(bilan: Row | None) -> dict:
+    def _dose(bilan: Row, espace: EspaceIdentifie):
+        epuisement = bilan.epuisement_fin_mm
+        if epuisement is None:
+            epuisement = bilan.taw_mm - bilan.reserve_utile_fin_journee
+        return dose_recommandee(
+            epuisement, bilan.taw_mm, getattr(espace, "surface_m2", None),
+            getattr(espace, "type_irrigation", None), getattr(espace, "debit_arrosage_l_min", None),
+        )
+
+    @classmethod
+    def _termes(cls, bilan: Row | None, espace: EspaceIdentifie) -> dict:
         """Termes FAO-56 du dernier bilan (restent à None pour un bilan historique-v1)."""
         if bilan is None:
             return {}
@@ -67,6 +78,7 @@ class CapteurHybridService(ICapteurService):
             "etc_mm": _arrondi(bilan.etc_mm),
             "date_bilan": bilan.date,
             "version_modele": bilan.version_modele,
+            "dose_recommandee": cls._dose(bilan, espace) if bilan.taw_mm is not None else None,
         }
 
     def lectures_actuelles(self, espaces: Sequence[EspaceIdentifie]) -> list[LectureCapteur]:
@@ -89,7 +101,7 @@ class CapteurHybridService(ICapteurService):
                 sante_percent=round((1.0 - bilan.indice_stress) * 100, 1) if bilan else None,
                 statut=bilan.statut_hydrique if bilan else STATUT_SANS_DONNEE,
                 timestamp=mesure.timestamp if mesure else None,
-                **self._termes(bilan),
+                **self._termes(bilan, espace),
             ))
         return lectures
 

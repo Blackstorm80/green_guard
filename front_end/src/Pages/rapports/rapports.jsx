@@ -7,6 +7,7 @@ import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION, peut } from "../..
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Alert, Badge, Card } from "../../components/ui/Card";
+import { ModaleArrosage } from "../../components/interventions/ModaleArrosage";
 
 const TON_STATUT = { planifiee: "info", en_cours: "alerte", terminee: "succes" };
 const FILTRES_INITIAUX = { du: "", au: "", espaceId: "", type: "", statut: "", recherche: "" };
@@ -16,6 +17,7 @@ const chargerDonnees = async (signal) => {
   return { interventions, espaces };
 };
 
+const formatVolume = (litres) => (typeof litres === "number" ? `${litres.toLocaleString("fr-FR")} L` : "—");
 const formatDate = (iso) => (iso ? new Date(iso).toLocaleString("fr-FR", { dateStyle: "short", timeStyle: "short" }) : "—");
 
 /** Export CSV compatible Excel (séparateur « ; », BOM UTF-8, champs échappés). */
@@ -41,6 +43,7 @@ export default function Rapports() {
   const { donnees, setDonnees, chargement, erreur } = useRequete(chargerDonnees, { interventions: [], espaces: [] });
   const [filtres, setFiltres] = useState(FILTRES_INITIAUX);
   const [erreurAction, setErreurAction] = useState("");
+  const [aTerminer, setATerminer] = useState(null);
   const majFiltre = (champ) => (e) => setFiltres((f) => ({ ...f, [champ]: e.target.value }));
 
   const nomsEspaces = useMemo(() => Object.fromEntries(donnees.espaces.map((e) => [e.id, e.nom])), [donnees.espaces]);
@@ -69,14 +72,26 @@ export default function Rapports() {
     volume: lignes.reduce((s, i) => s + (i.volume_eau_l ?? 0), 0),
   }), [lignes]);
 
+  const remplacer = (maj) =>
+    setDonnees((d) => ({ ...d, interventions: d.interventions.map((i) => (i.id === maj.id ? maj : i)) }));
+
   const terminer = async (intervention) => {
     setErreurAction("");
+    // Un arrosage se termine avec son volume réel : c'est lui qui est compté dans le bilan
+    if (intervention.type === "arrosage") {
+      setATerminer(intervention);
+      return;
+    }
     try {
-      const maj = await api.updateIntervention(intervention.id, { statut: "terminee" });
-      setDonnees((d) => ({ ...d, interventions: d.interventions.map((i) => (i.id === maj.id ? maj : i)) }));
+      remplacer(await api.updateIntervention(intervention.id, { statut: "terminee" }));
     } catch (err) {
       setErreurAction(err.message);
     }
+  };
+
+  const terminerArrosage = async ({ volume_eau_l }) => {
+    remplacer(await api.updateIntervention(aTerminer.id, { statut: "terminee", volume_eau_l }));
+    setATerminer(null);
   };
 
   return (
@@ -142,14 +157,25 @@ export default function Rapports() {
 
       {erreur && <Alert ton="danger">{erreur}</Alert>}
       {erreurAction && <Alert ton="danger">{erreurAction}</Alert>}
+      {aTerminer && (
+        <ModaleArrosage
+          titre={`Terminer l'arrosage : ${nomEspace(aTerminer.espace_id)}`}
+          description="Saisissez le volume réellement apporté."
+          volumeInitial={aTerminer.volume_eau_l ?? undefined}
+          aide="Compté aussitôt dans le bilan hydrique (volume / surface de l'espace). Vide : rien n'est compté."
+          libelleValider="Terminer l'arrosage"
+          onValider={terminerArrosage}
+          onClose={() => setATerminer(null)}
+        />
+      )}
 
       {/* relative : contient les éléments sr-only (position absolue) dans la zone défilante */}
       <Card className="relative overflow-x-auto p-0 sm:p-0">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[800px] text-left text-sm">
           <caption className="sr-only">Interventions filtrées ({lignes.length})</caption>
           <thead className="border-b border-line bg-surface-raised text-fg-muted">
             <tr>
-              {["Créée le", "Espace", "Type", "Description", "Statut", ""].map((titre, i) => (
+              {["Créée le", "Espace", "Type", "Description", "Volume", "Statut", ""].map((titre, i) => (
                 <th key={titre || i} scope="col" className="px-4 py-3 font-semibold">
                   {titre || <span className="sr-only">Actions</span>}
                 </th>
@@ -158,11 +184,11 @@ export default function Rapports() {
           </thead>
           <tbody className="divide-y divide-line">
             {chargement && (
-              <tr><td colSpan={6} className="px-4 py-8 text-center text-fg-muted" role="status">Chargement…</td></tr>
+              <tr><td colSpan={7} className="px-4 py-8 text-center text-fg-muted" role="status">Chargement…</td></tr>
             )}
             {!chargement && lignes.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-fg-muted">
+                <td colSpan={7} className="px-4 py-10 text-center text-fg-muted">
                   {donnees.interventions.length
                     ? "Aucune intervention ne correspond à ces filtres."
                     : "Aucune intervention pour le moment. Elles se créent depuis le tableau de bord, sur les espaces en alerte."}
@@ -175,6 +201,14 @@ export default function Rapports() {
                 <td className="px-4 py-3 font-medium text-fg">{nomEspace(i.espace_id)}</td>
                 <td className="px-4 py-3">{LIBELLES_INTERVENTION[i.type] ?? i.type}</td>
                 <td className="px-4 py-3">{i.description || "—"}</td>
+                <td className="whitespace-nowrap px-4 py-3">
+                  {formatVolume(i.volume_eau_l)}
+                  {i.arrosage_compte_mm !== null && i.arrosage_compte_mm !== undefined && (
+                    <span className="block text-xs text-fg-muted">
+                      {i.arrosage_compte_mm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} mm comptés
+                    </span>
+                  )}
+                </td>
                 <td className="px-4 py-3">
                   <Badge ton={TON_STATUT[i.statut]}>{LIBELLES_STATUT_INTERVENTION[i.statut] ?? i.statut}</Badge>
                 </td>

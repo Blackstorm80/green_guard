@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime, tzinfo
 
 from application.dto.intervention import (
     InterventionsUrgentesDTO,
@@ -6,6 +6,10 @@ from application.dto.intervention import (
     PrioriteIntervention,
     TypeIntervention,
 )
+from application.use_cases.generer_bilans_hydriques_journaliers import jour_metier
+from domain.logic.arrosage import horodatage_arrosage, quantite_apportee_mm
+from domain.models import ActionIrrigation, EspaceVert, Intervention
+from domain.ports.action_irrigation_repository import IActionIrrigationRepository
 from domain.ports.capteurs import EspaceIdentifie, ICapteurService, LectureCapteur
 
 SEUIL_CO2_PPM = 1200
@@ -65,3 +69,60 @@ def lister_interventions_urgentes(
         total=len(interventions),
         non_lues=sum(1 for i in retenues if not i.is_read),
     )
+
+
+def _arrosage_a_compter(intervention: Intervention) -> bool:
+    return (intervention.type == "arrosage" and intervention.statut == "terminee"
+            and (intervention.volume_eau_l or 0) > 0)
+
+
+def synchroniser_action_irrigation(
+    intervention: Intervention,
+    espace: EspaceVert,
+    action_repo: IActionIrrigationRepository,
+    fuseau: tzinfo,
+    maintenant: datetime | None = None,
+) -> date | None:
+    """Aligne l'apport d'eau lié sur l'intervention (déjà écrite, non validée).
+
+    Arrosage terminé avec un volume : un seul apport (volume / surface), horodaté à la réalisation.
+    Sinon (autre statut, autre type, volume nul) : l'apport éventuel est retiré.
+    Renvoie le premier jour (fuseau métier) dont le bilan change, None si rien ne change.
+    Lève ArrosageNonComptableError (surface inconnue, date future) : l'appelant annule la transaction.
+    """
+    existante = action_repo.get_par_intervention(intervention.id)
+    jours = [jour_metier(existante.timestamp, fuseau)] if existante else []
+
+    if not _arrosage_a_compter(intervention):
+        if existante is None:
+            return None
+        action_repo.supprimer(existante)
+        return jours[0]
+
+    maintenant = maintenant or datetime.now(UTC)
+    quantite = quantite_apportee_mm(intervention.volume_eau_l, espace.surface_m2)
+    horodatage = horodatage_arrosage(intervention.realisee_le or maintenant, maintenant)
+    intervention.realisee_le = horodatage   # même instant, en UTC : apport et intervention restent alignés
+    if existante is None:
+        action_repo.ajouter(ActionIrrigation(espace_id=espace.id, quantite_mm=quantite, timestamp=horodatage,
+                                             intervention_id=intervention.id))
+    else:
+        if existante.quantite_mm == quantite and jour_metier(horodatage, fuseau) == jours[0]:
+            existante.timestamp = horodatage
+            return None
+        existante.quantite_mm, existante.timestamp = quantite, horodatage
+        action_repo.ajouter(existante)
+    jours.append(jour_metier(horodatage, fuseau))
+    return min(jours)
+
+
+def retirer_action_irrigation(
+    intervention_id: int, action_repo: IActionIrrigationRepository, fuseau: tzinfo
+) -> date | None:
+    """Avant la suppression d'une intervention : retire son apport ; renvoie le jour à recalculer."""
+    existante = action_repo.get_par_intervention(intervention_id)
+    if existante is None:
+        return None
+    jour = jour_metier(existante.timestamp, fuseau)
+    action_repo.supprimer(existante)
+    return jour

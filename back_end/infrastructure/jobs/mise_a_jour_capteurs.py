@@ -7,17 +7,21 @@ Le worker sert toutes les organisations : seule leur liste est lue hors contexte
 puis chacune est traitée dans son propre contexte (comme une requête de ses membres).
 """
 import logging
-from datetime import UTC, date, datetime, time, timedelta, tzinfo
+from datetime import UTC, datetime, tzinfo
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from application.use_cases.generer_bilans_hydriques_journaliers import generer_bilans_hydriques_journaliers
+from application.use_cases.generer_bilans_hydriques_journaliers import (
+    arrosage_journalier,
+    bornes_du_jour,
+    generer_bilans_hydriques_journaliers,
+)
 from config import settings
 from domain.logic.droits import ROLES_INTERVENTION
-from domain.models import ActionIrrigation, Mesure, Notification, Organisation, User
+from domain.models import Mesure, Notification, Organisation, User
 from domain.ports.meteo import IMeteoService
 from infrastructure.database import SessionLocal
+from infrastructure.repositories.action_irrigation_repository_impl import ActionIrrigationRepositoryImpl
 from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
 from infrastructure.rls import CLE_ORGANISATION, contournement_rls, definir_organisation
@@ -26,26 +30,6 @@ from infrastructure.services.meteo_open_meteo import OpenMeteoService
 logger = logging.getLogger(__name__)
 
 INTERVALLE_MINUTES = 60
-
-
-def _bornes_du_jour(jour: date, fuseau: tzinfo) -> tuple[datetime, datetime]:
-    """Minuit local du jour et du lendemain, en UTC (heures stockées en UTC)."""
-    debut = datetime.combine(jour, time.min, tzinfo=fuseau)
-    fin = datetime.combine(jour + timedelta(days=1), time.min, tzinfo=fuseau)
-    return debut.astimezone(UTC), fin.astimezone(UTC)
-
-
-def _arrosage_du_jour(db: Session, fuseau: tzinfo):
-    def cumul(espace_id: int, jour: date) -> float:
-        debut, fin = _bornes_du_jour(jour, fuseau)
-        total = (
-            db.query(func.sum(ActionIrrigation.quantite_mm))
-            .filter(ActionIrrigation.espace_id == espace_id,
-                    ActionIrrigation.timestamp >= debut, ActionIrrigation.timestamp < fin)
-            .scalar()
-        )
-        return float(total or 0.0)
-    return cumul
 
 
 def _destinataires(db: Session, organisation_id: int) -> list[int]:
@@ -75,12 +59,12 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
         espaces=EspaceVertRepositoryImpl(db).list_par_organisation(organisation_id),
         bilan_repo=BilanHydriqueRepositoryImpl(db),
         meteo_service=meteo_service,
-        arrosage_du_jour_mm=_arrosage_du_jour(db, fuseau),
+        arrosage_du_jour_mm=arrosage_journalier(ActionIrrigationRepositoryImpl(db), fuseau),
         fuseau=fuseau,
         maintenant=maintenant,
     )
 
-    debut_journee, _ = _bornes_du_jour(maintenant.astimezone(fuseau).date(), fuseau)
+    debut_journee, _ = bornes_du_jour(maintenant.astimezone(fuseau).date(), fuseau)
     destinataires = _destinataires(db, organisation_id)
     notifications = 0
     for resultat in rapport.traites:

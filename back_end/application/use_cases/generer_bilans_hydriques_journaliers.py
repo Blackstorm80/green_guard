@@ -11,14 +11,19 @@ sinon, entre minuit et 2 h à Paris, le calcul écraserait le bilan de la veille
 Rattrapage : si le dernier bilan d'un espace date de plus d'un jour (worker arrêté…), chaque jour
 manquant est d'abord recalculé dans l'ordre à partir de la série météo journalière passée, puis le
 jour courant. Jamais plus de SERIE_JOURS_MAX jours : au-delà, la chaîne repart du dernier bilan connu.
+
+Recalcul immédiat : un arrosage saisi (ou retiré) recalcule aussitôt le bilan de l'espace, sans attendre
+le passage horaire. S'il date d'un jour passé, les bilans existants depuis ce jour sont d'abord recalculés
+dans l'ordre (série météo journalière), pour que la chaîne jusqu'au jour courant en tienne compte.
 """
 import logging
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
-from datetime import UTC, date, datetime, timedelta, tzinfo
+from datetime import UTC, date, datetime, time, timedelta, tzinfo
 
 from domain.logic.bilan_hydrique import COLONNES_CALCULEES, calculer_bilan_hydrique_pour_jour
 from domain.models import BilanHydriqueJournalier, EspaceVert
+from domain.ports.action_irrigation_repository import IActionIrrigationRepository
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
 from domain.ports.meteo import SERIE_JOURS_MAX, ConditionsMeteo, IMeteoService, MeteoIndisponibleError
 
@@ -37,6 +42,27 @@ class ResultatEspace:
 class RapportGeneration:
     traites: list[ResultatEspace] = field(default_factory=list)
     ignores: list[int] = field(default_factory=list)  # ids d'espaces sans données météo exploitables
+
+
+def bornes_du_jour(jour: date, fuseau: tzinfo) -> tuple[datetime, datetime]:
+    """Minuit local du jour et du lendemain, en UTC (heures stockées en UTC)."""
+    debut = datetime.combine(jour, time.min, tzinfo=fuseau)
+    fin = datetime.combine(jour + timedelta(days=1), time.min, tzinfo=fuseau)
+    return debut.astimezone(UTC), fin.astimezone(UTC)
+
+
+def jour_metier(horodatage: datetime, fuseau: tzinfo) -> date:
+    """Jour du fuseau métier d'un horodatage (naïf : UTC, comme le renvoie SQLite)."""
+    if horodatage.tzinfo is None:
+        horodatage = horodatage.replace(tzinfo=UTC)
+    return horodatage.astimezone(fuseau).date()
+
+
+def arrosage_journalier(action_repo: IActionIrrigationRepository, fuseau: tzinfo) -> Callable[[int, date], float]:
+    """Cumul des apports d'un espace sur un jour du fuseau métier."""
+    def cumul(espace_id: int, jour: date) -> float:
+        return action_repo.cumul_mm(espace_id, *bornes_du_jour(jour, fuseau))
+    return cumul
 
 
 def calculer_bilan_du_jour(
@@ -149,3 +175,57 @@ def generer_bilans_hydriques_journaliers(
                                               jours_rattrapes=rattrapes))
 
     return rapport
+
+
+def recorriger_jours_passes(
+    espace: EspaceVert,
+    depuis: date,
+    date_du_calcul: date,
+    bilan_repo: IBilanHydriqueRepository,
+    meteo_service: IMeteoService,
+    arrosage_du_jour_mm: Callable[[int, date], float],
+) -> int:
+    """Recalcule dans l'ordre les bilans existants de [depuis, date_du_calcul[ ; renvoie leur nombre.
+
+    Tout ou rien, comme le rattrapage : MeteoIndisponibleError si un jour n'a pas d'ET0, rien n'est écrit.
+    """
+    borne = max(depuis, date_du_calcul - timedelta(days=SERIE_JOURS_MAX))
+    jours = [b.date for b in bilan_repo.lister_depuis(espace.id, borne) if b.date < date_du_calcul]
+    if not jours:
+        return 0
+    serie = {
+        j.jour: j for j in meteo_service.recuperer_serie_journaliere(espace.latitude, espace.longitude,
+                                                                     jours[0], jours[-1])
+    }
+    if any(jour not in serie or serie[jour].et0_mm is None for jour in jours):
+        raise MeteoIndisponibleError("Série météo incomplète pour corriger les jours passés")
+    for jour in jours:
+        calculer_bilan_du_jour(
+            espace=espace, date_du_calcul=jour, pluie_mm=serie[jour].pluie_mm, et0_mm=serie[jour].et0_mm,
+            arrosage_jour_mm=arrosage_du_jour_mm(espace.id, jour), bilan_repo=bilan_repo,
+            source_meteo=serie[jour].source,
+        )
+    return len(jours)
+
+
+def recalculer_bilan_espace(
+    espace: EspaceVert,
+    depuis: date,
+    bilan_repo: IBilanHydriqueRepository,
+    meteo_service: IMeteoService,
+    arrosage_du_jour_mm: Callable[[int, date], float],
+    fuseau: tzinfo,
+    maintenant: datetime | None = None,
+) -> RapportGeneration:
+    """Recalcul immédiat après un changement des apports d'eau datés du jour `depuis` (fuseau métier)."""
+    maintenant = maintenant or datetime.now(UTC)
+    date_du_calcul = maintenant.astimezone(fuseau).date()
+    if depuis < date_du_calcul:
+        try:
+            recorriger_jours_passes(espace, depuis, date_du_calcul, bilan_repo, meteo_service, arrosage_du_jour_mm)
+        except MeteoIndisponibleError as exc:
+            # Le jour courant reste recalculé ; les jours passés gardent leur bilan
+            logger.warning("Espace %s : jours passés non corrigés depuis le %s (%s).", espace.id, depuis, exc)
+    return generer_bilans_hydriques_journaliers(
+        [espace], bilan_repo, meteo_service, arrosage_du_jour_mm, fuseau, maintenant,
+    )

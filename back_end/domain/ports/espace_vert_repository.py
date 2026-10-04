@@ -10,6 +10,9 @@ class EspaceResume:
     nom: str
     latitude: float
     longitude: float
+    surface_m2: float | None = None
+    type_irrigation: str | None = None
+    debit_arrosage_l_min: float | None = None
 
 
 class IEspaceVertRepository(ABC):
@@ -30,7 +33,7 @@ class IEspaceVertRepository(ABC):
 
     @abstractmethod
     def list_resume_par_organisation(self, organisation_id: int) -> list["EspaceResume"]:
-        """Vue allégée (id, nom, latitude, longitude) pour les écrans de synthèse à fort trafic."""
+        """Vue allégée (identité, position, données d'arrosage) pour les écrans de synthèse à fort trafic."""
 
     @abstractmethod
     def save(self, espace: EspaceVert) -> EspaceVert: ...

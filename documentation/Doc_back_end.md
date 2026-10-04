@@ -37,7 +37,7 @@ back_end/
 │   ├── database.py              # Moteur SQLAlchemy, convention de nommage des contraintes
 │   ├── rls.py                   # Contexte d'organisation des transactions PostgreSQL (Row Level Security)
 │   ├── jobs/mise_a_jour_capteurs.py
-│   ├── repositories/            # espaces verts, bilans hydriques, organisations et membres
+│   ├── repositories/            # espaces verts, bilans hydriques, apports d'eau (arrosages), organisations et membres
 │   └── services/                # Open-Meteo (avec cache), lecture capteurs groupée
 ├── alembic/                     # Migrations : seule source du schéma
 ├── scripts/load/taxonomy.py     # Chargement du catalogue iNaturalist
@@ -54,15 +54,15 @@ d'une même organisation partagent son patrimoine. Lecture : tout membre. Écrit
 | `/auth` | public (limité en débit) | public | `POST /login` (formulaire OAuth2), `POST /register` (JSON, crée une organisation), `POST /logout` |
 | `/users` | connecté | — | `GET /me` (dont `organisation {id, nom}`, `role`, `permissions`, `est_superadmin`), `GET /me/notifications` |
 | `/organisations` | connecté | voir colonne Contenu | `GET /moi` ; `PUT /moi` (paramètres : gestionnaire ; nom : admin) ; `GET /moi/membres` ; `PUT /moi/membres/{id}` (admin : rôle, désactivation) ; `POST /` (superadmin : organisation + premier admin) |
-| `/espaces-verts` | connecté | gestionnaire | CRUD complet (`reserve_utile_effective_mm` en lecture) ; `GET /{id}/bilans?jours=30` (historique des bilans et de leurs termes, 1 à 365 jours, par date croissante) |
+| `/espaces-verts` | connecté | gestionnaire | CRUD complet (`reserve_utile_effective_mm` en lecture, `debit_arrosage_l_min` facultatif) ; `GET /{id}/bilans?jours=30` (historique des bilans et de leurs termes, 1 à 365 jours, par date croissante) |
 | `/zones` | connecté | gestionnaire | `GET /`, `POST /clustering/rebuild` |
-| `/capteurs` | connecté | — | `GET /dashboard` (synthèse, lectures, météo extérieure) |
-| `/interventions` | connecté | technicien (création, suivi) ; gestionnaire (suppression) | `GET /urgent`, CRUD |
+| `/capteurs` | connecté | — | `GET /dashboard` (synthèse, lectures avec `dose_recommandee`, météo extérieure) |
+| `/interventions` | connecté | technicien (création, suivi) ; gestionnaire (suppression) | `GET /urgent`, CRUD ; un arrosage terminé avec un volume est compté dans le bilan (`arrosage_compte_mm` en lecture, § 4) |
 | `/notifications` | connecté (les siennes) | connecté (les siennes) | liste, `POST /{id}/mark-as-read` |
 | `/catalogue` | connecté | — | `GET /plantes`, `GET /auxiliaires` (pagination `offset`/`limit`) |
 | `/meteo` | connecté | — | `GET /actuelle?lat&lon`, `GET /{ville}` |
 | `/vegetal` | gestionnaire | — | `GET /etat-global`, `GET /impact-carbone` (patrimoine de l'organisation) |
-| `/health` | public / connecté | — | `GET /live`, `GET /ready` (base), `POST /diagnostic` (lecture seule : statut, message, `explication` calculée, mesures et termes du dernier bilan) |
+| `/health` | public / connecté | — | `GET /live`, `GET /ready` (base), `POST /diagnostic` (lecture seule : statut, message, `explication` calculée, `dose_recommandee`, `conseil_arrosage`, mesures et termes du dernier bilan) |
 
 « gestionnaire » se lit « gestionnaire ou admin », « technicien » « technicien, gestionnaire ou admin ».
 
@@ -127,7 +127,8 @@ appelé chaque heure par le worker. Référence : FAO Irrigation and Drainage Pa
 
 Le « jour » est celui de `FUSEAU_HORAIRE` (Europe/Paris par défaut), pour le bilan comme pour les
 cumuls météo demandés à Open-Meteo : un passage à 0 h 30 (heure de Paris) produit le bilan du jour
-qui commence sans écraser celui de la veille. Arrosages et notifications sont comptés sur ce même jour.
+qui commence sans écraser celui de la veille. Arrosages et notifications sont comptés sur ce même jour
+(voir « Boucle arrosage → bilan » pour l'origine des arrosages).
 
 **Réserve de l'espace.** `TAW = Δθ × Zr × 1000` (mm). Δθ par texture (FAO-56 tableau 19, milieu de
 fourchette) : Sableux 0,08 ; Limoneux 0,155 ; Limon-Argileux 0,155 ; Argileux 0,16 ; inconnue 0,14.
@@ -170,6 +171,51 @@ Comparé à l'ancien modèle (réserve fixe de 100 mm, facteur de sol empirique,
 réserve), un gazon sur limon (Zr 0,3 m, TAW 46,5 mm) à ET0 4 mm/j sans pluie passe « A surveiller » au
 jour 8 au lieu de 10 et « Critique » au jour 12 au lieu de 19 (même coefficient 0,8). Les tables de sols
 et de profondeurs restent **à faire valider par un agronome partenaire**.
+
+### Boucle arrosage → bilan
+`application/use_cases/interventions.py` (`synchroniser_action_irrigation`), appelé par chaque écriture
+d'une intervention (`POST`, `PUT`, `DELETE /interventions`), dans la même transaction.
+
+- Une intervention de type `arrosage` **terminée** (passée à `terminee`, ou créée directement avec
+  `statut: "terminee"`) avec `volume_eau_l > 0` crée un apport `actions_irrigation` :
+  `quantite_mm = volume_eau_l / surface_m2` (1 L/m² = 1 mm), horodaté à `realisee_le` (posée à
+  l'instant de la saisie si absente). Le volume saisi est le volume réellement versé : l'efficacité du
+  système n'est pas déduite, l'excédent éventuel sort du bilan par drainage.
+- `actions_irrigation.intervention_id` est **unique** : terminer de nouveau, ou corriger le volume, met
+  à jour l'apport existant, jamais de double comptage. Repasser l'intervention en `planifiee` ou
+  `en_cours` (annulation : `realisee_le` est effacée), changer son type, ramener le volume à 0 ou la
+  supprimer retire l'apport.
+- **Surface inconnue** (nulle ou absente) : refus **422** avec un message clair (« Surface de l'espace
+  inconnue : renseignez sa surface… »), rien n'est enregistré. Choix retenu plutôt qu'une hauteur d'eau
+  saisie à la main : une seule source de vérité (le volume), et la surface sert aussi à la dose.
+  Un arrosage terminé **sans** volume reste accepté et ne compte rien. `realisee_le` dans le futur
+  (au-delà de 5 min de décalage d'horloge) : 422. Volume borné à 10 000 m³.
+- **Recalcul immédiat** (`recalculer_bilan_espace`) après validation : bilan du jour de l'espace
+  recalculé avec le cas d'usage du worker (météo du cache Open-Meteo, 15 min). Pour un arrosage daté
+  d'un jour passé, les bilans existants depuis ce jour sont d'abord recalculés dans l'ordre avec la série
+  journalière (92 jours au plus). Si la météo est indisponible, l'intervention est tout de même validée :
+  le passage horaire suivant recompte l'apport du jour (un jour passé non corrigé garde son bilan).
+- Migration `0004_boucle_arrosage` : les arrosages déjà terminés avec un volume (et une surface connue)
+  reçoivent leur apport ; les bilans passés ne sont pas recalculés.
+
+### Dose recommandée
+`domain/logic/arrosage.py` (`dose_recommandee`, calcul pur), exposée dans chaque lecture de
+`GET /capteurs/dashboard` et dans `POST /health/diagnostic` : `dose_recommandee: {mm, litres, minutes}`.
+
+- `mm` = épuisement Dr du dernier bilan (quantité qui ramène la réserve à la capacité au champ),
+  plafonné à la TAW, au dixième.
+- `litres` = mm × `surface_m2` / efficacité, arrondi au litre ; efficacité selon `type_irrigation` :
+  goutte-à-goutte 0,9 ; aspersion 0,75 ; manuel / tuyau 0,7 ; autre ou non renseigné 0,75.
+  `null` si la surface est inconnue.
+- `minutes` = litres / `debit_arrosage_l_min` (débit de l'espace, facultatif), à la minute supérieure ;
+  `null` sans débit.
+- `null` pour un bilan `historique-v1` (termes inconnus) ou sans bilan.
+- Exemple : Dr 30 mm sur 1 000 m² en aspersion → 40 000 L ; à 100 L/min → 400 min.
+  Le diagnostic ajoute `conseil_arrosage`, par exemple « Pour remplir la réserve : 30 mm, soit 40 000 L
+  (400 min au débit de l'arrosage). » (`null` si la réserve est pleine).
+
+Le front pré-remplit le volume d'un arrosage déclenché depuis le tableau de bord avec `litres`
+(modifiable) et demande le volume réel au moment de « Terminer » (page Rapports).
 
 ### Impact carbone (estimation grossière)
 `domain/logic/bilan_carbone.py` : séquestration des arbres urbains selon Nowak & Crane (2002),

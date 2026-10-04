@@ -165,6 +165,8 @@ class EspaceVert(Base):
     frequence_arrosage_auto = Column(Integer, nullable=True)
     profondeur_racinaire = Column(Float, nullable=True)
     type_irrigation = Column(String, nullable=True)
+    # Débit de l'arrosage (L/min) : convertit la dose recommandée en minutes
+    debit_arrosage_l_min = Column(Float, nullable=True)
     date_derniere_fertilisation = Column(Date, nullable=True)
     sante_percent = Column(Float, nullable=True)
     # Surcharge facultative de la réserve utile (mm) ; NULL : réserve calculée (TAW FAO-56, sol × racines)
@@ -300,11 +302,15 @@ class Notification(Base):
 
 
 class ActionIrrigation(Base):
+    """Eau apportée, comptée dans le bilan du jour de son horodatage (fuseau métier)."""
     __tablename__ = "actions_irrigation"
     id = Column(Integer, primary_key=True, index=True)
     espace_id = Column(Integer, ForeignKey("espaces_verts.id", ondelete="CASCADE"), nullable=False, index=True)
     quantite_mm = Column(Float, nullable=False)
     timestamp = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # Intervention d'arrosage terminée à l'origine de l'apport (unique : jamais comptée deux fois)
+    intervention_id = Column(Integer, ForeignKey("interventions.id", ondelete="CASCADE"), nullable=True,
+                             unique=True)
 
 
 class Intervention(Base):
@@ -327,3 +333,9 @@ class Intervention(Base):
     cree_par = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
 
     espace = relationship("EspaceVert", back_populates="interventions")
+    action_irrigation = relationship("ActionIrrigation", uselist=False, viewonly=True)
+
+    @property
+    def arrosage_compte_mm(self) -> float | None:
+        """Hauteur d'eau comptée dans le bilan pour cet arrosage (None : rien de compté)."""
+        return self.action_irrigation.quantite_mm if self.action_irrigation else None

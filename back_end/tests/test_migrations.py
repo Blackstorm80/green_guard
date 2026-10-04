@@ -152,3 +152,43 @@ def test_migration_fao56_conserve_les_bilans_et_libere_la_reserve_par_defaut(mon
             10: 100, 11: 60, 12: 100}
         assert conn.execute(text("SELECT reserve_utile_fin_journee FROM bilans_hydriques")).scalar() == 70
     engine.dispose()
+
+
+def test_migration_boucle_arrosage_compte_les_arrosages_deja_termines(monkeypatch):
+    url = f"sqlite:///{os.path.join(tempfile.mkdtemp(), 'arrosage.db')}"
+    config = config_alembic(monkeypatch, url)
+    command.upgrade(config, "0003_moteur_fao56")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text("INSERT INTO organisations (id, nom, slug) VALUES (1, 'Ville', 'ville')"))
+        conn.execute(text(
+            "INSERT INTO espaces_verts (id, nom, latitude, longitude, organisation_id, surface_m2) VALUES "
+            "(10, 'Mesuré', 45.7, 4.8, 1, 200), (11, 'Sans surface', 45.8, 4.9, 1, NULL)"
+        ))
+        conn.execute(text(
+            "INSERT INTO interventions (id, espace_id, type, statut, volume_eau_l, realisee_le) VALUES "
+            "(1, 10, 'arrosage', 'terminee', 1000, '2026-07-01 08:00:00'), "
+            "(2, 10, 'arrosage', 'planifiee', 1000, NULL), (3, 10, 'taille', 'terminee', 1000, NULL), "
+            "(4, 11, 'arrosage', 'terminee', 1000, NULL), (5, 10, 'arrosage', 'terminee', NULL, NULL), "
+            "(6, 10, 'arrosage', 'terminee', 400, NULL)"
+        ))
+        # Apport saisi hors intervention : conservé tel quel
+        conn.execute(text("INSERT INTO actions_irrigation (espace_id, quantite_mm) VALUES (10, 7)"))
+
+    command.upgrade(config, "head")
+    with engine.begin() as conn:
+        apports = conn.execute(text(
+            "SELECT intervention_id, quantite_mm, timestamp FROM actions_irrigation ORDER BY id")).all()
+        assert [(a.intervention_id, a.quantite_mm) for a in apports] == [(None, 7), (1, 5), (6, 2)]
+        assert str(apports[1].timestamp).startswith("2026-07-01 08:00")          # horodaté à la réalisation
+        assert conn.execute(text("SELECT debit_arrosage_l_min FROM espaces_verts WHERE id = 10")).scalar() is None
+        # Une intervention ne peut produire qu'un apport
+        with pytest.raises(IntegrityError), conn.begin_nested():
+            conn.execute(text("INSERT INTO actions_irrigation (espace_id, quantite_mm, intervention_id) "
+                              "VALUES (10, 1, 1)"))
+
+    command.downgrade(config, "0003_moteur_fao56")
+    with engine.begin() as conn:
+        assert conn.execute(text("SELECT quantite_mm FROM actions_irrigation")).scalars().all() == [7]
+        assert conn.execute(text("SELECT COUNT(*) FROM interventions")).scalar() == 6
+    engine.dispose()

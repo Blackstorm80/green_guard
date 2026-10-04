@@ -9,7 +9,7 @@ import { DRAINAGES, EXPOSITIONS, IRRIGATIONS, TYPES_SOL } from "../../lib/refere
 
 const CHAMPS_NUMERIQUES = new Set([
   "surface_m2", "ph_actuel", "humidite_cible", "frequence_arrosage_auto", "profondeur_racinaire",
-  "reserve_utile_max", "coefficient_cultural",
+  "reserve_utile_max", "coefficient_cultural", "debit_arrosage_l_min",
 ]);
 
 const valeursInitiales = (espace) => ({
@@ -26,6 +26,7 @@ const valeursInitiales = (espace) => ({
   reserve_utile_max: espace?.reserve_utile_max ?? "",
   coefficient_cultural: espace?.coefficient_cultural ?? "",
   type_irrigation: espace?.type_irrigation ?? "",
+  debit_arrosage_l_min: espace?.debit_arrosage_l_min ?? "",
   date_derniere_fertilisation: espace?.date_derniere_fertilisation ?? "",
 });
 
@@ -52,6 +53,7 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
     );
     // Réserve vidée : retour à la réserve calculée (FAO-56) plutôt que « inchangée »
     if (valeurs.reserve_utile_max === "" && espace.reserve_utile_max != null) payload.reserve_utile_max = null;
+    if (valeurs.debit_arrosage_l_min === "" && espace.debit_arrosage_l_min != null) payload.debit_arrosage_l_min = null;
     try {
       await api.updateEspace(espace.id, payload);
       onSuccess();
@@ -99,7 +101,10 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
                    : "Valeur saisie. Vider le champ pour revenir à la réserve calculée."} />
           <Champ {...lie} nom="coefficient_cultural" label="Coefficient paysager" type="number" min="0.1" max="3" step="0.05"
                  aide="0,8 pour un gazon." />
-          <Choix {...lie} nom="type_irrigation" label="Irrigation" options={IRRIGATIONS} />
+          <Choix {...lie} nom="type_irrigation" label="Irrigation" options={IRRIGATIONS}
+                 aide="Efficacité retenue pour la dose : goutte-à-goutte 90 %, aspersion 75 %, manuel 70 %." />
+          <Champ {...lie} nom="debit_arrosage_l_min" label="Débit d'arrosage (L/min)" type="number" min="0.1" step="any"
+                 aide="Facultatif : donne la durée d'arrosage de la dose recommandée." />
           <Champ {...lie} nom="date_derniere_fertilisation" label="Dernière fertilisation" type="date" />
         </fieldset>
 

@@ -8,6 +8,7 @@ import { useAuth } from "../../context/AuthContext";
 import { useRequete, useTitrePage } from "../../lib/hooks";
 import { peut, TON_STATUT } from "../../lib/referentiels";
 import { Badge } from "../../components/ui/Card";
+import { ModaleArrosage } from "../../components/interventions/ModaleArrosage";
 
 const INTERVALLE_RAFRAICHISSEMENT_MS = 30000;
 const STATUTS_EN_ALERTE = ["Critique", "A surveiller"];
@@ -20,6 +21,16 @@ const ACTIONS = [
 const formatNombre = (v, decimales = 0) =>
   typeof v === "number" ? v.toLocaleString("fr-FR", { maximumFractionDigits: decimales }) : "--";
 
+/** Aide du champ volume : dose recommandée (mm, litres, minutes) calculée par le bilan. */
+function aideDose(dose) {
+  if (!dose) return "Aucune dose calculée pour cet espace (bilan hydrique pas encore disponible).";
+  if (dose.litres === null) {
+    return `Dose recommandée : ${formatNombre(dose.mm, 1)} mm. Renseignez la surface de l'espace pour l'obtenir en litres.`;
+  }
+  const minutes = dose.minutes !== null ? `, soit ${formatNombre(dose.minutes)} min au débit de l'arrosage` : "";
+  return `Dose recommandée pour remplir la réserve : ${formatNombre(dose.mm, 1)} mm, ${formatNombre(dose.litres)} L${minutes}. Modifiable.`;
+}
+
 export default function HomeTableauDeBord() {
   useTitrePage("Tableau de bord");
   const { user } = useAuth();
@@ -31,6 +42,7 @@ export default function HomeTableauDeBord() {
   const [feedback, setFeedback] = useState(null);
   const [ouverts, setOuverts] = useState({});
   const [actionEnCours, setActionEnCours] = useState(null);
+  const [arrosage, setArrosage] = useState(null);
 
   const charger = useCallback(async (signal) => {
     try {
@@ -60,6 +72,11 @@ export default function HomeTableauDeBord() {
   }, [charger]);
 
   const declencherIntervention = async (site, action) => {
+    if (action.type === "arrosage") {
+      setFeedback(null);
+      setArrosage(site);
+      return;
+    }
     setActionEnCours(`${site.espace_id}-${action.type}`);
     setFeedback(null);
     try {
@@ -73,6 +90,26 @@ export default function HomeTableauDeBord() {
       setFeedback({ ok: false, message: err.message });
     } finally {
       setActionEnCours(null);
+    }
+  };
+
+  const creerArrosage = async ({ volume_eau_l, terminee }) => {
+    const site = arrosage;
+    const creee = await api.createIntervention({
+      espace_id: site.espace_id,
+      type: "arrosage",
+      description: `Déclenchée depuis le tableau de bord (statut : ${site.statut})`,
+      volume_eau_l,
+      statut: terminee ? "terminee" : "planifiee",
+    });
+    setArrosage(null);
+    if (creee.arrosage_compte_mm !== null) {
+      setFeedback({ ok: true, message: `Arrosage de ${site.nom} enregistré : ${formatNombre(creee.arrosage_compte_mm, 1)} mm comptés dans le bilan.` });
+      charger();
+    } else {
+      setFeedback({ ok: true, message: terminee
+        ? `Arrosage de ${site.nom} enregistré sans volume : rien n'est compté dans le bilan.`
+        : `Arrosage planifié pour ${site.nom}.` });
     }
   };
 
@@ -171,6 +208,19 @@ export default function HomeTableauDeBord() {
         </section>
       )}
 
+      {arrosage && (
+        <ModaleArrosage
+          titre={`Arroser « ${arrosage.nom} »`}
+          description="Volume pré-rempli avec la dose recommandée par le bilan hydrique."
+          volumeInitial={arrosage.dose_recommandee?.litres ?? undefined}
+          aide={aideDose(arrosage.dose_recommandee)}
+          libelleValider="Enregistrer l'arrosage"
+          proposerTerminee
+          onValider={creerArrosage}
+          onClose={() => setArrosage(null)}
+        />
+      )}
+
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-8 items-start pt-4">
         {/* TÉLÉMÉTRIE PAR ESPACE */}
         <section className="space-y-6" aria-labelledby="titre-telemetrie">
@@ -208,6 +258,13 @@ export default function HomeTableauDeBord() {
                       <MetricCard icon={<Droplets className="text-indigo-400" />} label="Réserve en eau" value={formatNombre(capteur.reserve_eau_mm, 1)}
                                   unit={typeof capteur.reserve_max_mm === "number" ? `mm sur ${formatNombre(capteur.reserve_max_mm, 1)} mm` : "mm"} />
                       <MetricCard icon={<Sun className="text-amber-400" />} label="Consommation du jour" value={formatNombre(capteur.etc_mm, 1)} unit="mm" />
+                      {capteur.dose_recommandee?.mm > 0 && (
+                        <MetricCard icon={<Droplets className="text-blue-400" />} label="Dose pour remplir la réserve"
+                                    value={formatNombre(capteur.dose_recommandee.litres ?? capteur.dose_recommandee.mm, 1)}
+                                    unit={capteur.dose_recommandee.litres !== null
+                                      ? `L (${formatNombre(capteur.dose_recommandee.mm, 1)} mm${capteur.dose_recommandee.minutes !== null ? `, ${formatNombre(capteur.dose_recommandee.minutes)} min` : ""})`
+                                      : "mm"} />
+                      )}
                       <ExplicationReserve espaceId={capteur.espace_id} />
                       <MetricCard icon={<Activity className="text-purple-400" />} label="CO₂" value={formatNombre(capteur.co2_ppm)} unit="ppm" />
                     </div>

@@ -5,6 +5,15 @@ from pydantic import BaseModel, ConfigDict
 from application.dto.meteo import MeteoDTO
 
 
+class DoseRecommandeeDTO(BaseModel):
+    """Dose pour revenir à la capacité au champ ; litres sans surface connue et minutes sans débit : null."""
+    model_config = ConfigDict(from_attributes=True)
+
+    mm: float
+    litres: float | None = None
+    minutes: float | None = None
+
+
 class LectureCapteurDTO(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -25,6 +34,7 @@ class LectureCapteurDTO(BaseModel):
     etc_mm: float | None = None
     date_bilan: date | None = None
     version_modele: str | None = None
+    dose_recommandee: DoseRecommandeeDTO | None = None
 
 
 class MetriquesDashboardDTO(BaseModel):
@@ -50,4 +60,7 @@ class DiagnosticDTO(BaseModel):
     message: str
     # Phrase calculée (réserve, manque depuis la dernière pluie, évapotranspiration) ; None sans bilan FAO-56
     explication: str | None = None
+    dose_recommandee: DoseRecommandeeDTO | None = None
+    # Conseil chiffré (mm, litres, minutes) ; None si la réserve est pleine ou sans bilan FAO-56
+    conseil_arrosage: str | None = None
     mesures: LectureCapteurDTO

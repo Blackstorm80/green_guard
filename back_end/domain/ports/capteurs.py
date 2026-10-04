@@ -4,11 +4,16 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from typing import Protocol
 
+from domain.logic.arrosage import DoseRecommandee
+
 STATUT_SANS_DONNEE = "Sans donnée"
 
 
 class EspaceIdentifie(Protocol):
-    """Ce que la lecture capteurs exige d'un espace : entité complète ou vue allégée (EspaceResume)."""
+    """Ce que la lecture capteurs exige d'un espace : entité complète ou vue allégée (EspaceResume).
+
+    surface_m2, type_irrigation et debit_arrosage_l_min, lus s'ils existent, chiffrent la dose recommandée.
+    """
     id: int
     nom: str
     latitude: float
@@ -36,6 +41,8 @@ class LectureCapteur:
     etc_mm: float | None = None
     date_bilan: date | None = None
     version_modele: str | None = None
+    # Dose pour revenir à la capacité au champ (bilan FAO-56 seulement)
+    dose_recommandee: DoseRecommandee | None = None
 
 
 class ICapteurService(ABC):

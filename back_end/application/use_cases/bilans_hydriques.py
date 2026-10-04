@@ -2,6 +2,7 @@
 from datetime import date, timedelta
 
 from application.dto.capteurs import DiagnosticDTO, LectureCapteurDTO
+from domain.logic.arrosage import formuler_dose
 from domain.logic.fao56 import expliquer_bilan
 from domain.models import BilanHydriqueJournalier
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
@@ -32,11 +33,14 @@ def diagnostiquer_espace(
     bilan_repo: IBilanHydriqueRepository,
 ) -> DiagnosticDTO:
     """Diagnostic en lecture seule : dernier état connu et phrase explicative calculée sur l'historique."""
-    lecture = LectureCapteurDTO.model_validate(capteur_service.lecture_actuelle(espace))
+    brute = capteur_service.lecture_actuelle(espace)
+    lecture = LectureCapteurDTO.model_validate(brute)
     explication = None
     if lecture.date_bilan is not None:
         debut = lecture.date_bilan - timedelta(days=JOURS_EXPLICATION - 1)
         explication = expliquer_bilan(bilan_repo.lister_depuis(espace.id, debut))
     return DiagnosticDTO(
-        statut=lecture.statut, message=MESSAGES.get(lecture.statut, ""), explication=explication, mesures=lecture,
+        statut=lecture.statut, message=MESSAGES.get(lecture.statut, ""), explication=explication,
+        dose_recommandee=lecture.dose_recommandee, conseil_arrosage=formuler_dose(brute.dose_recommandee),
+        mesures=lecture,
     )
