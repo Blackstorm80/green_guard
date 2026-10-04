@@ -42,3 +42,7 @@ Thumbs.db
 # Playwright
 front_end/test-results/
 front_end/playwright-report/
+
+# Sauvegardes de base (contiennent des données personnelles)
+sauvegardes/
+*.dump
