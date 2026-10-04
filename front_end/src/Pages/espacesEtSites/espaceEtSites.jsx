@@ -2,9 +2,6 @@ import { useState, useEffect } from "react";
 import { 
   Search, Plus, MapPin, Leaf, LayoutGrid, List, Layers 
 } from "lucide-react";
-import { motion, AnimatePresence } from "framer-motion";
-
-const MotionButton = motion.button;
 import { api } from "../../services/api";
 import { useTitrePage } from "../../lib/hooks";
 import AddSpaceModal from "./AddSpaceModal";
@@ -211,21 +208,16 @@ export default function EspacesSites() {
       </div>
 
       {/* BOUTON MOBILE FLOTTANT (FAB) */}
-      <AnimatePresence>
-        <MotionButton
-          initial={{ scale: 0 }}
-          animate={{ 
-            scale: 1,
-            boxShadow: aBesoinDePulse ? ["0px 0px 0px rgba(34,197,94,0)", "0px 0px 20px rgba(34,197,94,0.6)", "0px 0px 0px rgba(34,197,94,0)"] : "none"
-          }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          onClick={() => setIsAddModalOpen(true)}
-          aria-label="Ajouter un espace"
-          className="md:hidden fixed bottom-6 right-6 z-50 bg-primary text-on-accent p-4 rounded-full shadow-2xl"
-        >
-          <Plus size={28} />
-        </MotionButton>
-      </AnimatePresence>
+      <button
+        type="button"
+        onClick={() => setIsAddModalOpen(true)}
+        aria-label="Ajouter un espace"
+        className="md:hidden fixed bottom-6 right-6 z-50 rounded-full bg-primary p-4 text-on-accent shadow-2xl"
+      >
+        {/* Halo d'invitation quand la liste est vide (désactivé si « réduire les animations ») */}
+        {aBesoinDePulse && <span aria-hidden className="absolute inset-0 rounded-full bg-primary/40 animate-ping" />}
+        <Plus size={28} aria-hidden className="relative" />
+      </button>
 
       {/* MODALES */}
       {isAddModalOpen && (
