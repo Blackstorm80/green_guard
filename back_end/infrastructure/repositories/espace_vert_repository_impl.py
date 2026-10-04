@@ -31,7 +31,8 @@ class EspaceVertRepositoryImpl(IEspaceVertRepository):
     def list_resume_par_organisation(self, organisation_id: int) -> list[EspaceResume]:
         lignes = (
             self.db.query(EspaceVert.id, EspaceVert.nom, EspaceVert.latitude, EspaceVert.longitude,
-                          EspaceVert.surface_m2, EspaceVert.type_irrigation, EspaceVert.debit_arrosage_l_min)
+                          EspaceVert.surface_m2, EspaceVert.type_irrigation, EspaceVert.debit_arrosage_l_min,
+                          EspaceVert.source_eau, EspaceVert.date_plantation, EspaceVert.type_espace)
             .filter(EspaceVert.organisation_id == organisation_id)
             .order_by(EspaceVert.id)
         )

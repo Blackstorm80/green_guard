@@ -1,9 +1,13 @@
+from collections.abc import Mapping
 from datetime import UTC, datetime, tzinfo
 
 from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO, MetriquesDashboardDTO
 from application.dto.meteo import MeteoDTO
 from application.use_cases.meteo import obtenir_meteo_actuelle
 from application.use_cases.prevision import decision_dto, previsions_des_lectures
+from application.use_cases.secheresse import evaluer_espace, secheresse_espace
+from domain.logic.secheresse import ReglesSecheresse, appliquer_restriction
+from domain.models import RestrictionSecheresse
 from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService
 from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
 
@@ -45,22 +49,36 @@ def obtenir_dashboard_capteurs(
     meteo_service: IMeteoService,
     fuseau: tzinfo,
     maintenant: datetime | None = None,
+    regles: ReglesSecheresse | None = None,
+    restrictions: Mapping[int, RestrictionSecheresse] | None = None,
 ) -> DashboardCapteursDTO:
     """Tableau de bord des espaces fournis (déjà filtrés sur l'utilisateur par l'appelant).
 
     Chaque lecture porte la décision de la prévision à 7 jours et la date de bascule en Critique,
-    absentes si la météo prévue est indisponible.
+    absentes si la météo prévue est indisponible. Avec des règles sécheresse, chaque lecture porte aussi
+    le niveau VigiEau du jour (relevés fournis) ; la décision et la dose en tiennent compte.
     """
     brutes = capteur_service.lectures_actuelles(espaces)
-    aujourd_hui = (maintenant or datetime.now(UTC)).astimezone(fuseau).date()
+    local = (maintenant or datetime.now(UTC)).astimezone(fuseau)
+    aujourd_hui = local.date()
     previsions = previsions_des_lectures(espaces, brutes, meteo_service, aujourd_hui)
+    par_id = {e.id: e for e in espaces}
     lectures = []
     for brute in brutes:
         lecture = LectureCapteurDTO.model_validate(brute)
+        evaluation = None
+        espace = par_id.get(brute.espace_id)
+        if regles is not None and espace is not None:
+            restriction = (restrictions or {}).get(espace.id)
+            evaluation = evaluer_espace(espace, restriction, regles, aujourd_hui)
+            mise_a_jour = {"secheresse": secheresse_espace(espace, restriction, regles, local)}
+            if evaluation.interdit_toute_la_journee:
+                mise_a_jour["dose_recommandee"] = None   # aucune dose conseillée pour un arrosage interdit
+            lecture = lecture.model_copy(update=mise_a_jour)
         prevision = previsions.get(brute.espace_id)
         if prevision is not None:
             lecture = lecture.model_copy(update={
-                "decision": decision_dto(prevision.decision),
+                "decision": decision_dto(appliquer_restriction(prevision.decision, evaluation, aujourd_hui)),
                 "date_bascule": prevision.date_bascule_critique,
             })
         lectures.append(lecture)

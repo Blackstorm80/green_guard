@@ -10,12 +10,15 @@ ROLES = (ADMIN, GESTIONNAIRE, TECHNICIEN, LECTEUR)
 ROLES_INTERVENTION = (ADMIN, GESTIONNAIRE, TECHNICIEN)   # créer, terminer une intervention
 ROLES_GESTION = (ADMIN, GESTIONNAIRE)                    # espaces, zones, paramètres métier, indicateurs
 ROLES_ADMINISTRATION = (ADMIN,)                          # membres de l'organisation
+# Registre sécheresse : document de contrôle, consultable par l'élu ; pas un outil de terrain
+ROLES_REGISTRE = (ADMIN, GESTIONNAIRE, LECTEUR)
 
 # Droits exposés au front (/users/me) pour afficher ou masquer les actions
 PERMISSIONS = {
     "interventions": ROLES_INTERVENTION,
     "gestion": ROLES_GESTION,
     "membres": ROLES_ADMINISTRATION,
+    "registre": ROLES_REGISTRE,
 }
 
 

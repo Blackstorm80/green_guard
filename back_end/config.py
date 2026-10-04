@@ -51,6 +51,10 @@ class Settings:
     # Fuseau du « jour » métier : celui de la météo journalière et du bilan hydrique
     fuseau_horaire: str = field(default_factory=lambda: os.getenv("FUSEAU_HORAIRE", "Europe/Paris"))
 
+    # Mode sécheresse : API publique VigiEau (sans clé). URL fixée par l'exploitant, jamais par un utilisateur.
+    vigieau_url: str = field(default_factory=lambda: os.getenv("VIGIEAU_URL", "https://api.vigieau.gouv.fr/api/zones"))
+    vigieau_timeout_s: float = field(default_factory=lambda: float(os.getenv("VIGIEAU_TIMEOUT_S", "10")))
+
     # Job planifié : à n'activer que dans UN processus (service worker en production)
     enable_scheduler: bool = field(default_factory=lambda: _bool("ENABLE_SCHEDULER", False))
 
@@ -70,6 +74,10 @@ class Settings:
                 f"SECRET_KEY trop courte ({len(self.secret_key)} caractères, minimum {LONGUEUR_MIN_SECRET}). "
                 'Générer : python -c "import secrets; print(secrets.token_hex(32))"'
             )
+        if not self.vigieau_url.startswith("https://"):
+            raise RuntimeError(f"VIGIEAU_URL doit être une URL https ({self.vigieau_url!r}).")
+        if not 0 < self.vigieau_timeout_s <= 60:
+            raise RuntimeError(f"VIGIEAU_TIMEOUT_S hors bornes ({self.vigieau_timeout_s}, attendu entre 0 et 60 s).")
         try:
             ZoneInfo(self.fuseau_horaire)
         except (ZoneInfoNotFoundError, ValueError) as exc:

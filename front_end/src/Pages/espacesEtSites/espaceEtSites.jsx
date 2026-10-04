@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
 import { 
-  Search, Plus, MapPin, Leaf, LayoutGrid, List, Layers 
+  Search, Plus, MapPin, Leaf, LayoutGrid, List, Layers, RefreshCw
 } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useTitrePage } from "../../lib/hooks";
 import { peut } from "../../lib/referentiels";
+import { PastilleVigieau } from "../../components/secheresse/PastilleVigieau";
 import AddSpaceModal from "./AddSpaceModal";
 import EditSpaceModal from "./EditSpaceModal"; // 1. Importer le nouveau composant
 
@@ -16,6 +17,7 @@ export default function EspacesSites() {
   const peutGerer = peut(user, "gestion");
   const [espaces, setEspaces] = useState([]);
   const [clusters, setClusters] = useState([]);
+  const [secheresse, setSecheresse] = useState({});
   const [loading, setLoading] = useState(true);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false); // 2. State pour la modale d'édition
@@ -24,6 +26,7 @@ export default function EspacesSites() {
   const [activeClusterId, setActiveClusterId] = useState(null);
   const [viewMode, setViewMode] = useState("grid");
   const [recalcul, setRecalcul] = useState({ enCours: false, message: "" });
+  const [releveVigieau, setReleveVigieau] = useState({ enCours: false, message: "" });
 
   useEffect(() => {
     chargerDonnees();
@@ -32,12 +35,15 @@ export default function EspacesSites() {
   const chargerDonnees = async () => {
     setLoading(true);
     try {
-      const [sitesData, clustersData] = await Promise.all([
+      const [sitesData, clustersData, etatSecheresse] = await Promise.all([
         api.getEspacesVerts(),
-        api.getZones()
+        api.getZones(),
+        // Fonction secondaire : sans niveau VigiEau, la liste des espaces reste affichée
+        api.getEtatSecheresse().catch(() => null),
       ]);
       setEspaces(sitesData);
       setClusters(clustersData);
+      setSecheresse(Object.fromEntries((etatSecheresse?.espaces ?? []).map((e) => [e.espace_id, e])));
     } catch (err) {
       console.error("Erreur chargement :", err);
     } finally {
@@ -53,6 +59,18 @@ export default function EspacesSites() {
       await chargerDonnees();
     } catch (err) {
       setRecalcul({ enCours: false, message: err.message });
+    }
+  };
+
+  // Sans worker actif (développement), les niveaux du jour ne sont relevés qu'à la demande
+  const actualiserVigieau = async () => {
+    setReleveVigieau({ enCours: true, message: "" });
+    try {
+      const etat = await api.actualiserSecheresse();
+      setSecheresse(Object.fromEntries(etat.espaces.map((e) => [e.espace_id, e])));
+      setReleveVigieau({ enCours: false, message: etat.avertissement || "Niveaux VigiEau du jour actualisés." });
+    } catch (err) {
+      setReleveVigieau({ enCours: false, message: err.message });
     }
   };
 
@@ -87,6 +105,7 @@ export default function EspacesSites() {
           <h1 className="text-3xl font-bold text-fg tracking-tight">Espaces et zones</h1>
           <p className="text-fg-muted mt-1">Vos espaces verts regroupés par zone géographique</p>
           {recalcul.message && <p role="status" className="text-sm text-fg-soft mt-2">{recalcul.message}</p>}
+          {releveVigieau.message && <p role="status" className="text-sm text-fg-soft mt-2">{releveVigieau.message}</p>}
         </div>
         {peutGerer && <div className="flex gap-3">
         <button
@@ -97,6 +116,16 @@ export default function EspacesSites() {
         >
           <Layers size={18} aria-hidden />
           <span>{recalcul.enCours ? "Calcul…" : "Recalculer les zones"}</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={actualiserVigieau}
+          disabled={releveVigieau.enCours || espaces.length === 0}
+          className="hidden md:flex items-center gap-2 bg-surface-raised hover:bg-surface-strong disabled:opacity-50 text-fg px-5 py-2 rounded-xl font-bold transition-all"
+        >
+          <RefreshCw size={18} aria-hidden className={releveVigieau.enCours ? "animate-spin" : undefined} />
+          <span>{releveVigieau.enCours ? "Relevé…" : "Actualiser VigiEau"}</span>
         </button>
 
         <button 
@@ -198,6 +227,7 @@ export default function EspacesSites() {
               <MapPin size={14} />
               <span>{site.ville}</span>
             </div>
+            {secheresse[site.id] && <div className="mb-4"><PastilleVigieau secheresse={secheresse[site.id]} /></div>}
             <div className="pt-4 border-t border-line flex justify-between items-center text-xs text-fg-muted font-bold uppercase">
                <span>Zone : {nomZone(site.zone_id)}</span>
                <span className={site.sante_percent >= 85 ? "text-success" : "text-warning"}>

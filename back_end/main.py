@@ -17,6 +17,7 @@ from api.v1.endpoints import (
     meteo,
     notifications,
     organisations,
+    secheresse,
     user,
     vegetal,
     zones,
@@ -68,7 +69,7 @@ app.add_middleware(
     allow_credentials=True,  # cookie de session
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Authorization", "Content-Type", EN_TETE_CSRF],
-    expose_headers=["X-Request-ID", "Retry-After"],
+    expose_headers=["X-Request-ID", "Retry-After", "Content-Disposition"],
 )
 
 # ADR-1 : le préfixe d'un router est défini ici et nulle part ailleurs.
@@ -83,6 +84,7 @@ app.include_router(catalogue.router, prefix=f"{API}/catalogue", tags=["Catalogue
 app.include_router(interventions.router, prefix=f"{API}/interventions", tags=["Interventions"])
 app.include_router(notifications.router, prefix=f"{API}/notifications", tags=["Notifications"])
 app.include_router(meteo.router, prefix=f"{API}/meteo", tags=["Météo"])
+app.include_router(secheresse.router, prefix=f"{API}/secheresse", tags=["Mode sécheresse"])
 app.include_router(vegetal.router, prefix=f"{API}/vegetal", tags=["Indicateurs végétaux"])
 app.include_router(health.router, prefix=f"{API}/health", tags=["Santé"])
 

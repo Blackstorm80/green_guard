@@ -11,6 +11,7 @@ from application.dto.capteurs import DecisionDTO, DoseRecommandeeDTO
 from application.dto.prevision import JourPrevisionDTO, PrevisionDTO
 from domain.logic.fao56 import COEFFICIENT_PAYSAGER_DEFAUT
 from domain.logic.prevision import Decision, EtatHydrique, Prevision, PrevisionImpossibleError, prevoir
+from domain.logic.secheresse import EvaluationArrosage, appliquer_restriction
 from domain.models import BilanHydriqueJournalier
 from domain.ports.bilan_hydrique_repository import IBilanHydriqueRepository
 from domain.ports.capteurs import EspaceIdentifie, LectureCapteur
@@ -46,6 +47,7 @@ def decision_dto(decision: Decision) -> DecisionDTO:
         jour_pluie=decision.jour_pluie,
         pluie_attendue_mm=round(decision.pluie_attendue_mm, 1) if decision.pluie_attendue_mm is not None else None,
         dose_recommandee=DoseRecommandeeDTO.model_validate(decision.dose) if decision.dose else None,
+        plage_interdite=decision.plage_interdite, derogation=decision.derogation,
     )
 
 
@@ -59,8 +61,11 @@ def prevision_de_l_espace(
     meteo_service: IMeteoService,
     fuseau: tzinfo,
     maintenant: datetime | None = None,
+    evaluation: EvaluationArrosage | None = None,
 ) -> PrevisionDTO:
     """Prévision détaillée d'un espace (déjà contrôlé sur l'organisation par l'appelant).
+
+    evaluation : restriction sécheresse du jour, appliquée à la décision (jamais d'arrosage interdit conseillé).
 
     Lève PrevisionImpossibleError (pas de bilan FAO-56 récent, prévision incomplète) et MeteoIndisponibleError.
     """
@@ -86,7 +91,7 @@ def prevision_de_l_espace(
         ],
         date_bascule_a_surveiller=prevision.date_bascule_a_surveiller,
         date_bascule_critique=prevision.date_bascule_critique,
-        decision=decision_dto(prevision.decision),
+        decision=decision_dto(appliquer_restriction(prevision.decision, evaluation, aujourd_hui)),
         avertissement=prevision.avertissement,
         source_meteo=next((p.source for p in previsions if p.source), None),
     )

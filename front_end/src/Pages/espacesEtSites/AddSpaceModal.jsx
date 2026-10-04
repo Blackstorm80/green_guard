@@ -3,13 +3,13 @@ import { api } from "../../services/api";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Alert } from "../../components/ui/Card";
-import { Champ, Choix } from "./champsEspace";
-import { nombreOuVide, TYPES_ESPACE, TYPES_SOL } from "../../lib/referentiels";
+import { Champ, ChoixSourceEau, Choix } from "./champsEspace";
+import { aujourdhuiSaisie, nombreOuVide, TYPES_ESPACE, TYPES_SOL } from "../../lib/referentiels";
 
 const INITIAL = {
   nom: "", type_espace: "Parc", ville: "", latitude: "", longitude: "",
   surface_m2: "", type_sol: "Argileux", ph_actuel: "7", profondeur_racinaire: "", reserve_utile_max: "",
-  coefficient_cultural: "0.8",
+  coefficient_cultural: "0.8", source_eau: "reseau", date_plantation: "",
 };
 
 export default function AddSpaceModal({ onClose, onSuccess }) {
@@ -37,6 +37,8 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
         profondeur_racinaire: nombreOuVide(valeurs.profondeur_racinaire),
         reserve_utile_max: nombreOuVide(valeurs.reserve_utile_max),
         coefficient_cultural: nombreOuVide(valeurs.coefficient_cultural),
+        source_eau: valeurs.source_eau,
+        date_plantation: valeurs.date_plantation || undefined,
       });
       onSuccess();
       onClose();
@@ -70,6 +72,13 @@ export default function AddSpaceModal({ onClose, onSuccess }) {
                  aide="Vide : calculée selon le sol et la profondeur racinaire (méthode FAO-56)." />
           <Champ {...lie} nom="coefficient_cultural" label="Coefficient paysager" type="number" min="0.1" max="3" step="0.05"
                  aide="Besoin en eau relatif de la végétation (0,8 pour un gazon)." />
+        </fieldset>
+
+        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <legend className="mb-3 text-sm font-bold uppercase tracking-wide text-fg-muted">Sécheresse</legend>
+          <ChoixSourceEau {...lie} />
+          <Champ {...lie} nom="date_plantation" label="Date de plantation" type="date" max={aujourdhuiSaisie()}
+                 aide="Facultatif : une jeune plantation (moins de 2 ans par défaut) peut bénéficier d'une dérogation." />
         </fieldset>
 
         {erreur && <Alert ton="danger">{erreur}</Alert>}

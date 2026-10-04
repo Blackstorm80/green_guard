@@ -9,15 +9,18 @@ from application.use_cases.organisations import (
     MembreIntrouvableError,
     SlugDejaUtiliseError,
     creer_organisation_avec_admin,
+    definir_regles_secheresse,
     mettre_a_jour_organisation,
     modifier_membre,
 )
 from domain.logic.droits import ADMIN, ROLES_ADMINISTRATION, ROLES_GESTION, DernierAdministrateurError
-from domain.models import User
+from domain.logic.secheresse import CLE_PARAMETRES, SOURCE_REGLES, parametres_depuis_regles, regles_depuis_parametres
+from domain.models import Organisation, User
 from infrastructure.database import get_db
 from infrastructure.repositories.organisation_repository_impl import OrganisationRepositoryImpl
 from infrastructure.rls import contournement_rls
 from schema.organisations import MembreRead, MembreUpdate, OrganisationCreate, OrganisationRead, OrganisationUpdate
+from schema.secheresse import ReglesSecheresseRead, ReglesSecheresseSchema
 
 router = APIRouter()
 
@@ -38,6 +41,31 @@ def modifier_mon_organisation(
     if "nom" in champs and current_user.role != ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissions insuffisantes")
     return mettre_a_jour_organisation(OrganisationRepositoryImpl(db), current_user.organisation, champs)
+
+
+def _regles_lues(organisation: Organisation) -> dict:
+    parametres = organisation.parametres or {}
+    return {**parametres_depuis_regles(regles_depuis_parametres(parametres)),
+            "personnalisees": bool(parametres.get(CLE_PARAMETRES)), "source": SOURCE_REGLES}
+
+
+@router.get("/moi/secheresse", response_model=ReglesSecheresseRead)
+def lire_regles_secheresse(current_user: User = Depends(get_current_user)):
+    """Règles d'arrosage par niveau VigiEau et dérogations (défauts du guide national 2023 si non personnalisées).
+    Lisibles par tout membre : elles expliquent les refus d'arrosage."""
+    return _regles_lues(current_user.organisation)
+
+
+@router.put("/moi/secheresse", response_model=ReglesSecheresseRead)
+def modifier_regles_secheresse(
+    data: ReglesSecheresseSchema,
+    current_user: User = Depends(exiger_role(*ROLES_ADMINISTRATION)),
+    db: Session = Depends(get_db),
+):
+    """Administrateur : règles adaptées à l'arrêté-cadre du département."""
+    organisation = definir_regles_secheresse(OrganisationRepositoryImpl(db), current_user.organisation,
+                                             data.model_dump())
+    return _regles_lues(organisation)
 
 
 @router.get("/moi/membres", response_model=list[MembreRead])

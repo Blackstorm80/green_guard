@@ -45,3 +45,10 @@ class InterventionRead(BaseModel):
     cree_par: int | None = None
     # Hauteur d'eau comptée dans le bilan (volume / surface) ; None si l'intervention n'apporte rien
     arrosage_compte_mm: float | None = None
+    # Registre sécheresse d'un arrosage réalisé (niveau VigiEau, plage interdite, dérogation, zone, agent)
+    realisee_par: int | None = None
+    secheresse_niveau: str | None = None
+    secheresse_plage_interdite: str | None = None
+    secheresse_derogation: str | None = None
+    secheresse_zone: str | None = None
+    avertissement_secheresse: str | None = None

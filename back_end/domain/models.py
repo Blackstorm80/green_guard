@@ -23,6 +23,7 @@ from sqlalchemy.orm import relationship
 
 from domain.logic.droits import LECTEUR, ROLES, permissions_du_role
 from domain.logic.fao56 import reserve_utile_de_l_espace
+from domain.logic.secheresse import INCONNU, NIVEAUX, RESEAU, SOURCES_EAU
 from infrastructure.database import Base
 
 STATUTS_HYDRIQUES = ("Optimal", "A surveiller", "Critique")
@@ -149,6 +150,8 @@ class Alerte(Base):
 #  3. ESPACES & LOGIQUE MÉTIER
 class EspaceVert(Base):
     __tablename__ = "espaces_verts"
+    __table_args__ = (CheckConstraint(_in("source_eau", SOURCES_EAU), name="source_eau"),)
+
     id = Column(Integer, primary_key=True, index=True)
     nom = Column(String, nullable=False)
     ville = Column(String, nullable=True)
@@ -173,6 +176,9 @@ class EspaceVert(Base):
     reserve_utile_max = Column(Float, nullable=True)
     # Coefficient paysager KL (0,8 : gazon de saison fraîche)
     coefficient_cultural = Column(Float, nullable=False, default=0.8, server_default="0.8")
+    # Mode sécheresse : ressource prélevée (zone d'alerte VigiEau) et âge de la plantation (dérogation)
+    source_eau = Column(String(20), nullable=False, default=RESEAU, server_default=RESEAU)
+    date_plantation = Column(Date, nullable=True)
     cree_le = Column(DateTime(timezone=True), server_default=func.now())
 
     organisation_id = Column(Integer, ForeignKey("organisations.id", ondelete="CASCADE"), nullable=False, index=True)
@@ -183,6 +189,7 @@ class EspaceVert(Base):
     bilans_hydriques = relationship("BilanHydriqueJournalier", back_populates="espace", passive_deletes=True)
     capteurs = relationship("Capteur", back_populates="espace", passive_deletes=True)
     interventions = relationship("Intervention", back_populates="espace", passive_deletes=True)
+    restrictions_secheresse = relationship("RestrictionSecheresse", back_populates="espace", passive_deletes=True)
     zones = relationship("ZoneIntelligente", secondary=zone_espaces, back_populates="espaces")
 
     @property
@@ -289,6 +296,28 @@ class BilanHydriqueJournalier(Base):
     espace = relationship("EspaceVert", back_populates="bilans_hydriques")
 
 
+class RestrictionSecheresse(Base):
+    """Niveau VigiEau en vigueur au point de l'espace, un relevé par jour (fuseau métier)."""
+    __tablename__ = "restrictions_secheresse"
+    __table_args__ = (
+        UniqueConstraint("espace_id", "date", name="uq_restrictions_secheresse_espace_date"),
+        CheckConstraint(_in("niveau", NIVEAUX), name="niveau"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    espace_id = Column(Integer, ForeignKey("espaces_verts.id", ondelete="CASCADE"), nullable=False, index=True)
+    date = Column(Date, nullable=False)
+    niveau = Column(String(20), nullable=False)   # « aucune » : aucune zone d'alerte en vigueur
+    type_zone = Column(String(3), nullable=True)  # AEP, SOU ou SUP
+    zone_nom = Column(String(255), nullable=True)
+    zone_code = Column(String(60), nullable=True)
+    arrete_identifiant = Column(String(40), nullable=True)
+    arrete_url = Column(String(500), nullable=True)
+    recupere_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+
+    espace = relationship("EspaceVert", back_populates="restrictions_secheresse")
+
+
 class Notification(Base):
     __tablename__ = "notifications"
     id = Column(Integer, primary_key=True, index=True)
@@ -321,6 +350,7 @@ class Intervention(Base):
     __table_args__ = (
         CheckConstraint(_in("type", TYPES_INTERVENTION), name="type"),
         CheckConstraint(_in("statut", STATUTS_INTERVENTION), name="statut"),
+        CheckConstraint(_in("secheresse_niveau", (*NIVEAUX, INCONNU)), name="secheresse_niveau"),
     )
 
     id = Column(Integer, primary_key=True, index=True)
@@ -333,6 +363,13 @@ class Intervention(Base):
     realisee_le = Column(DateTime(timezone=True), nullable=True)
     cree_le = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
     cree_par = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    # Registre sécheresse d'un arrosage, figé à sa réalisation : agent, niveau VigiEau, plage interdite
+    # (« 11:00–18:00 »), dérogation retenue et zone d'alerte. NULL avant le registre ou hors arrosage.
+    realisee_par = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    secheresse_niveau = Column(String(20), nullable=True)
+    secheresse_plage_interdite = Column(String(20), nullable=True)
+    secheresse_derogation = Column(String(200), nullable=True)
+    secheresse_zone = Column(String(255), nullable=True)
 
     espace = relationship("EspaceVert", back_populates="interventions")
     action_irrigation = relationship("ActionIrrigation", uselist=False, viewonly=True)
@@ -341,3 +378,11 @@ class Intervention(Base):
     def arrosage_compte_mm(self) -> float | None:
         """Hauteur d'eau comptée dans le bilan pour cet arrosage (None : rien de compté)."""
         return self.action_irrigation.quantite_mm if self.action_irrigation else None
+
+    @property
+    def avertissement_secheresse(self) -> str | None:
+        """Arrosage réalisé sans niveau VigiEau connu : non bloqué, mais signalé."""
+        if self.secheresse_niveau == INCONNU:
+            return ("Niveau VigiEau indisponible au moment de l'arrosage : vérifiez qu'il respectait l'arrêté "
+                    "sécheresse en vigueur.")
+        return None

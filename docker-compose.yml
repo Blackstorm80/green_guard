@@ -39,6 +39,8 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1}  # proxys dont X-Forwarded-For est cru (uvicorn)
       ENABLE_DOCS: ${ENABLE_DOCS:-false}              # /docs, /redoc, /openapi.json
       FUSEAU_HORAIRE: ${FUSEAU_HORAIRE:-Europe/Paris} # jour du bilan hydrique et de la météo journalière
+      VIGIEAU_URL: ${VIGIEAU_URL:-https://api.vigieau.gouv.fr/api/zones}  # mode sécheresse (niveau par espace)
+      VIGIEAU_TIMEOUT_S: ${VIGIEAU_TIMEOUT_S:-10}
       LOG_FORMAT: json
       ENABLE_SCHEDULER: "false"               # le job tourne dans le service worker (ADR-5)
     depends_on:

@@ -18,12 +18,19 @@ from fastapi.testclient import TestClient  # noqa: E402
 
 from api.v1.endpoints.auth import limiteur_connexion, limiteur_inscription  # noqa: E402
 from api.v1.endpoints.meteo import get_meteo_service  # noqa: E402
+from api.v1.endpoints.secheresse import get_vigieau_service, limiteur_actualisation  # noqa: E402
 from domain.ports.meteo import (  # noqa: E402
     ConditionsMeteo,
     IMeteoService,
     MeteoIndisponibleError,
     MeteoJournaliere,
     PrevisionJournaliere,
+)
+from domain.ports.vigieau import (  # noqa: E402
+    IVigieauService,
+    NiveauVigieau,
+    VigieauIndisponibleError,
+    VigieauInjoignableError,
 )
 from infrastructure.database import Base, SessionLocal, engine  # noqa: E402
 from main import app  # noqa: E402
@@ -82,12 +89,45 @@ class FausseMeteo(IMeteoService):
         ]
 
 
+class FausseVigieau(IVigieauService):
+    """VigiEau simulé : aucune restriction par défaut ; niveau par point ou global, panne simulable."""
+
+    def __init__(self, niveau: str = "aucune"):
+        self.niveau = niveau
+        self.par_point: dict[tuple[float, float], str] = {}
+        self.disponible = True
+        self.injoignable = False
+        self.appels: list[tuple[float, float, str | None]] = []
+
+    def niveau_au_point(self, latitude, longitude, type_zone) -> NiveauVigieau:
+        self.appels.append((latitude, longitude, type_zone))
+        if self.injoignable:
+            raise VigieauInjoignableError("injoignable")
+        if not self.disponible:
+            raise VigieauIndisponibleError("indisponible")
+        niveau = self.par_point.get((latitude, longitude), self.niveau)
+        if niveau == "aucune":
+            return NiveauVigieau(niveau="aucune", type_zone=type_zone)
+        return NiveauVigieau(niveau=niveau, type_zone=type_zone, zone_nom="Zone test", zone_code="69_T",
+                             arrete_identifiant="42", arrete_url="https://example.org/arrete.pdf")
+
+
+@pytest.fixture(autouse=True)
+def vigieau(monkeypatch):
+    """Aucun appel réseau à VigiEau : API et worker reçoivent le même service simulé."""
+    fausse = FausseVigieau()
+    app.dependency_overrides[get_vigieau_service] = lambda: fausse
+    monkeypatch.setattr("infrastructure.jobs.mise_a_jour_capteurs.VigieauService", lambda: fausse)
+    return fausse
+
+
 @pytest.fixture(autouse=True)
 def base_vierge():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
     limiteur_connexion.reinitialiser()
     limiteur_inscription.reinitialiser()
+    limiteur_actualisation.reinitialiser()
     yield
     app.dependency_overrides.clear()
 

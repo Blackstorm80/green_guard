@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useState } from "react";
-import { CheckCircle2, Download, Printer } from "lucide-react";
+import { CheckCircle2, Download, FileDown, Printer } from "lucide-react";
 import { api } from "../../services/api";
 import { useAuth } from "../../context/AuthContext";
 import { useRequete, useTitrePage } from "../../lib/hooks";
-import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION, peut } from "../../lib/referentiels";
+import { LIBELLES_INTERVENTION, LIBELLES_STATUT_INTERVENTION, NIVEAUX_VIGIEAU, peut } from "../../lib/referentiels";
 import { Button } from "../../components/ui/Button";
 import { Field } from "../../components/ui/Field";
 import { Alert, Badge, Card } from "../../components/ui/Card";
@@ -36,10 +36,21 @@ function exporterCsv(lignes, nomEspace) {
   URL.revokeObjectURL(lien.href);
 }
 
+function enregistrerFichier({ blob, nom }) {
+  const lien = document.createElement("a");
+  lien.href = URL.createObjectURL(blob);
+  lien.download = nom ?? "registre_secheresse.csv";
+  lien.click();
+  URL.revokeObjectURL(lien.href);
+}
+
 export default function Rapports() {
   useTitrePage("Rapports");
   const { user } = useAuth();
   const peutIntervenir = peut(user, "interventions");
+  // Registre sécheresse : document de contrôle (gestionnaire, administrateur, élu)
+  const peutExporterRegistre = peut(user, "registre");
+  const [exportRegistre, setExportRegistre] = useState(false);
   const { donnees, setDonnees, chargement, erreur } = useRequete(chargerDonnees, { interventions: [], espaces: [] });
   const [filtres, setFiltres] = useState(FILTRES_INITIAUX);
   const [erreurAction, setErreurAction] = useState("");
@@ -89,8 +100,20 @@ export default function Rapports() {
     }
   };
 
-  const terminerArrosage = async ({ volume_eau_l }) => {
-    remplacer(await api.updateIntervention(aTerminer.id, { statut: "terminee", volume_eau_l }));
+  const exporterRegistre = async () => {
+    setErreurAction("");
+    setExportRegistre(true);
+    try {
+      enregistrerFichier(await api.telechargerRegistreSecheresse({ du: filtres.du, au: filtres.au }));
+    } catch (err) {
+      setErreurAction(err.message);
+    } finally {
+      setExportRegistre(false);
+    }
+  };
+
+  const terminerArrosage = async ({ volume_eau_l, realisee_le }) => {
+    remplacer(await api.updateIntervention(aTerminer.id, { statut: "terminee", volume_eau_l, realisee_le }));
     setATerminer(null);
   };
 
@@ -101,8 +124,14 @@ export default function Rapports() {
           <h1 className="text-3xl font-bold tracking-tight text-fg">Rapports</h1>
           <p className="mt-1 text-fg-muted">Historique des interventions sur vos espaces verts.</p>
         </div>
-        <div className="no-print flex gap-2">
+        <div className="no-print flex flex-wrap gap-2">
           <Button variante="secondaire" icone={Printer} onClick={() => window.print()}>Imprimer</Button>
+          {peutExporterRegistre && (
+            <Button variante="secondaire" icone={FileDown} onClick={exporterRegistre} chargement={exportRegistre}
+                    title="Arrosages réalisés avec le niveau VigiEau en vigueur, la plage autorisée et la dérogation (période des filtres Du / Au, sinon l'année en cours)">
+              Registre sécheresse
+            </Button>
+          )}
           <Button icone={Download} onClick={() => exporterCsv(lignes, nomEspace)} disabled={!lignes.length}>
             Exporter en CSV
           </Button>
@@ -160,7 +189,7 @@ export default function Rapports() {
       {aTerminer && (
         <ModaleArrosage
           titre={`Terminer l'arrosage : ${nomEspace(aTerminer.espace_id)}`}
-          description="Saisissez le volume réellement apporté."
+          description="Saisissez le volume réellement apporté et l'heure de l'arrosage."
           volumeInitial={aTerminer.volume_eau_l ?? undefined}
           aide="Compté aussitôt dans le bilan hydrique (volume / surface de l'espace). Vide : rien n'est compté."
           libelleValider="Terminer l'arrosage"
@@ -206,6 +235,12 @@ export default function Rapports() {
                   {i.arrosage_compte_mm !== null && i.arrosage_compte_mm !== undefined && (
                     <span className="block text-xs text-fg-muted">
                       {i.arrosage_compte_mm.toLocaleString("fr-FR", { maximumFractionDigits: 1 })} mm comptés
+                    </span>
+                  )}
+                  {i.secheresse_niveau && (
+                    <span className="block text-xs text-fg-muted">
+                      VigiEau : {NIVEAUX_VIGIEAU[i.secheresse_niveau]?.libelle ?? i.secheresse_niveau}
+                      {i.secheresse_derogation ? " (dérogation)" : ""}
                     </span>
                   )}
                 </td>

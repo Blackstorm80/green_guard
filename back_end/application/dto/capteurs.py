@@ -4,6 +4,7 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict
 
 from application.dto.meteo import MeteoDTO
+from application.dto.secheresse import SecheresseEspaceDTO
 
 
 class DoseRecommandeeDTO(BaseModel):
@@ -16,15 +17,18 @@ class DoseRecommandeeDTO(BaseModel):
 
 
 class DecisionDTO(BaseModel):
-    """Décision d'arrosage issue de la prévision à 7 jours (arroser / reporter / surveiller / rien)."""
+    """Décision d'arrosage issue de la prévision à 7 jours (arroser / reporter / surveiller / rien), corrigée
+    par le mode sécheresse : « interdit » (besoin d'eau, arrosage interdit) ou « arroser » hors d'une plage."""
     model_config = ConfigDict(from_attributes=True)
 
-    code: Literal["arroser", "reporter", "surveiller", "rien"]
+    code: Literal["arroser", "reporter", "surveiller", "rien", "interdit"]
     texte: str
     date_limite: date | None = None
     jour_pluie: date | None = None
     pluie_attendue_mm: float | None = None
     dose_recommandee: DoseRecommandeeDTO | None = None
+    plage_interdite: str | None = None   # « 11:00–18:00 » : arroser en dehors
+    derogation: str | None = None
 
 
 class LectureCapteurDTO(BaseModel):
@@ -51,6 +55,8 @@ class LectureCapteurDTO(BaseModel):
     # Prévision à 7 jours ; null si la météo est indisponible ou sans bilan FAO-56 récent
     decision: DecisionDTO | None = None
     date_bascule: date | None = None   # premier jour prévu en Critique (J si déjà critique)
+    # Niveau VigiEau du jour et ce qu'il permet ; null si le mode sécheresse n'est pas évalué
+    secheresse: SecheresseEspaceDTO | None = None
 
 
 class MetriquesDashboardDTO(BaseModel):

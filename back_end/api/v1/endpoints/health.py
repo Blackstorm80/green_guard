@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy import text
@@ -7,10 +9,14 @@ from api.deps.auth import get_current_user
 from api.v1.endpoints.capteurs import get_capteur_service
 from application.dto.capteurs import DiagnosticDTO
 from application.use_cases.bilans_hydriques import diagnostiquer_espace
+from application.use_cases.secheresse import evaluer_espace, restrictions_en_vigueur
+from config import settings
+from domain.logic.secheresse import regles_depuis_parametres
 from domain.models import User
 from infrastructure.database import get_db
 from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
+from infrastructure.repositories.restriction_secheresse_repository_impl import RestrictionSecheresseRepositoryImpl
 from infrastructure.services.capteur_hybrid_service import CapteurHybridService
 
 router = APIRouter()
@@ -49,4 +55,8 @@ def run_diagnostic(
     espace = EspaceVertRepositoryImpl(db).get_pour_organisation(payload.espace_id, current_user.organisation_id)
     if espace is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Espace vert introuvable")
-    return diagnostiquer_espace(espace, capteurs, BilanHydriqueRepositoryImpl(db))
+    aujourd_hui = datetime.now(settings.fuseau).date()
+    restriction = restrictions_en_vigueur([espace.id], aujourd_hui, RestrictionSecheresseRepositoryImpl(db))
+    evaluation = evaluer_espace(espace, restriction.get(espace.id),
+                                regles_depuis_parametres(current_user.organisation.parametres), aujourd_hui)
+    return diagnostiquer_espace(espace, capteurs, BilanHydriqueRepositoryImpl(db), evaluation)

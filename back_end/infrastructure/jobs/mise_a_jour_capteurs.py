@@ -1,5 +1,9 @@
-"""Job planifié : bilan hydrique du jour + relevé de mesures pour chaque espace, puis alertes
-(stress critique, arrosage à prévoir selon la prévision à 7 jours).
+"""Job planifié : niveau VigiEau du jour, bilan hydrique du jour + relevé de mesures pour chaque espace,
+puis alertes (stress critique, arrosage à prévoir selon la prévision à 7 jours, corrigée par le mode
+sécheresse : aucun arrosage interdit n'est conseillé).
+
+Niveau VigiEau : relevé une fois par jour et par espace (le passage horaire ne relit que les espaces
+encore sans relevé du jour, ce qui retente aussi les échecs de la veille ou de l'heure précédente).
 
 Tant que les capteurs IoT ne sont pas branchés, la mesure est dérivée de la
 météo réelle (température, humidité de l'air) et du bilan (humidité du sol).
@@ -18,23 +22,30 @@ from application.use_cases.generer_bilans_hydriques_journaliers import (
     generer_bilans_hydriques_journaliers,
 )
 from application.use_cases.prevision import etat_du_bilan, prevoir_espace
+from application.use_cases.secheresse import actualiser_restrictions, evaluer_espace, restrictions_en_vigueur
 from config import settings
 from domain.logic.arrosage import formuler_dose
 from domain.logic.droits import ROLES_INTERVENTION
 from domain.logic.prevision import ARROSER, PrevisionImpossibleError, formater_jour
-from domain.models import Mesure, Notification, Organisation, User
+from domain.logic.secheresse import LIBELLES_NIVEAU, EvaluationArrosage, appliquer_restriction, regles_depuis_parametres
+from domain.models import Mesure, Notification, Organisation, RestrictionSecheresse, User
 from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
+from domain.ports.vigieau import IVigieauService
 from infrastructure.database import SessionLocal
 from infrastructure.repositories.action_irrigation_repository_impl import ActionIrrigationRepositoryImpl
 from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
 from infrastructure.repositories.espace_vert_repository_impl import EspaceVertRepositoryImpl
+from infrastructure.repositories.restriction_secheresse_repository_impl import RestrictionSecheresseRepositoryImpl
 from infrastructure.rls import CLE_ORGANISATION, contournement_rls, definir_organisation
 from infrastructure.services.meteo_open_meteo import OpenMeteoService
+from infrastructure.services.vigieau import VigieauService
 
 logger = logging.getLogger(__name__)
 
 INTERVALLE_MINUTES = 60
 TYPE_ARROSAGE_A_PREVOIR = "arrosage_a_prevoir"
+# Durée maximale des appels VigiEau par organisation et par passage : les espaces restants le sont au suivant
+BUDGET_RELEVE_VIGIEAU_S = 300
 
 
 def _destinataires(db: Session, organisation_id: int) -> list[int]:
@@ -44,11 +55,16 @@ def _destinataires(db: Session, organisation_id: int) -> list[int]:
     ).order_by(User.id)]
 
 
-def _notifier_stress_critique(db: Session, resultat, destinataires: list[int], debut_journee: datetime) -> int:
-    """Une notification par espace critique, par destinataire et par jour (pas de rappel horaire)."""
+def _notifier_stress_critique(db: Session, resultat, destinataires: list[int], debut_journee: datetime,
+                              evaluation: EvaluationArrosage | None = None) -> int:
+    """Une notification par espace critique, par destinataire et par jour (pas de rappel horaire).
+    Sous interdiction sécheresse totale, le message ne recommande pas l'arrosage."""
     if resultat.bilan.statut_hydrique != "Critique":
         return 0
     message = f"Stress hydrique critique sur « {resultat.espace.nom} » : arrosage recommandé."
+    if evaluation is not None and evaluation.interdit_toute_la_journee:
+        message = (f"Stress hydrique critique sur « {resultat.espace.nom} » : arrosage interdit "
+                   f"({LIBELLES_NIVEAU[evaluation.niveau]}, arrêté sécheresse), sauf dérogation.")
     deja = {id_ for (id_,) in db.query(Notification.user_id).filter(
         Notification.user_id.in_(destinataires), Notification.type == "stress_hydrique",
         Notification.message == message, Notification.cree_le >= debut_journee,
@@ -60,7 +76,8 @@ def _notifier_stress_critique(db: Session, resultat, destinataires: list[int], d
 
 
 def _notifier_arrosage_a_prevoir(db: Session, resultat, destinataires: list[int], meteo_service: IMeteoService,
-                                 aujourd_hui: date, debut_journee: datetime) -> int:
+                                 aujourd_hui: date, debut_journee: datetime,
+                                 evaluation: EvaluationArrosage | None = None) -> int:
     """Une notification par espace, par destinataire et par jour quand la prévision conclut « arroser ».
 
     Un espace déjà critique a reçu l'alerte de stress : pas de second message pour la même action.
@@ -72,7 +89,8 @@ def _notifier_arrosage_a_prevoir(db: Session, resultat, destinataires: list[int]
     if etat is None:
         return 0
     try:
-        decision = prevoir_espace(resultat.espace, etat, meteo_service, aujourd_hui).decision
+        decision = appliquer_restriction(prevoir_espace(resultat.espace, etat, meteo_service, aujourd_hui).decision,
+                                         evaluation, aujourd_hui)
     except (MeteoIndisponibleError, PrevisionImpossibleError) as exc:
         logger.info("Prévision indisponible pour l'espace %s : %s", resultat.espace.id, exc)
         return 0
@@ -97,10 +115,33 @@ def _notifier_arrosage_a_prevoir(db: Session, resultat, destinataires: list[int]
     return len(nouveaux)
 
 
+def _relever_restrictions(db: Session, espaces: list, vigieau_service: IVigieauService, aujourd_hui: date,
+                          maintenant: datetime) -> dict[int, RestrictionSecheresse]:
+    """Niveau du jour des espaces qui n'en ont pas encore ; un échec n'empêche ni les bilans ni les alertes."""
+    repo = RestrictionSecheresseRepositoryImpl(db)
+    try:
+        rapport = actualiser_restrictions(espaces, repo, vigieau_service, aujourd_hui, maintenant,
+                                          seulement_manquants=True, liberer=db.commit,
+                                          budget_s=BUDGET_RELEVE_VIGIEAU_S)
+        db.commit()
+        if rapport.echecs:
+            logger.warning("Niveau VigiEau du jour manquant pour %d espace(s).", rapport.echecs)
+    except Exception:
+        db.rollback()
+        logger.exception("Échec du relevé des niveaux VigiEau.")
+    return restrictions_en_vigueur([e.id for e in espaces], aujourd_hui, repo)
+
+
 def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service: IMeteoService,
-                                maintenant: datetime, fuseau: tzinfo) -> tuple[int, int, int]:
+                                maintenant: datetime, fuseau: tzinfo,
+                                vigieau_service: IVigieauService) -> tuple[int, int, int]:
+    aujourd_hui = maintenant.astimezone(fuseau).date()
+    espaces = EspaceVertRepositoryImpl(db).list_par_organisation(organisation_id)
+    restrictions = _relever_restrictions(db, espaces, vigieau_service, aujourd_hui, maintenant)
+    organisation = db.get(Organisation, organisation_id)
+    regles = regles_depuis_parametres(organisation.parametres if organisation else None)
     rapport = generer_bilans_hydriques_journaliers(
-        espaces=EspaceVertRepositoryImpl(db).list_par_organisation(organisation_id),
+        espaces=espaces,
         bilan_repo=BilanHydriqueRepositoryImpl(db),
         meteo_service=meteo_service,
         arrosage_du_jour_mm=arrosage_journalier(ActionIrrigationRepositoryImpl(db), fuseau),
@@ -108,7 +149,6 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
         maintenant=maintenant,
     )
 
-    aujourd_hui = maintenant.astimezone(fuseau).date()
     debut_journee, _ = bornes_du_jour(aujourd_hui, fuseau)
     destinataires = _destinataires(db, organisation_id)
     notifications = 0
@@ -122,18 +162,20 @@ def _mettre_a_jour_organisation(db: Session, organisation_id: int, meteo_service
             humidite_air=resultat.conditions.humidite,
             timestamp=maintenant,
         ))
-        notifications += _notifier_stress_critique(db, resultat, destinataires, debut_journee)
+        evaluation = evaluer_espace(resultat.espace, restrictions.get(resultat.espace.id), regles, aujourd_hui)
+        notifications += _notifier_stress_critique(db, resultat, destinataires, debut_journee, evaluation)
         notifications += _notifier_arrosage_a_prevoir(db, resultat, destinataires, meteo_service, aujourd_hui,
-                                                      debut_journee)
+                                                      debut_journee, evaluation)
     db.commit()
     return len(rapport.traites), len(rapport.ignores), notifications
 
 
 def executer_mise_a_jour(db: Session, meteo_service: IMeteoService | None = None,
-                         maintenant: datetime | None = None) -> None:
+                         maintenant: datetime | None = None, vigieau_service: IVigieauService | None = None) -> None:
     fuseau = settings.fuseau
     maintenant = maintenant or datetime.now(UTC)
     meteo_service = meteo_service or OpenMeteoService()
+    vigieau_service = vigieau_service or VigieauService()
 
     with contournement_rls(db):
         organisations = [id_ for (id_,) in db.query(Organisation.id).order_by(Organisation.id)]
@@ -144,7 +186,8 @@ def executer_mise_a_jour(db: Session, meteo_service: IMeteoService | None = None
         for organisation_id in organisations:
             definir_organisation(db, organisation_id)
             try:
-                t, i, n = _mettre_a_jour_organisation(db, organisation_id, meteo_service, maintenant, fuseau)
+                t, i, n = _mettre_a_jour_organisation(db, organisation_id, meteo_service, maintenant, fuseau,
+                                                      vigieau_service)
             except Exception:
                 # Une organisation en échec ne prive pas les autres de leur bilan
                 db.rollback()

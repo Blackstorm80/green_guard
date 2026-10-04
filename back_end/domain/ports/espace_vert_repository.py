@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from datetime import date
 
 from domain.models import EspaceVert
 
@@ -13,6 +14,10 @@ class EspaceResume:
     surface_m2: float | None = None
     type_irrigation: str | None = None
     debit_arrosage_l_min: float | None = None
+    # Mode sécheresse : zone d'alerte de la ressource, dérogation et priorité d'arrosage
+    source_eau: str = "reseau"
+    date_plantation: date | None = None
+    type_espace: str | None = None
 
 
 class IEspaceVertRepository(ABC):

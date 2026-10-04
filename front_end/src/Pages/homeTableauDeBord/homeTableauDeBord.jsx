@@ -9,6 +9,7 @@ import { useRequete, useTitrePage } from "../../lib/hooks";
 import { DECISIONS_PREVISION, peut, TON_STATUT } from "../../lib/referentiels";
 import { Badge } from "../../components/ui/Card";
 import { ModaleArrosage } from "../../components/interventions/ModaleArrosage";
+import { PastilleVigieau } from "../../components/secheresse/PastilleVigieau";
 
 const INTERVALLE_RAFRAICHISSEMENT_MS = 30000;
 const STATUTS_EN_ALERTE = ["Critique", "A surveiller"];
@@ -29,6 +30,15 @@ function aideDose(dose) {
   }
   const minutes = dose.minutes !== null ? `, soit ${formatNombre(dose.minutes)} min au débit de l'arrosage` : "";
   return `Dose recommandée pour remplir la réserve : ${formatNombre(dose.mm, 1)} mm, ${formatNombre(dose.litres)} L${minutes}. Modifiable.`;
+}
+
+/** Rappel de la restriction sécheresse avant d'arroser ; rien si l'arrosage est permis sans condition. */
+function avertissementSecheresse(secheresse) {
+  if (!secheresse) return undefined;
+  if (secheresse.niveau === "inconnu" || secheresse.plage_interdite || !secheresse.autorise_maintenant) {
+    return secheresse.motif;
+  }
+  return undefined;
 }
 
 export default function HomeTableauDeBord() {
@@ -93,7 +103,7 @@ export default function HomeTableauDeBord() {
     }
   };
 
-  const creerArrosage = async ({ volume_eau_l, terminee }) => {
+  const creerArrosage = async ({ volume_eau_l, terminee, realisee_le }) => {
     const site = arrosage;
     const creee = await api.createIntervention({
       espace_id: site.espace_id,
@@ -101,10 +111,15 @@ export default function HomeTableauDeBord() {
       description: `Déclenchée depuis le tableau de bord (statut : ${site.statut})`,
       volume_eau_l,
       statut: terminee ? "terminee" : "planifiee",
+      ...(terminee && realisee_le ? { realisee_le } : {}),
     });
     setArrosage(null);
+    const registre = [
+      creee.secheresse_derogation && `Dérogation sécheresse : ${creee.secheresse_derogation.toLowerCase()}.`,
+      creee.avertissement_secheresse,
+    ].filter(Boolean).join(" ");
     if (creee.arrosage_compte_mm !== null) {
-      setFeedback({ ok: true, message: `Arrosage de ${site.nom} enregistré : ${formatNombre(creee.arrosage_compte_mm, 1)} mm comptés dans le bilan.` });
+      setFeedback({ ok: true, message: `Arrosage de ${site.nom} enregistré : ${formatNombre(creee.arrosage_compte_mm, 1)} mm comptés dans le bilan. ${registre}`.trim() });
       charger();
     } else {
       setFeedback({ ok: true, message: terminee
@@ -215,6 +230,7 @@ export default function HomeTableauDeBord() {
           volumeInitial={arrosage.dose_recommandee?.litres ?? undefined}
           aide={aideDose(arrosage.dose_recommandee)}
           libelleValider="Enregistrer l'arrosage"
+          avertissement={avertissementSecheresse(arrosage.secheresse)}
           proposerTerminee
           onValider={creerArrosage}
           onClose={() => setArrosage(null)}
@@ -238,6 +254,9 @@ export default function HomeTableauDeBord() {
                   <h3 className="text-sm font-black text-fg">{capteur.nom}</h3>
                   <Badge ton={TON_STATUT[capteur.statut] ?? "neutre"}>{capteur.statut}</Badge>
                 </header>
+                {capteur.secheresse && (
+                  <div className="mb-4"><PastilleVigieau secheresse={capteur.secheresse} detail /></div>
+                )}
                 <DecisionPrevision decision={capteur.decision} dateBascule={capteur.date_bascule} dateCalcul={dashboard?.date_calcul} />
                 <div className="flex flex-col gap-3">
                   <MetricCard icon={<Thermometer className="text-orange-400" />} label="Température" value={formatNombre(capteur.temperature_c, 1)} unit="°C" />
@@ -307,6 +326,7 @@ function ActionCard({ site, onAction, actionEnCours }) {
         <span className="text-sm font-bold text-fg truncate w-2/3">{site.nom}</span>
         <span className="text-xs font-bold text-danger">{formatNombre(site.sante_percent)} % santé</span>
       </div>
+      {site.secheresse && <div className="mb-3"><PastilleVigieau secheresse={site.secheresse} /></div>}
       {/* Rôle lecteur : l'alerte est visible, les actions terrain ne sont pas proposées */}
       {onAction && <div className="grid grid-cols-3 gap-2">
         {ACTIONS.map((action) => {

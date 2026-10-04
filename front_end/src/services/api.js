@@ -29,7 +29,7 @@ function messageErreur(detail, status) {
  * Session : cookie httpOnly posé par le serveur (illisible par JavaScript, donc à l'abri d'un vol par XSS).
  * X-Requested-With est exigé par l'API pour toute écriture authentifiée par cookie (protection CSRF).
  */
-async function request(path, { method = "GET", body, form, signalerExpiration = true, signal } = {}) {
+async function request(path, { method = "GET", body, form, signalerExpiration = true, signal, fichier = false } = {}) {
   const headers = { "X-Requested-With": "greenguard" };
 
   let payload;
@@ -56,7 +56,14 @@ async function request(path, { method = "GET", body, form, signalerExpiration = 
     const data = await response.json().catch(() => ({}));
     throw new ApiError(messageErreur(data.detail, response.status), response.status);
   }
+  if (fichier) return { blob: await response.blob(), nom: nomFichier(response.headers.get("Content-Disposition")) };
   return response.status === 204 ? null : response.json();
+}
+
+/** Nom proposé par le serveur (Content-Disposition), sinon null. */
+function nomFichier(disposition) {
+  const trouve = /filename="([^"]+)"/.exec(disposition ?? "");
+  return trouve ? trouve[1] : null;
 }
 
 const query = (params) => {
@@ -117,9 +124,20 @@ export const api = {
   getInterventionsUrgentes: (limit = 5, signal) => request(`/interventions/urgent${query({ limit })}`, { signal }),
   getInterventions: (espaceId, signal) => request(`/interventions/${query({ espace_id: espaceId })}`, { signal }),
   // Arrosage terminé avec volume_eau_l (créé avec statut « terminee » ou terminé par PUT) : compté aussitôt
-  // dans le bilan (arrosage_compte_mm en retour) ; 422 si la surface de l'espace est inconnue.
+  // dans le bilan (arrosage_compte_mm en retour) ; 422 si la surface de l'espace est inconnue ;
+  // 409 si l'arrêté sécheresse l'interdit (detail : motif), sauf dérogation (secheresse_derogation en retour).
   createIntervention: (data) => request("/interventions/", { method: "POST", body: data }),
   updateIntervention: (id, data) => request(`/interventions/${id}`, { method: "PUT", body: data }),
+
+  // --- MODE SÉCHERESSE (VigiEau) ---
+  // Niveau du jour par espace (par priorité d'arrosage) et synthèse ; « inconnu » si VigiEau n'a pas répondu
+  getEtatSecheresse: (signal) => request("/secheresse/etat", { signal }),
+  actualiserSecheresse: () => request("/secheresse/actualiser", { method: "POST" }),
+  // Registre CSV des arrosages (gestionnaire, administrateur, lecteur) : { blob, nom }
+  telechargerRegistreSecheresse: ({ du, au } = {}) =>
+    request(`/secheresse/registre${query({ du: du || undefined, au: au || undefined })}`, { fichier: true }),
+  getReglesSecheresse: (signal) => request("/organisations/moi/secheresse", { signal }),
+  updateReglesSecheresse: (regles) => request("/organisations/moi/secheresse", { method: "PUT", body: regles }),
 
   // --- NOTIFICATIONS ---
   getNotifications: (signal) => request("/notifications/", { signal }),

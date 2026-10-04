@@ -42,10 +42,10 @@ def test_slug_lisible_et_unique():
 
 
 def test_permissions_par_role():
-    assert permissions_du_role("admin") == ["interventions", "gestion", "membres"]
-    assert permissions_du_role("gestionnaire") == ["interventions", "gestion"]
+    assert permissions_du_role("admin") == ["interventions", "gestion", "membres", "registre"]
+    assert permissions_du_role("gestionnaire") == ["interventions", "gestion", "registre"]
     assert permissions_du_role("technicien") == ["interventions"]
-    assert permissions_du_role("lecteur") == []
+    assert permissions_du_role("lecteur") == ["registre"]
 
 
 def test_dernier_admin_protege():
@@ -65,7 +65,7 @@ def test_inscription_cree_une_organisation_dont_on_est_admin(client):
     profil = moi(client, alice)
     assert profil["role"] == "admin" and profil["est_superadmin"] is False
     assert profil["organisation"]["nom"] == "Organisation de Alice"
-    assert profil["permissions"] == ["interventions", "gestion", "membres"]
+    assert profil["permissions"] == ["interventions", "gestion", "membres", "registre"]
     organisation = client.get(f"{API}/organisations/moi", headers=alice).json()
     assert organisation["slug"] == "organisation-de-alice"
 
@@ -237,7 +237,7 @@ def test_lecteur_consulte_sans_rien_ecrire(client, db, meteo):
         assert r.status_code == 403, (methode, chemin, r.status_code)
     for chemin in ["/vegetal/etat-global", "/vegetal/impact-carbone"]:
         assert client.get(f"{API}{chemin}", headers=elu).status_code == 403
-    assert moi(client, elu)["permissions"] == []
+    assert moi(client, elu)["permissions"] == ["registre"]   # registre sécheresse : consultation
 
 
 def test_technicien_intervient_sans_gerer_le_patrimoine(client, db):
@@ -310,7 +310,7 @@ def test_admin_change_le_role_et_desactive_un_membre(client, db):
 
     r = client.put(f"{API}/organisations/moi/membres/{id_tech}", json={"role": "gestionnaire"}, headers=alice)
     assert r.status_code == 200 and r.json()["role"] == "gestionnaire"
-    assert moi(client, tech)["permissions"] == ["interventions", "gestion"]
+    assert moi(client, tech)["permissions"] == ["interventions", "gestion", "registre"]
     r = client.put(f"{API}/organisations/moi/membres/{id_tech}", json={"role": "superadmin"}, headers=alice)
     assert r.status_code == 422
 

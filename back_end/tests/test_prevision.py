@@ -487,7 +487,8 @@ def test_tableau_de_bord_expose_decision_et_date_de_bascule(client, db, meteo):
 
 def test_contrat_decision_visible_dans_openapi(client):
     schema = client.get("/openapi.json").json()["components"]["schemas"]["DecisionDTO"]
-    assert schema["properties"]["code"]["enum"] == ["arroser", "reporter", "surveiller", "rien"]
+    # « interdit » : ajouté par le mode sécheresse (tests/test_secheresse.py)
+    assert schema["properties"]["code"]["enum"] == ["arroser", "reporter", "surveiller", "rien", "interdit"]
 
 
 def test_tableau_de_bord_fonctionne_malgre_une_prevision_inattendue(client, db, meteo):

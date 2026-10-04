@@ -152,6 +152,27 @@ def test_rls_limite_a_l_organisation_du_contexte(base_rls):
             assert _compter(conn, "espaces_verts") == 2
 
 
+def test_rls_restrictions_secheresse(base_rls):
+    """Table du mode sécheresse (migration 0006) : cloisonnée par l'espace, comme les autres."""
+    a, b = base_rls["a"], base_rls["b"]
+    with base_rls["superutilisateur"].begin() as conn:
+        for espace in (a["espace"], b["espace"]):
+            conn.execute(text("INSERT INTO restrictions_secheresse (espace_id, date, niveau) "
+                              "VALUES (:e, '2026-07-01', 'crise') ON CONFLICT DO NOTHING"), {"e": espace})
+    with base_rls["app"].connect() as conn:
+        with conn.begin():
+            assert _compter(conn, "restrictions_secheresse") == 0      # sans contexte : rien
+        with conn.begin():
+            _contexte(conn, a["organisation"])
+            assert conn.execute(text("SELECT espace_id FROM restrictions_secheresse")).scalars().all() == [a["espace"]]
+            assert conn.execute(text("UPDATE restrictions_secheresse SET niveau = 'aucune' WHERE espace_id = :e"),
+                                {"e": b["espace"]}).rowcount == 0
+        with pytest.raises(DBAPIError, match="row-level security"), conn.begin():
+            _contexte(conn, a["organisation"])
+            conn.execute(text("INSERT INTO restrictions_secheresse (espace_id, date, niveau) "
+                              "VALUES (:e, '2026-07-02', 'aucune')"), {"e": b["espace"]})
+
+
 def test_session_repose_le_contexte_a_chaque_transaction(base_rls):
     a = base_rls["a"]
     session = SessionLocal(bind=base_rls["app"])

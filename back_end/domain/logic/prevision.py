@@ -104,6 +104,9 @@ class Decision:
     jour_pluie: date | None = None        # « reporter » : jour de la pluie attendue
     pluie_attendue_mm: float | None = None
     dose: DoseRecommandee | None = None   # « arroser » : dose au jour limite
+    # Mode sécheresse (domain/logic/secheresse.py) : plage à éviter (« 11:00–18:00 ») et dérogation retenue
+    plage_interdite: str | None = None
+    derogation: str | None = None
 
 
 @dataclass(frozen=True)

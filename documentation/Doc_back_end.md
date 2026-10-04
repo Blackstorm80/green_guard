@@ -37,9 +37,9 @@ back_end/
 ├── infrastructure/
 │   ├── database.py              # Moteur SQLAlchemy, convention de nommage des contraintes
 │   ├── rls.py                   # Contexte d'organisation des transactions PostgreSQL (Row Level Security)
-│   ├── jobs/mise_a_jour_capteurs.py   # bilans du jour, mesures, alertes (stress critique, arrosage à prévoir)
+│   ├── jobs/mise_a_jour_capteurs.py   # niveau VigiEau du jour, bilans du jour, mesures, alertes (stress critique, arrosage à prévoir)
 │   ├── repositories/            # espaces verts, bilans hydriques, apports d'eau (arrosages), organisations et membres
-│   └── services/                # Open-Meteo (conditions, série passée, prévision ; cache par point), lecture capteurs groupée
+│   └── services/                # Open-Meteo (conditions, série passée, prévision ; cache par point), VigiEau (niveau sécheresse ; cache par point et par jour), lecture capteurs groupée
 ├── alembic/                     # Migrations : seule source du schéma
 ├── scripts/load/taxonomy.py     # Chargement du catalogue iNaturalist
 └── tests/                       # pytest (SQLite par défaut, PostgreSQL via TEST_DATABASE_URL)
@@ -54,11 +54,12 @@ d'une même organisation partagent son patrimoine. Lecture : tout membre. Écrit
 |---|---|---|---|
 | `/auth` | public (limité en débit) | public | `POST /login` (formulaire OAuth2), `POST /register` (JSON, crée une organisation), `POST /logout` |
 | `/users` | connecté | — | `GET /me` (dont `organisation {id, nom}`, `role`, `permissions`, `est_superadmin`), `GET /me/notifications` (`espace_id` : espace concerné par une alerte, ou `null`) |
-| `/organisations` | connecté | voir colonne Contenu | `GET /moi` ; `PUT /moi` (paramètres : gestionnaire ; nom : admin) ; `GET /moi/membres` ; `PUT /moi/membres/{id}` (admin : rôle, désactivation) ; `POST /` (superadmin : organisation + premier admin) |
-| `/espaces-verts` | connecté | gestionnaire | CRUD complet (`reserve_utile_effective_mm` en lecture, `debit_arrosage_l_min` facultatif) ; `GET /{id}/bilans?jours=30` (historique des bilans et de leurs termes, 1 à 365 jours, par date croissante) ; `GET /{id}/prevision` (réserve projetée J..J+7, dates de bascule, décision ; 409 sans bilan FAO-56 récent, 502 si la météo prévue est indisponible ; § 4) |
+| `/organisations` | connecté | voir colonne Contenu | `GET /moi` ; `PUT /moi` (paramètres : gestionnaire ; nom : admin ; la clé `secheresse` y est ignorée) ; `GET /moi/secheresse` (règles sécheresse effectives, lisibles par tout membre : écart assumé au cahier des charges « lecture admin », les techniciens doivent connaître la plage autorisée) ; `PUT /moi/secheresse` (admin : règles par niveau et dérogations, § 4) ; `GET /moi/membres` ; `PUT /moi/membres/{id}` (admin : rôle, désactivation) ; `POST /` (superadmin : organisation + premier admin) |
+| `/espaces-verts` | connecté | gestionnaire | CRUD complet (`reserve_utile_effective_mm` en lecture, `debit_arrosage_l_min` facultatif, `source_eau` `reseau`/`forage`/`recuperation`/`riviere` (défaut `reseau`), `date_plantation` facultative) ; `GET /{id}/bilans?jours=30` (historique des bilans et de leurs termes, 1 à 365 jours, par date croissante) ; `GET /{id}/prevision` (réserve projetée J..J+7, dates de bascule, décision ; 409 sans bilan FAO-56 récent, 502 si la météo prévue est indisponible ; § 4) |
 | `/zones` | connecté | gestionnaire | `GET /`, `POST /clustering/rebuild` |
-| `/capteurs` | connecté | — | `GET /dashboard` (synthèse, lectures avec `dose_recommandee`, `decision` et `date_bascule` de la prévision à 7 jours, `date_calcul`, météo extérieure) |
-| `/interventions` | connecté | technicien (création, suivi) ; gestionnaire (suppression) | `GET /urgent`, CRUD ; un arrosage terminé avec un volume est compté dans le bilan (`arrosage_compte_mm` en lecture, § 4) |
+| `/capteurs` | connecté | — | `GET /dashboard` (synthèse, lectures avec `dose_recommandee`, `decision` et `date_bascule` de la prévision à 7 jours, `secheresse` (niveau VigiEau du jour, priorité d'arrosage), `date_calcul`, météo extérieure) |
+| `/interventions` | connecté | technicien (création, suivi) ; gestionnaire (suppression) | `GET /urgent`, CRUD ; un arrosage terminé avec un volume est compté dans le bilan (`arrosage_compte_mm` en lecture, § 4) ; un arrosage interdit par l'arrêté sécheresse est refusé (**409**, motif dans `detail`), sinon son registre est figé (`realisee_par`, `secheresse_*`, `avertissement_secheresse`) |
+| `/secheresse` | connecté | voir colonne Contenu | `GET /etat` (tout membre : niveau VigiEau du jour par espace, par priorité d'arrosage, et synthèse) ; `POST /actualiser` (gestionnaire, admin : relevé immédiat) ; `GET /registre?du&au` (CSV ; gestionnaire, admin **et lecteur**, technicien exclu ; dates de 2000-01-01 à 2100-12-31, 3 ans au plus) |
 | `/notifications` | connecté (les siennes) | connecté (les siennes) | liste, `POST /{id}/mark-as-read` |
 | `/catalogue` | connecté | — | `GET /plantes`, `GET /auxiliaires` (pagination `offset`/`limit`) |
 | `/meteo` | connecté | — | `GET /actuelle?lat&lon`, `GET /{ville}` |
@@ -273,6 +274,131 @@ Le front pré-remplit le volume d'un arrosage déclenché depuis le tableau de b
   `ON DELETE SET NULL` : l'historique survit à la suppression de l'espace ; les alertes de stress déjà
   émises y sont rattachées quand leur message désigne sans ambiguïté un espace de l'organisation).
 
+### Mode sécheresse (VigiEau)
+`domain/logic/secheresse.py` (règles, calcul pur), `application/use_cases/secheresse.py`,
+`infrastructure/services/vigieau.py`. Objectif : ne jamais recommander un arrosage interdit, et tenir un
+registre prêt pour un contrôle.
+
+- **Source** : API publique VigiEau (dépôt MTES-MCT/vigieau-api, vérifié le 2026-10-04),
+  `GET https://api.vigieau.gouv.fr/api/zones?lon&lat&profil=collectivite&zoneType=AEP|SOU|SUP`. Réponse :
+  liste des zones d'alerte contenant le point (vide : aucune restriction), avec `type`, `niveauGravite`
+  (`vigilance`, `alerte`, `alerte_renforcee`, `crise`), `nom`, `code` et `arrete` (`id`,
+  `cheminFichier`). 400 : coordonnées invalides ; 500 : plusieurs zones de même type au point (données
+  VigiEau). Dans le code source (`src/zones/zones.service.ts`, branche master), la recherche par lon/lat ne
+  lève jamais 404 (liste vide sans zone), bien que le README annonce un 404 « aucune zone d'alerte en
+  vigueur » : un 404 (route inconnue, `VIGIEAU_URL` mal saisie, ou changement de comportement de l'API) est
+  une **erreur pour ce point**, jamais « aucune restriction » ; seule une liste JSON vaut réponse. Le profil
+  `collectivite` existe ; il ne filtre que la liste des usages, pas le niveau (les usages détaillés de
+  l'arrêté ne sont pas exploités : seules les règles de l'organisation s'appliquent).
+- **Type de zone selon la source d'eau** (`espaces_verts.source_eau`) : `reseau` → `AEP` (eau potable),
+  `forage` → `SOU` (souterraine), `riviere` → `SUP` (superficielle), `recuperation` → aucun type
+  (zone la plus sévère, affichée pour information ; la dérogation s'applique).
+- **Client** : délai `VIGIEAU_TIMEOUT_S`, aucune redirection suivie, URL fixée par l'exploitant (https
+  imposé) : seules latitude et longitude (bornées) varient, aucune URL fournie par un utilisateur.
+  Cache par point (5 décimales) et par jour métier ; échec mémorisé 60 s. Niveau inconnu, lien d'arrêté non
+  https (jamais affiché) ou réponse illisible : erreur explicite (`VigieauIndisponibleError`) ; réseau,
+  délai dépassé, 502, 503, 504 : `VigieauInjoignableError`, les espaces suivants ne sont pas
+  interrogés ; trois erreurs de suite (404 compris) arrêtent aussi l'actualisation. Une actualisation qui
+  ne lit aucun niveau est journalisée en **erreur** (panne durable ou changement d'API à surveiller).
+- **Relevé quotidien** : table `restrictions_secheresse` (unique par espace et par jour : niveau, `aucune`
+  compris, type et nom de zone, identifiant et lien de l'arrêté, `recupere_le`). Le passage horaire du
+  worker ne relit que les espaces sans relevé du jour (une lecture par espace et par jour, échecs retentés
+  l'heure suivante) ; `POST /secheresse/actualiser` relit tout de suite (bouton « Actualiser VigiEau » de
+  la page Espaces ; 5 fois par organisation et par 10 minutes au plus, 429 au-delà) ; un arrosage saisi sans
+  relevé du jour le déclenche pour son espace (relevé conservé même si l'arrosage est refusé). Tous les
+  niveaux sont lus avant d'écrire (aucun verrou pendant les appels HTTP) ; la transaction de lecture est
+  validée avant le premier appel (la connexion revient au pool au lieu de rester « idle in transaction ») et
+  les appels d'une actualisation sont plafonnés en durée (60 s pour `POST /actualiser`, 300 s par
+  organisation pour le worker ; les espaces restants sont relevés au passage suivant). L'écriture est un
+  `INSERT … ON CONFLICT (espace_id, date) DO UPDATE` : le worker et une requête qui relèvent le même espace
+  le même jour ne se heurtent pas.
+- **Relevé du jour manquant** (VigiEau en panne, worker pas encore passé) : le **dernier relevé de moins de
+  7 jours** est appliqué (état, tableau de bord, prévision, diagnostic, alertes du worker, contrôle des
+  arrosages), signalé dans le motif (« Niveau relevé le … »), dans `releve_du` (date du relevé retenu) et
+  dans l'avertissement de `GET /secheresse/etat` ; un arrosage refusé ou enregistré sur cette base le dit
+  dans la zone du registre « (niveau relevé le …) ». Un arrêté couvre en général plusieurs semaines : une
+  panne VigiEau ne doit pas faire conseiller un arrosage interdit la veille. Aucun relevé récent : niveau
+  **inconnu**, rien n'est bloqué, mais c'est signalé (état, tableau de bord, registre).
+- **Règles par défaut** (guide national de mise en œuvre des mesures de restriction des usages de l'eau
+  en période de sécheresse, ministère de la Transition écologique, mai 2023 ; **à confronter à
+  l'arrêté-cadre du département**, qui fait foi et peut être plus souple ou plus strict) :
+
+  | Niveau | Arrosage des espaces verts |
+  |---|---|
+  | vigilance | autorisé (sensibilisation) |
+  | alerte | interdit de 11 h à 18 h |
+  | alerte renforcée, crise | interdit, sauf dérogation |
+
+  Dérogations par défaut : **jeunes plantations** de moins de 2 ans (`date_plantation`), arrosage permis
+  hors 11 h–18 h ; **eau de récupération** (`source_eau = recuperation`), non prélevée dans la ressource,
+  sans plage. Paramétrables par l'administrateur (`PUT /organisations/moi/secheresse`, stockées dans
+  `organisations.parametres.secheresse`) : pour chaque niveau `interdit` et/ou `plage_interdite`
+  (`{debut, fin}`, HH:MM), et `derogations` (`jeunes_plantations_ans` de 0 à 10, 0 ou null :
+  désactivée ; `plage_interdite_jeunes_plantations` ; `eau_recuperation`). Chaque niveau exige `interdit`
+  **et** `plage_interdite` (null explicite pour « aucune plage ») : une règle incomplète est refusée
+  (422), tout comme un champ inconnu. Une dérogation omise prend la valeur du guide (plage 11:00–18:00 des
+  jeunes plantations comprise). En base, une clé absente prend le défaut champ par champ, une valeur
+  illisible fait retomber sur les défauts (jamais « aucune règle »). « Moins de N ans » se compte au
+  calendrier : la dérogation cesse le jour du N-ième anniversaire de la plantation.
+- **Évaluation** : `autorise` (à l'heure locale évaluée), `interdit_toute_la_journee`, `plage_interdite`
+  (« 11:00–18:00 »), `motif` (phrase), `derogation` (texte ou `null`). Priorité de l'eau
+  (`priorite_secheresse`) : 1 jeunes plantations, 2 arbres (type `Rue`, `Arbres`), 3 massifs (`Jardin`,
+  `Massif`), 4 gazons et autres. Approximation : la végétation réelle n'est pas modélisée, un parc arboré
+  est classé « gazons et autres » (un champ « végétation dominante » affinerait ce classement).
+- **Date de plantation** : refusée dans le futur (422, un jour de marge pour le fuseau) : une erreur de
+  saisie (2062 pour 2026) priverait sinon l'espace de sa dérogation sans le signaler.
+- **Décision et dose** : la décision de la prévision passe par `appliquer_restriction` : `arroser` devient
+  `interdit` (sans dose) sous interdiction totale, ou reste `arroser` avec « Arroser hors 11 h–18 h
+  (alerte). » et `plage_interdite` ; la dérogation retenue est citée. Le niveau du jour est supposé
+  toujours en vigueur à la date limite. Tableau de bord : `dose_recommandee` à `null` sous interdiction
+  totale ; diagnostic : pas de `conseil_arrosage`. Worker : pas d'alerte « arrosage à prévoir » pour un
+  espace interdit ; l'alerte de stress critique y dit « arrosage interdit (crise, arrêté sécheresse), sauf
+  dérogation ».
+- **Contrôle des arrosages** : à la création d'une intervention d'arrosage, ou quand son type, son statut ou
+  ses dates changent. Réalisé : évalué à `realisee_le` (niveau relevé ce jour-là ; jour sans relevé,
+  worker ou VigiEau en panne : relevé le plus proche à 7 jours près, à égalité le plus sévère, signalé dans
+  la zone du registre « (niveau relevé le …) » ; aucun : inconnu). Le front transmet l'heure réelle de
+  l'arrosage (champ « Date et heure de l'arrosage », pré-rempli à l'ouverture de la saisie) : un arrosage
+  fait à 7 h et saisi à 14 h en alerte est accepté et inscrit à 7 h ; sans `realisee_le`, l'heure de la
+  saisie est retenue ; planifié : à `planifiee_le`, sinon sur la journée
+  (refusé seulement sous interdiction totale). Réalisation datée dans le futur (au-delà de 5 min de
+  tolérance d'horloge) ou de plus de 30 jours → **422**, avec ou sans volume : l'heure déclarée ne doit pas
+  permettre d'échapper à une interdiction (antidatage).
+  Interdit → **409** avec le motif (et la zone d'alerte), rien n'est enregistré. Sinon, un arrosage terminé
+  fige son **registre** sur l'intervention (migration `0006_mode_secheresse`) : `realisee_par` (agent qui
+  le termine), `secheresse_niveau` (`inconnu` compris), `secheresse_plage_interdite`,
+  `secheresse_derogation`, `secheresse_zone`. Tant qu'il reste réalisé, ce registre n'est ni recontrôlé ni
+  réécrit (règles, niveau ou espace modifiés ensuite) et sa `realisee_le` n'est plus modifiable (**409**) :
+  pour la corriger, repasser l'intervention en planifiée (ce qui efface son registre), puis la terminer à
+  nouveau, contrôlée à la nouvelle date. Cette **annulation** (terminée → planifiée ou en cours, sans
+  nouvelle `planifiee_le`) n'est pas contrôlée : elle reste possible en crise ; la replanifier à une
+  nouvelle date ou la terminer à nouveau l'est.
+- **Registre** `GET /secheresse/registre?du&au` (défaut : du 1er janvier de l'année de `au` à aujourd'hui) :
+  CSV UTF-8 avec BOM, séparateur « ; », virgule décimale ; colonnes Date/heure (fuseau métier), Espace,
+  Commune, Volume (L), Niveau VigiEau, Plage autorisée (« hors 11:00–18:00 », « toute la journée », « non
+  vérifiée (niveau inconnu) »), Dérogation, Zone d'alerte, Agent. Les cellules commençant par `=`, `+`,
+  `-`, `@` sont préfixées d'une apostrophe (pas de formule exécutée par le tableur). Arrosages antérieurs
+  au registre : « non enregistré (antérieur au registre) ». Agent dont le compte a été supprimé : « inconnu
+  (compte supprimé ou non renseigné) », jamais le créateur de l'intervention à sa place (arrosages
+  antérieurs à la migration `0006` compris : leur agent n'est pas renseigné).
+- **Limite connue (valeur probante)** : le registre est lu sur les interventions, sans journal en ajout
+  seul. Annuler un arrosage réalisé (repasser en planifié), changer son type (technicien) ou le supprimer
+  (gestionnaire) le retire de l'export. Un journal horodaté des modifications reste à faire si le registre
+  doit faire foi devant un contrôle. Le volume d'un arrosage réalisé reste corrigeable.
+- **Limite connue (disponibilité)** : un arrosage saisi sans relevé du jour interroge VigiEau dans la
+  requête (jusqu'à `VIGIEAU_TIMEOUT_S`, sans écriture en attente : contrôle sans autoflush) ; atténué par
+  le cache (échec mémorisé 60 s) et la limitation de `POST /secheresse/actualiser` (limiteur en mémoire,
+  propre à chaque processus).
+- **Données personnelles (RGPD)** : le registre CSV cite le nom de l'agent (`users.name`) qui a réalisé
+  chaque arrosage, y compris pour le rôle lecteur (élu), comme le prévoit le cahier des charges. Finalité :
+  justifier du respect des arrêtés sécheresse lors d'un contrôle (police de l'eau, DDT) ; base légale :
+  mission d'intérêt public / obligation légale de la collectivité. Conservation : celle des interventions
+  (aucune purge automatique à ce jour ; à fixer par la collectivité, par exemple 3 ans, durée maximale d'un
+  export). Aucune minimisation n'est appliquée (initiales pour le lecteur, par exemple) : à décider avec
+  le DPO de la collectivité et à inscrire au registre des traitements.
+- **Isolation** : la table `restrictions_secheresse` est soumise à la RLS PostgreSQL (via l'espace) ;
+  l'état et le registre sont filtrés sur l'organisation.
+
 ### Impact carbone (estimation grossière)
 `domain/logic/bilan_carbone.py` : séquestration des arbres urbains selon Nowak & Crane (2002),
 0,306 kg C par m² de couvert arboré et par an, soit ≈ 1,12 kg CO₂/m²/an (× 44/12), appliquée comme
@@ -302,6 +428,8 @@ sinon 5). Les zones appartiennent à l'organisation : un recalcul remplace celle
 | `ENABLE_SCHEDULER` | `false` | Job intégré à l'API (développement sans worker) |
 | `LOG_FORMAT` / `LOG_LEVEL` | `text` / `INFO` | `json` en production |
 | `HSTS` | `false` | À activer derrière HTTPS |
+| `VIGIEAU_URL` | `https://api.vigieau.gouv.fr/api/zones` | Mode sécheresse : point d'entrée VigiEau (https obligatoire) |
+| `VIGIEAU_TIMEOUT_S` | `10` | Délai d'attente d'un appel VigiEau (0 à 60 s) |
 
 ## 6. Exploitation
 

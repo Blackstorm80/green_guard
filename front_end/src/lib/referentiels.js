@@ -34,7 +34,30 @@ export const DECISIONS_PREVISION = {
   reporter: { libelle: "Reporter", ton: "info" },
   surveiller: { libelle: "À surveiller", ton: "alerte" },
   rien: { libelle: "Rien à prévoir", ton: "succes" },
+  interdit: { libelle: "Arrosage interdit", ton: "danger" },
 };
+
+// Mode sécheresse : niveau VigiEau du jour (PastilleVigieau double la couleur d'une icône, pour l'accessibilité)
+export const NIVEAUX_VIGIEAU = {
+  aucune: { libelle: "Aucune restriction", ton: "succes" },
+  vigilance: { libelle: "Vigilance", ton: "info" },
+  alerte: { libelle: "Alerte", ton: "alerte" },
+  alerte_renforcee: { libelle: "Alerte renforcée", ton: "danger" },
+  crise: { libelle: "Crise", ton: "danger" },
+  inconnu: { libelle: "Niveau inconnu", ton: "neutre" },
+};
+
+// Ressource prélevée : elle détermine la zone d'alerte VigiEau (eau potable, nappe, cours d'eau)
+export const SOURCES_EAU = {
+  reseau: "Réseau d'eau potable",
+  forage: "Forage (nappe)",
+  riviere: "Rivière ou canal",
+  recuperation: "Eau de récupération",
+};
+
+/** Message d'un refus d'arrosage par l'arrêté sécheresse (409), sinon le message d'origine. */
+export const messageArrosage = (err) =>
+  err?.status === 409 ? `Arrosage refusé (arrêté sécheresse). ${err.message}` : err?.message;
 
 export const LIBELLES_INTERVENTION = {
   arrosage: "Arrosage", ombrage: "Ombrage", taille: "Taille", fertilisation: "Fertilisation",
@@ -44,3 +67,9 @@ export const LIBELLES_STATUT_INTERVENTION = { planifiee: "Planifiée", en_cours:
 
 /** Valeur saisie → nombre, ou undefined si le champ est vide (le champ est alors omis du payload). */
 export const nombreOuVide = (valeur) => (valeur === "" || valeur === null || valeur === undefined ? undefined : Number(valeur));
+
+/** Aujourd'hui (heure locale) au format d'un <input type="date"> : borne haute de la date de plantation. */
+export const aujourdhuiSaisie = () => {
+  const maintenant = new Date();
+  return new Date(maintenant.getTime() - maintenant.getTimezoneOffset() * 60000).toISOString().slice(0, 10);
+};

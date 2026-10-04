@@ -4,8 +4,8 @@ import { api } from "../../services/api";
 import { Modal } from "../../components/ui/Modal";
 import { Button } from "../../components/ui/Button";
 import { Alert } from "../../components/ui/Card";
-import { Champ, Choix } from "./champsEspace";
-import { DRAINAGES, EXPOSITIONS, IRRIGATIONS, TYPES_SOL } from "../../lib/referentiels";
+import { Champ, ChoixSourceEau, Choix } from "./champsEspace";
+import { aujourdhuiSaisie, DRAINAGES, EXPOSITIONS, IRRIGATIONS, TYPES_SOL } from "../../lib/referentiels";
 
 const CHAMPS_NUMERIQUES = new Set([
   "surface_m2", "ph_actuel", "humidite_cible", "frequence_arrosage_auto", "profondeur_racinaire",
@@ -28,6 +28,8 @@ const valeursInitiales = (espace) => ({
   type_irrigation: espace?.type_irrigation ?? "",
   debit_arrosage_l_min: espace?.debit_arrosage_l_min ?? "",
   date_derniere_fertilisation: espace?.date_derniere_fertilisation ?? "",
+  source_eau: espace?.source_eau ?? "reseau",
+  date_plantation: espace?.date_plantation ?? "",
 });
 
 const formatMm = (v) => (typeof v === "number" ? v.toLocaleString("fr-FR", { maximumFractionDigits: 1 }) : "--");
@@ -54,6 +56,7 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
     // Réserve vidée : retour à la réserve calculée (FAO-56) plutôt que « inchangée »
     if (valeurs.reserve_utile_max === "" && espace.reserve_utile_max != null) payload.reserve_utile_max = null;
     if (valeurs.debit_arrosage_l_min === "" && espace.debit_arrosage_l_min != null) payload.debit_arrosage_l_min = null;
+    if (valeurs.date_plantation === "" && espace.date_plantation != null) payload.date_plantation = null;
     try {
       await api.updateEspace(espace.id, payload);
       onSuccess();
@@ -106,6 +109,13 @@ export default function EditSpaceModal({ espace, onClose, onSuccess }) {
           <Champ {...lie} nom="debit_arrosage_l_min" label="Débit d'arrosage (L/min)" type="number" min="0.1" step="any"
                  aide="Facultatif : donne la durée d'arrosage de la dose recommandée." />
           <Champ {...lie} nom="date_derniere_fertilisation" label="Dernière fertilisation" type="date" />
+        </fieldset>
+
+        <fieldset className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          <legend className="mb-3 text-sm font-bold uppercase tracking-wide text-fg-muted">Sécheresse</legend>
+          <ChoixSourceEau {...lie} />
+          <Champ {...lie} nom="date_plantation" label="Date de plantation" type="date" max={aujourdhuiSaisie()}
+                 aide="Une jeune plantation (moins de 2 ans par défaut) peut être arrosée par dérogation." />
         </fieldset>
 
         {erreur && <Alert ton="danger">{erreur}</Alert>}

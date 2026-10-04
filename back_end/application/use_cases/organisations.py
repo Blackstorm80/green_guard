@@ -5,6 +5,7 @@ l'appelant les exécute hors contexte d'organisation (contournement explicite de
 """
 from domain.logic.droits import ADMIN, ROLES, verifier_admin_restant
 from domain.logic.organisations import generer_slug, nom_organisation_par_defaut, slug_disponible
+from domain.logic.secheresse import CLE_PARAMETRES as CLE_SECHERESSE
 from domain.models import Organisation, User
 from domain.ports.organisation_repository import IOrganisationRepository
 
@@ -66,7 +67,20 @@ def mettre_a_jour_organisation(repo: IOrganisationRepository, organisation: Orga
     if "nom" in champs and champs["nom"] is not None:
         organisation.nom = champs["nom"].strip()
     if "parametres" in champs:
-        organisation.parametres = champs["parametres"]
+        # Les règles sécheresse ont leur propre route, réservée à l'administrateur : jamais modifiées ici
+        parametres = {k: v for k, v in (champs["parametres"] or {}).items() if k != CLE_SECHERESSE}
+        existantes = (organisation.parametres or {}).get(CLE_SECHERESSE)
+        if existantes is not None:
+            parametres[CLE_SECHERESSE] = existantes
+        organisation.parametres = parametres or (None if champs["parametres"] is None else {})
+    repo.valider()
+    return organisation
+
+
+def definir_regles_secheresse(repo: IOrganisationRepository, organisation: Organisation,
+                              regles: dict) -> Organisation:
+    """Règles validées (schema/secheresse.py) ; nouveau dictionnaire : la colonne JSON est bien réécrite."""
+    organisation.parametres = {**(organisation.parametres or {}), CLE_SECHERESSE: regles}
     repo.valider()
     return organisation
 
