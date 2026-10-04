@@ -25,10 +25,10 @@ avec le thème. Exceptions tolérées : pictogrammes décoratifs (`text-teal-400
 | Décoratif seulement | `text-fg-subtle` | #94a3b8 | #475569 |
 | Action principale | `bg-primary` + `text-on-accent` | #15803d | #15803d |
 | Contour de focus | `ring-focus` / `outline` | #15803d | #4ade80 |
-| États | `text-success`, `text-danger`, `text-warning`, `text-info` | teintes 700 | teintes 400 |
+| États | `text-success`, `text-danger`, `text-warning`, `text-info` | teintes 700-800 | teintes 400 |
 | Fonds d'état | `bg-success-soft`, `bg-danger-soft`… | 8–10 % | 12 % |
 
-Tous les textes atteignent au moins **4,5:1** sur `canvas`, `surface` et `surface-raised` dans les
+Tous les textes atteignent au moins **4,5:1** sur `canvas`, `surface`, `surface-raised` **et sur leur propre fond teinté** (`*-soft`) dans les
 deux thèmes (calculé lors de la phase 3). `text-fg-subtle` (≈ 2,5:1) est réservé au décor :
 jamais pour une information.
 
