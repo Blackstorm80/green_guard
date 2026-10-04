@@ -1,0 +1,52 @@
+# Journal des versions
+
+Format inspiré de [Keep a Changelog](https://keepachangelog.com/fr/1.1.0/) ; versions selon [SemVer](https://semver.org/lang/fr/).
+
+## [1.0.0-rc1] — 2026-10-04 (version candidate)
+
+Première version candidate après la reprise du projet. Plan et décisions :
+`PLAN_ARCHITECTE_2026-10-03.md` ; rapport de recette : `documentation/recette_v1.0.0-rc1.md`.
+
+### Sécurité
+- Secrets retirés du code et des fichiers versionnés (clé OpenWeather, secret JWT, base SQLite
+  contenant des comptes) ; scan de secrets en CI. **Rotation des clés et purge de l'historique
+  restent à faire** (voir le guide d'exploitation).
+- Session par cookie `httpOnly` + `SameSite=Lax` + `Secure`, protection CSRF, PyJWT (remplace
+  python-jose), limitation de débit sur la connexion et l'inscription, mot de passe de 12 caractères
+  minimum, `SECRET_KEY` de 32 caractères minimum.
+- Isolation stricte entre comptes (plusieurs accès aux données d'autres utilisateurs corrigés),
+  plus d'escalade de privilèges à l'inscription, comptes désactivés bloqués immédiatement.
+- En-têtes de sécurité et CSP sur l'API et le front, erreurs 500 génériques, images Docker non root.
+- Dépendances : CVE corrigées (PyJWT, python-multipart, python-dotenv, requests, react-router,
+  postcss…) ; pip-audit et npm audit à zéro.
+
+### Corrigé
+- API réellement fonctionnelle : préfixes de routes doublés, une dizaine de routes en erreur 500,
+  modules qui ne s'importaient pas, création et édition d'espace impossibles côté front.
+- Bilan hydrique : la réserve en eau était décomptée à chaque passage du job (720 fois par jour) ;
+  calcul journalier idempotent à partir de la météo réelle.
+- Interblocage de l'API sous charge (dépendance `async` bloquant la boucle d'événements) ; requêtes
+  N+1 sur les espaces, le tableau de bord et les zones.
+- Clustering : centroïdes enregistrés en coordonnées normalisées (fausses positions).
+- Données inventées supprimées (valeurs aléatoires, O₂ constant, notifications et rapports factices).
+- Conteneur front marqué « unhealthy » en permanence ; bouton mobile animé en boucle.
+
+### Ajouté
+- Schéma PostgreSQL v1 piloté par Alembic : contraintes d'intégrité, cascades, index, dates avec fuseau.
+- Service worker dédié aux tâches planifiées ; notifications de stress hydrique critique.
+- CRUD des interventions (repris de la branche de Lucresse) ; boutons d'action du tableau de bord.
+- Page Rapports (historique réel, filtres, export CSV, impression) ; page Paramètres.
+- Design system (tokens sémantiques, thèmes clair et sombre), accessibilité WCAG 2.1 AA vérifiée
+  par audit automatique (axe-core).
+- Catalogue iNaturalist rechargé proprement (1 258 plantes, 80 auxiliaires).
+- Tests : 70 tests back (96 % de couverture, SQLite et PostgreSQL), 20 tests de bout en bout
+  Playwright (bureau et mobile) ; CI complète ; test de charge ; scripts de sauvegarde et restauration.
+
+### Retiré
+- Environ 80 fichiers de code mort ou cassé ; `node_modules`, `dist/` et la base SQLite du dépôt ;
+  dépendances inutilisées (passlib, python-jose, python-weather, websockets, framer-motion).
+
+### Notes de migration
+- Toute base de développement créée avant octobre 2026 doit être recréée (`docker compose down -v`) :
+  la migration de référence a été remplacée par `0001_schema_v1`.
+- Nouvelles variables d'environnement : voir `.env.example` et `documentation/Doc_back_end.md`.

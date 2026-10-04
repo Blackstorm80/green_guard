@@ -124,4 +124,10 @@ python create_user.py --email <email> --password <mot_de_passe>
 ---
 Plan de reprise et feuille de route v1.0 : [`PLAN_ARCHITECTE_2026-10-03.md`](PLAN_ARCHITECTE_2026-10-03.md)
 
+Documentation : [exploitation](documentation/exploitation.md) · [back-end](documentation/Doc_back_end.md) ·
+[design system](documentation/design_system.md) · [recette 1.0.0-rc1](documentation/recette_v1.0.0-rc1.md) ·
+[journal des versions](CHANGELOG.md)
+
+Tests de bout en bout (pile démarrée) : `cd front_end && npm run test:e2e`
+
 *Développé pour une gestion durable des ressources urbaines.*

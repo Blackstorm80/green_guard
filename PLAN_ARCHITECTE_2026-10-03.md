@@ -271,6 +271,14 @@ Hypothèse : un développeur à temps plein accompagné de l'architecte. Chaque 
 - Tag `v1.0.0-rc1`. Recette fonctionnelle complète, tests de charge légers (200 espaces), revue de sécurité finale, sauvegarde/restauration PostgreSQL testée.
 - Seuls les correctifs bloquants sont acceptés.
 
+**Suivi au 2026-10-04** (branche `release/v1.0.0-rc1`, tag local `v1.0.0-rc1`) : **phase 4 terminée**. Rapport : `documentation/recette_v1.0.0-rc1.md`.
+- ✅ Tests de bout en bout Playwright (bureau et mobile) et audit axe-core WCAG AA : 20/20, 0 violation sérieuse.
+- ✅ Test de charge sur 200 espaces. Il a révélé un **interblocage critique de l'API**, corrigé, ainsi que des N+1 (`/espaces-verts/` est passé de 3,3 s à 0,3 s).
+- ✅ Sauvegarde et restauration testées ; revue de sécurité ; audits à zéro ; version, CHANGELOG, guide d'exploitation.
+- ⚠️ Réserve n° 1 : le p95 du tableau de bord (540-660 ms, pour un objectif de 500) est à re-mesurer sur l'hébergement cible (D-7).
+- ⚠️ Réserve n° 2 : rotation des clés, purge de l'historique et réglages GitHub, à faire avant la mise en ligne.
+- Calendrier : la recette prévue du 23 au 27 novembre est réalisée. Il reste avant le 1er décembre : lever les réserves, valider D-4, D-6 et D-7, puis faire une recette métier par les utilisateurs.
+
 ### 🚀 v1.0.0 : mardi 1er décembre 2026
 
 ---
