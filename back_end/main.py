@@ -46,7 +46,8 @@ async def lifespan(_: FastAPI):
         scheduler.shutdown()
 
 
-app = FastAPI(title="GreenGuard API", version="0.9.0", lifespan=lifespan)
+VERSION = "1.0.0-rc1"
+app = FastAPI(title="GreenGuard API", version=VERSION, lifespan=lifespan)
 
 installer_middlewares(app)
 app.add_middleware(
@@ -75,4 +76,4 @@ app.include_router(health.router, prefix=f"{API}/health", tags=["Santé"])
 
 @app.get("/", include_in_schema=False)
 def racine():
-    return {"status": "online", "project": "GreenGuard"}
+    return {"status": "online", "project": "GreenGuard", "version": VERSION}

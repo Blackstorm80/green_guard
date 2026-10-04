@@ -83,7 +83,7 @@ export default function Parametres() {
         <Button variante="secondaire" icone={LogOut} onClick={logout} className="mt-4">Se déconnecter</Button>
       </Card>
 
-      <p className="text-xs text-fg-muted">GreenGuard · version 0.9 (pré-version)</p>
+      <p className="text-xs text-fg-muted">GreenGuard · version {__APP_VERSION__}</p>
     </div>
   );
 }
