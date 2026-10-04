@@ -120,3 +120,13 @@ def test_secret_trop_court_refuse(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "trop-courte")
     with pytest.raises(RuntimeError, match="trop courte"):
         Settings()
+
+
+def test_dependances_bdd_synchrones():
+    """Non-régression (recette phase 4) : une dépendance `async` qui interroge la base bloque la boucle
+    d'événements en attendant une connexion du pool ; sous charge, l'API entière se fige."""
+    import inspect
+
+    from api.deps.auth import get_current_user, require_any_role
+    assert not inspect.iscoroutinefunction(get_current_user)
+    assert not inspect.iscoroutinefunction(require_any_role(["admin"]))

@@ -41,6 +41,11 @@ class Settings:
     # Job planifié : à n'activer que dans UN processus (service worker en production)
     enable_scheduler: bool = field(default_factory=lambda: _bool("ENABLE_SCHEDULER", False))
 
+    # Pool de connexions : à dimensionner avec le nombre de threads du serveur (40 par défaut)
+    db_pool_size: int = field(default_factory=lambda: int(os.getenv("DB_POOL_SIZE", "10")))
+    db_max_overflow: int = field(default_factory=lambda: int(os.getenv("DB_MAX_OVERFLOW", "20")))
+    db_pool_timeout_s: int = field(default_factory=lambda: int(os.getenv("DB_POOL_TIMEOUT_S", "10")))
+
     log_level: str = field(default_factory=lambda: os.getenv("LOG_LEVEL", "INFO"))
     log_format: str = field(default_factory=lambda: os.getenv("LOG_FORMAT", "text"))  # "text" | "json"
     hsts: bool = field(default_factory=lambda: _bool("HSTS", False))  # à activer derrière HTTPS

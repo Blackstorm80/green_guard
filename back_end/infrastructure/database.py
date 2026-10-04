@@ -10,7 +10,12 @@ connect_args = {}
 if DATABASE_URL.startswith("sqlite"):
     connect_args = {"check_same_thread": False}
 
-engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True)
+_options_pool = {} if DATABASE_URL.startswith("sqlite") else {
+    "pool_size": settings.db_pool_size,
+    "max_overflow": settings.db_max_overflow,
+    "pool_timeout": settings.db_pool_timeout_s,  # échec rapide plutôt qu'une file d'attente de 30 s
+}
+engine = create_engine(DATABASE_URL, connect_args=connect_args, pool_pre_ping=True, **_options_pool)
 
 if DATABASE_URL.startswith("sqlite"):
     # SQLite n'applique ON DELETE CASCADE qu'avec ce pragma (comportement aligné sur PostgreSQL)

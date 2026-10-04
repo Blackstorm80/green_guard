@@ -37,7 +37,7 @@ def get_interventions_urgentes(
     capteur_service: CapteurHybridService = Depends(get_capteur_service),
 ):
     """Interventions urgentes pour le dashboard."""
-    espaces = EspaceVertRepositoryImpl(db).list_by_user(current_user.id)
+    espaces = EspaceVertRepositoryImpl(db).list_resume_by_user(current_user.id)
     return lister_interventions_urgentes(espaces=espaces, capteur_service=capteur_service, limit=limit)
 
 

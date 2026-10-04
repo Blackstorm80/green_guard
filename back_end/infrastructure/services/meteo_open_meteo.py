@@ -18,20 +18,34 @@ PRECISION_CACHE = 1
 
 _cache: dict[tuple[float, float], tuple[float, ConditionsMeteo]] = {}
 _cache_lock = Lock()
+_verrous_par_point: dict[tuple[float, float], Lock] = {}
+
+
+def _lire_cache(cle: tuple[float, float]) -> ConditionsMeteo | None:
+    with _cache_lock:
+        entree = _cache.get(cle)
+    if entree and time.monotonic() - entree[0] < CACHE_TTL_S:
+        return entree[1]
+    return None
 
 
 class OpenMeteoService(IMeteoService):
     def recuperer_conditions_actuelles(self, latitude, longitude, maintenant: datetime) -> ConditionsMeteo:
         cle = (round(latitude, PRECISION_CACHE), round(longitude, PRECISION_CACHE))
+        conditions = _lire_cache(cle)
+        if conditions:
+            return conditions
         with _cache_lock:
-            entree = _cache.get(cle)
-            if entree and time.monotonic() - entree[0] < CACHE_TTL_S:
-                return entree[1]
-
-        conditions = self._appeler_api(latitude, longitude)
-        with _cache_lock:
-            _cache[cle] = (time.monotonic(), conditions)
-        return conditions
+            verrou = _verrous_par_point.setdefault(cle, Lock())
+        # Un seul appel réseau par point : les requêtes concurrentes attendent puis lisent le cache
+        with verrou:
+            conditions = _lire_cache(cle)
+            if conditions:
+                return conditions
+            conditions = self._appeler_api(latitude, longitude)
+            with _cache_lock:
+                _cache[cle] = (time.monotonic(), conditions)
+            return conditions
 
     @staticmethod
     def _appeler_api(latitude: float, longitude: float) -> ConditionsMeteo:

@@ -1,8 +1,7 @@
 from application.dto.capteurs import DashboardCapteursDTO, LectureCapteurDTO, MetriquesDashboardDTO
 from application.dto.meteo import MeteoDTO
 from application.use_cases.meteo import obtenir_meteo_actuelle
-from domain.models import EspaceVert
-from domain.ports.capteurs import STATUT_SANS_DONNEE, ICapteurService
+from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService
 from domain.ports.meteo import IMeteoService, MeteoIndisponibleError
 
 SEUIL_CO2_MOYEN_PPM = 800
@@ -38,7 +37,7 @@ def _synthese(metrics: MetriquesDashboardDTO) -> tuple[str, str]:
 
 
 def obtenir_dashboard_capteurs(
-    espaces: list[EspaceVert],
+    espaces: list[EspaceIdentifie],
     capteur_service: ICapteurService,
     meteo_service: IMeteoService,
 ) -> DashboardCapteursDTO:

@@ -63,7 +63,9 @@ def effacer_cookie_session(response: Response) -> None:
 
 
 #  SECTION 3 : UTILISATEUR COURANT
-async def get_current_user(
+# Synchrone volontairement : elle interroge la base. En `async def`, elle s'exécuterait sur la
+# boucle d'événements et la bloquerait en attendant une connexion du pool (interblocage sous charge).
+def get_current_user(
     request: Request,
     db: Session = Depends(get_db),
     bearer: str | None = Depends(oauth2_scheme),
@@ -109,7 +111,7 @@ def require_role(role: str):
 
 
 def require_any_role(roles: list[str]):
-    async def role_checker(current_user: User = Depends(get_current_user)) -> User:
+    def role_checker(current_user: User = Depends(get_current_user)) -> User:
         if current_user.role not in roles:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissions insuffisantes")
         return current_user

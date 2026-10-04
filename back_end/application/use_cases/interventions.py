@@ -6,8 +6,7 @@ from application.dto.intervention import (
     PrioriteIntervention,
     TypeIntervention,
 )
-from domain.models import EspaceVert
-from domain.ports.capteurs import ICapteurService, LectureCapteur
+from domain.ports.capteurs import EspaceIdentifie, ICapteurService, LectureCapteur
 
 SEUIL_CO2_PPM = 1200
 SEUIL_CHALEUR_C = 32
@@ -17,7 +16,7 @@ _ORDRE_TYPES = list(TypeIntervention)
 
 
 def _detecter_problemes(
-    espace: EspaceVert, lecture: LectureCapteur, maintenant: datetime
+    espace: EspaceIdentifie, lecture: LectureCapteur, maintenant: datetime
 ) -> list[InterventionUrgenteDTO]:
     """Plusieurs alertes possibles pour un même espace (pas de elif)."""
     problemes = []
@@ -49,7 +48,7 @@ def _detecter_problemes(
 
 
 def lister_interventions_urgentes(
-    espaces: list[EspaceVert],
+    espaces: list[EspaceIdentifie],
     capteur_service: ICapteurService,
     limit: int = 5,
 ) -> InterventionsUrgentesDTO:

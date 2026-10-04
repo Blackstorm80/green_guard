@@ -1,6 +1,15 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 
 from domain.models import EspaceVert
+
+
+@dataclass(frozen=True)
+class EspaceResume:
+    id: int
+    nom: str
+    latitude: float
+    longitude: float
 
 
 class IEspaceVertRepository(ABC):
@@ -15,6 +24,10 @@ class IEspaceVertRepository(ABC):
 
     @abstractmethod
     def list_by_user(self, user_id: int) -> list[EspaceVert]: ...
+
+    @abstractmethod
+    def list_resume_by_user(self, user_id: int) -> list["EspaceResume"]:
+        """Vue allégée (id, nom, latitude, longitude) pour les écrans de synthèse à fort trafic."""
 
     @abstractmethod
     def list_tous(self) -> list[EspaceVert]: ...

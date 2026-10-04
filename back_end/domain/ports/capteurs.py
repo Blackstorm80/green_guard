@@ -2,10 +2,17 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import datetime
-
-from domain.models import EspaceVert
+from typing import Protocol
 
 STATUT_SANS_DONNEE = "Sans donnée"
+
+
+class EspaceIdentifie(Protocol):
+    """Ce que la lecture capteurs exige d'un espace : entité complète ou vue allégée (EspaceResume)."""
+    id: int
+    nom: str
+    latitude: float
+    longitude: float
 
 
 @dataclass(frozen=True)
@@ -27,9 +34,9 @@ class ICapteurService(ABC):
     """Port de lecture de la télémétrie d'un espace vert."""
 
     @abstractmethod
-    def lecture_actuelle(self, espace: EspaceVert) -> LectureCapteur:
+    def lecture_actuelle(self, espace: EspaceIdentifie) -> LectureCapteur:
         """Toujours une lecture ; champs à None et statut STATUT_SANS_DONNEE si rien n'est mesuré."""
 
     @abstractmethod
-    def lectures_actuelles(self, espaces: Sequence[EspaceVert]) -> list[LectureCapteur]:
+    def lectures_actuelles(self, espaces: Sequence[EspaceIdentifie]) -> list[LectureCapteur]:
         """Lectures de plusieurs espaces, dans l'ordre fourni (implémentation sans N+1 attendue)."""

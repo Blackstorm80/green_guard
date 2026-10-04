@@ -22,5 +22,6 @@ EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
   CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=4).status == 200 else 1)"
 
-# Migrations puis API (pas de --reload en production)
-CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers"]
+# Migrations puis API (pas de --reload en production).
+# WEB_CONCURRENCY : nombre de processus API, à ajuster aux cœurs de l hébergement (test de charge à rejouer)
+CMD ["sh", "-c", "alembic upgrade head && uvicorn main:app --host 0.0.0.0 --port 8000 --proxy-headers --workers ${WEB_CONCURRENCY:-1}"]

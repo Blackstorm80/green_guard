@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 from domain.logic.clustering import nommer_zones, regrouper
 from domain.models import ClusteringConfig, EspaceVert, ZoneIntelligente
-from infrastructure.repositories.bilan_hydrique_repository_impl import BilanHydriqueRepositoryImpl
+from infrastructure.services.capteur_hybrid_service import CapteurHybridService
 
 N_CLUSTERS_PAR_DEFAUT = 5
 
@@ -18,12 +18,8 @@ def _config_pour(db: Session, user_id: int) -> ClusteringConfig | None:
     )
 
 
-def _sante_moyenne(espaces: list[EspaceVert], bilans: BilanHydriqueRepositoryImpl) -> float | None:
-    scores = []
-    for espace in espaces:
-        bilan = bilans.get_dernier_bilan_pour_espace(espace.id)
-        if bilan is not None:
-            scores.append((1.0 - bilan.indice_stress) * 100)
+def _sante_moyenne(espaces: list[EspaceVert], sante_par_espace: dict[int, float | None]) -> float | None:
+    scores = [s for e in espaces if (s := sante_par_espace.get(e.id)) is not None]
     return round(sum(scores) / len(scores), 1) if scores else None
 
 
@@ -39,7 +35,8 @@ def reconstruire_zones(db: Session, user_id: int) -> list[ZoneIntelligente]:
 
     groupes = regrouper([(e.latitude, e.longitude) for e in espaces], n_clusters)
     noms = nommer_zones(len(groupes), granularite)
-    bilans = BilanHydriqueRepositoryImpl(db)
+    lectures = CapteurHybridService(db).lectures_actuelles(espaces)  # 2 requêtes pour tous les espaces
+    sante_par_espace = {lecture.espace_id: lecture.sante_percent for lecture in lectures}
 
     db.query(ZoneIntelligente).filter(ZoneIntelligente.user_id == user_id).delete()
     zones = []
@@ -52,7 +49,7 @@ def reconstruire_zones(db: Session, user_id: int) -> list[ZoneIntelligente]:
             centroid_lat=groupe.centroid_lat,
             centroid_lon=groupe.centroid_lon,
             rayon_km=groupe.rayon_km,
-            sante_moyenne=_sante_moyenne(membres, bilans),
+            sante_moyenne=_sante_moyenne(membres, sante_par_espace),
             nb_espaces=len(membres),
         )
         zone.espaces = membres

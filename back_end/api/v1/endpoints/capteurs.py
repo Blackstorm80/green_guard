@@ -28,7 +28,7 @@ def dashboard_capteurs(
     capteurs: CapteurHybridService = Depends(get_capteur_service),
     meteo: OpenMeteoService = Depends(get_meteo_service),
 ):
-    espaces = EspaceVertRepositoryImpl(db).list_by_user(current_user.id)
+    espaces = EspaceVertRepositoryImpl(db).list_resume_by_user(current_user.id)
     if espace_ids:
         # Filtre appliqué sur les espaces de l'utilisateur : impossible de lire ceux d'un autre compte
         demandes = set(espace_ids)

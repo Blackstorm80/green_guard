@@ -1,10 +1,10 @@
 from collections.abc import Sequence
 
-from sqlalchemy import func
+from sqlalchemy import Row, func, select
 from sqlalchemy.orm import Session
 
-from domain.models import BilanHydriqueJournalier, EspaceVert, Mesure
-from domain.ports.capteurs import STATUT_SANS_DONNEE, ICapteurService, LectureCapteur
+from domain.models import BilanHydriqueJournalier, Mesure
+from domain.ports.capteurs import STATUT_SANS_DONNEE, EspaceIdentifie, ICapteurService, LectureCapteur
 
 
 class CapteurHybridService(ICapteurService):
@@ -18,32 +18,35 @@ class CapteurHybridService(ICapteurService):
     def __init__(self, db_session: Session):
         self.db = db_session
 
-    def _dernieres_mesures(self, ids: list[int]) -> dict[int, Mesure]:
+    # Lecture par colonnes (et non par objets ORM complets) : le tableau de bord est la route la plus
+    # sollicitée, et l'hydratation de centaines d'objets coûtait l'essentiel du temps de réponse.
+    def _dernieres_mesures(self, ids: list[int]) -> dict[int, Row]:
         derniere = (
-            self.db.query(Mesure.espace_id, func.max(Mesure.timestamp).label("ts"))
-            .filter(Mesure.espace_id.in_(ids))
+            select(Mesure.espace_id, func.max(Mesure.timestamp).label("ts"))
+            .where(Mesure.espace_id.in_(ids))
             .group_by(Mesure.espace_id)
             .subquery()
         )
-        lignes = self.db.query(Mesure).join(
-            derniere, (Mesure.espace_id == derniere.c.espace_id) & (Mesure.timestamp == derniere.c.ts)
-        )
-        return {m.espace_id: m for m in lignes}
+        requete = select(
+            Mesure.espace_id, Mesure.temperature, Mesure.humidite_sol,
+            Mesure.humidite_air, Mesure.co2, Mesure.timestamp,
+        ).join(derniere, (Mesure.espace_id == derniere.c.espace_id) & (Mesure.timestamp == derniere.c.ts))
+        return {ligne.espace_id: ligne for ligne in self.db.execute(requete)}
 
-    def _derniers_bilans(self, ids: list[int]) -> dict[int, BilanHydriqueJournalier]:
+    def _derniers_bilans(self, ids: list[int]) -> dict[int, Row]:
+        b = BilanHydriqueJournalier
         dernier = (
-            self.db.query(BilanHydriqueJournalier.espace_id, func.max(BilanHydriqueJournalier.date).label("d"))
-            .filter(BilanHydriqueJournalier.espace_id.in_(ids))
-            .group_by(BilanHydriqueJournalier.espace_id)
+            select(b.espace_id, func.max(b.date).label("d"))
+            .where(b.espace_id.in_(ids))
+            .group_by(b.espace_id)
             .subquery()
         )
-        lignes = self.db.query(BilanHydriqueJournalier).join(
-            dernier,
-            (BilanHydriqueJournalier.espace_id == dernier.c.espace_id) & (BilanHydriqueJournalier.date == dernier.c.d),
+        requete = select(b.espace_id, b.reserve_utile_fin_journee, b.indice_stress, b.statut_hydrique).join(
+            dernier, (b.espace_id == dernier.c.espace_id) & (b.date == dernier.c.d)
         )
-        return {b.espace_id: b for b in lignes}
+        return {ligne.espace_id: ligne for ligne in self.db.execute(requete)}
 
-    def lectures_actuelles(self, espaces: Sequence[EspaceVert]) -> list[LectureCapteur]:
+    def lectures_actuelles(self, espaces: Sequence[EspaceIdentifie]) -> list[LectureCapteur]:
         """Lectures de plusieurs espaces en 2 requêtes, quel que soit leur nombre."""
         if not espaces:
             return []
@@ -66,5 +69,5 @@ class CapteurHybridService(ICapteurService):
             ))
         return lectures
 
-    def lecture_actuelle(self, espace: EspaceVert) -> LectureCapteur:
+    def lecture_actuelle(self, espace: EspaceIdentifie) -> LectureCapteur:
         return self.lectures_actuelles([espace])[0]
