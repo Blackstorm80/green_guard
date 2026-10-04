@@ -32,7 +32,7 @@ jobs:
           --health-cmd "pg_isready -U gg -d gg_ci"
           --health-interval 5s --health-timeout 5s --health-retries 10
     env:
-      SECRET_KEY: cle-ci-uniquement-0123456789abcdef0123
+      SECRET_KEY: cle-ci-uniquement-0123456789abcdef0123  # gitleaks:allow (clé factice de test)
       PG_URL: postgresql://gg:gg_ci@localhost:5432/gg_ci
     steps:
       - uses: actions/checkout@v4
@@ -85,7 +85,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: [backend, frontend]
     env:
-      SECRET_KEY: cle-ci-e2e-uniquement-0123456789abcdef0123
+      SECRET_KEY: cle-ci-e2e-uniquement-0123456789abcdef0123  # gitleaks:allow (clé factice de test)
       POSTGRES_PASSWORD: gg_ci_e2e
       AUTH_RATE_LIMIT: "1000"   # chaque test crée un compte
     steps:
