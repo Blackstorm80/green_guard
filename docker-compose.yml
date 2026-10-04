@@ -31,6 +31,7 @@ services:
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:3000}
       COOKIE_SECURE: ${COOKIE_SECURE:-true}   # http://localhost est un contexte sécurisé pour les navigateurs
       HSTS: ${HSTS:-false}                    # true uniquement derrière HTTPS
+      AUTH_RATE_LIMIT: ${AUTH_RATE_LIMIT:-10} # tentatives de connexion/inscription par minute et par IP
       LOG_FORMAT: json
       ENABLE_SCHEDULER: "false"               # le job tourne dans le service worker (ADR-5)
     depends_on:

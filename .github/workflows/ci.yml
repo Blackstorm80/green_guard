@@ -80,11 +80,39 @@ jobs:
       - name: Audit des dépendances (vulnérabilités hautes et critiques)
         run: npm audit --omit=dev --audit-level=high
 
-  images:
-    name: Images Docker
+  e2e:
+    name: Bout en bout (pile Docker, Playwright, audit axe WCAG AA)
     runs-on: ubuntu-latest
     needs: [backend, frontend]
+    env:
+      SECRET_KEY: cle-ci-e2e-uniquement-0123456789abcdef0123
+      POSTGRES_PASSWORD: gg_ci_e2e
+      AUTH_RATE_LIMIT: "1000"   # chaque test crée un compte
     steps:
       - uses: actions/checkout@v4
-      - run: docker build -t greenguard-backend ./back_end
-      - run: docker build -t greenguard-frontend ./front_end
+      - name: Construire et démarrer la pile (db, backend, worker, frontend)
+        run: docker compose up --build -d
+      - name: Attendre l'API et le front
+        run: |
+          for i in $(seq 1 60); do
+            curl -sf http://localhost:8000/api/v1/health/ready && curl -sf http://localhost:3000/ >/dev/null && exit 0
+            sleep 2
+          done
+          docker compose logs; exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: front_end/package-lock.json
+      - working-directory: front_end
+        run: npm ci --no-audit --no-fund && npx playwright install --with-deps chromium
+      - working-directory: front_end
+        run: npm run test:e2e
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapport-playwright
+          path: front_end/playwright-report
+          retention-days: 7
+      - if: always()
+        run: docker compose down -v

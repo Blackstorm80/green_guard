@@ -38,3 +38,7 @@ inaturalist/
 .DS_Store
 Thumbs.db
 .idea/
+
+# Playwright
+front_end/test-results/
+front_end/playwright-report/
